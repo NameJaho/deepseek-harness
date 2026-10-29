@@ -14,8 +14,14 @@ DSH_PUBLIC_URL="${DSH_PUBLIC_URL:-https://test-hmwork.busyming.com/}"
 DSH_TRUSTED_HOST="${DSH_TRUSTED_HOST:-test-hmwork.busyming.com}"
 DSH_PID_FILE="${DSH_PID_FILE:-$DSH_BASE/dsh.pid}"
 DSH_STOP_TIMEOUT_SECONDS="${DSH_STOP_TIMEOUT_SECONDS:-90}"
-# 独立的 harness home，避免与公司 profile 的插件与会话数据混用。
-export DSH_HOME="${DSH_HOME:-$DSH_BASE/dsh-data}"
+# 独立的 harness home，避免继承公司 profile 的插件与会话数据。
+# Use DSH_TEST_HOME when a deployment needs a stable non-default location.
+DSH_INHERITED_HOME="${DSH_HOME-}"
+export DSH_HOME="${DSH_TEST_HOME:-$DSH_BASE/dsh-data}"
+if [[ -n "$DSH_INHERITED_HOME" && "$DSH_INHERITED_HOME" != "$DSH_HOME" ]]; then
+  printf '忽略继承的 DSH_HOME=%s；测试环境使用 DSH_HOME=%s（如需指定请使用 DSH_TEST_HOME）\n' \
+    "$DSH_INHERITED_HOME" "$DSH_HOME" >&2
+fi
 
 if [[ ! "$DSH_STOP_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
   printf 'DSH_STOP_TIMEOUT_SECONDS 必须是正整数\n' >&2
