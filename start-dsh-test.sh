@@ -12,6 +12,7 @@ DSH_HOST="${DSH_HOST:-127.0.0.1}"
 DSH_PORT="${DSH_PORT:-3080}"
 DSH_PUBLIC_URL="${DSH_PUBLIC_URL:-https://test-hmwork.busyming.com/}"
 DSH_TRUSTED_HOST="${DSH_TRUSTED_HOST:-test-hmwork.busyming.com}"
+DSH_PROFILE="${DSH_PROFILE:-test-web}"
 DSH_PID_FILE="${DSH_PID_FILE:-$DSH_BASE/dsh.pid}"
 DSH_STOP_TIMEOUT_SECONDS="${DSH_STOP_TIMEOUT_SECONDS:-90}"
 # 独立的 harness home，避免继承公司 profile 的插件与会话数据。
@@ -71,6 +72,34 @@ fi
 mkdir -p "$DSH_BASE"
 cd "$DSH_REPO"
 
+# Keep the test profile independent from a previously deployed company `web`
+# profile. A contaminated profile is retained as a timestamped backup before
+# the shipped official Web template recreates it.
+DSH_PROFILE_DIR="$DSH_HOME/profiles/$DSH_PROFILE"
+DSH_PROFILE_INIT=0
+if [[ ! -f "$DSH_PROFILE_DIR/package.json" ]]; then
+  DSH_PROFILE_INIT=1
+elif ! node - "$DSH_PROFILE_DIR/package.json" <<'NODE'
+const fs = require('node:fs')
+const path = process.argv[2]
+const manifest = JSON.parse(fs.readFileSync(path, 'utf8'))
+const bundles = manifest.dsh?.profile?.bundles
+const dependencies = Object.keys(manifest.dependencies ?? {})
+const expected = ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app']
+const official = Array.isArray(bundles)
+  && bundles.length === expected.length
+  && bundles.every((name, index) => name === expected[index])
+  && dependencies.length === 0
+process.exit(official ? 0 : 1)
+NODE
+then
+  DSH_PROFILE_BACKUP="$DSH_BASE/profile-backups/$DSH_PROFILE-$(date +%Y%m%d%H%M%S)"
+  mkdir -p "$(dirname "$DSH_PROFILE_BACKUP")"
+  mv "$DSH_PROFILE_DIR" "$DSH_PROFILE_BACKUP"
+  printf '检测到非官方测试 profile，已备份到：%s\n' "$DSH_PROFILE_BACKUP" >&2
+  DSH_PROFILE_INIT=1
+fi
+
 if [[ "${DSH_SKIP_INSTALL:-0}" != "1" ]]; then
   corepack pnpm install --frozen-lockfile
 fi
@@ -78,7 +107,11 @@ if [[ "${DSH_SKIP_BUILD:-0}" != "1" ]]; then
   DSH_GATE_CONCURRENCY="${DSH_GATE_CONCURRENCY:-2}" corepack pnpm run build
 fi
 
-DSH_COMMAND=(corepack pnpm dsh web --no-open --host "$DSH_HOST" --port "$DSH_PORT")
+DSH_COMMAND=(corepack pnpm dsh --profile "$DSH_PROFILE")
+if [[ "$DSH_PROFILE_INIT" == "1" ]]; then
+  DSH_COMMAND+=(--from-default-profile web)
+fi
+DSH_COMMAND+=(--no-open --host "$DSH_HOST" --port "$DSH_PORT")
 if [[ -n "$DSH_PUBLIC_URL" ]]; then
   DSH_COMMAND+=(--public-url "$DSH_PUBLIC_URL")
 fi
