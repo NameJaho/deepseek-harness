@@ -6,9 +6,10 @@
  *
  * Security has one home, here. Every route asks the composition's
  * `connection` service for a rejection first (`requestRejection`): its
- * Host/Origin fence defeats DNS rebinding and cross-site calls, and its
- * browser authentication (the login-token cookie) gates every caller before
- * any resolution result, icon, or launch is reachable. On top of that fence
+ * Host/Origin fence defeats DNS rebinding and cross-site calls. Authenticated
+ * non-owner callers receive an empty catalog, while icons and launches remain
+ * unavailable; Owner callers reach the resolved host applications. On top of
+ * that fence
  * the open route validates its body at the wire: an `application/json` media
  * type, a 64 KiB ceiling, string `app`/`path` fields, a resolved-available
  * catalog id, and an absolute path naming an existing directory.
@@ -78,6 +79,8 @@ export const Config: z<Config> = z.object({
 /** Trust surface consumed here; the browser-side connection package owns the full type. */
 interface OpenInAppConnection {
   requestRejection(request: { readonly headers: IncomingMessage['headers'] }): 401 | 403 | undefined
+  admit?: (request: { readonly headers: IncomingMessage['headers'] }) =>
+    { readonly peer: { readonly principal: { readonly kind: string } } } | { readonly rejection: 401 | 403 }
 }
 
 /** The composition's connection service (typed locally: its package is browser-side). */
@@ -181,10 +184,18 @@ export function apply(ctx: Context, config: Config): void {
     map.set(app.id, fresh)
     return fresh
   }
-  /** Answer an untrusted/unauthenticated request; true when it was rejected. */
-  const rejected = (req: IncomingMessage, res: ServerResponse): boolean => {
-    const rejection = connectionOf(ctx).requestRejection(req)
+  /** Answer a route request; non-owner catalog reads intentionally return no local apps. */
+  const rejected = (req: IncomingMessage, res: ServerResponse, nonOwnerRead?: () => void): boolean => {
+    const connection = connectionOf(ctx)
+    const rejection = connection.requestRejection(req)
     if (rejection === undefined) return false
+    if (rejection === 403 && req.method === 'GET' && nonOwnerRead !== undefined) {
+      const admission = connection.admit?.(req)
+      if (admission !== undefined && 'peer' in admission && admission.peer.principal.kind !== 'owner') {
+        nonOwnerRead()
+        return true
+      }
+    }
     res.statusCode = rejection
     res.end()
     return true
@@ -194,7 +205,7 @@ export function apply(ctx: Context, config: Config): void {
     kind: 'exact',
     path: OPEN_IN_APP_APPS_PATH,
     handler: async (req, res) => {
-      if (rejected(req, res)) return
+      if (rejected(req, res, () => sendJson(res, 200, { apps: [] }))) return
       if (req.method !== 'GET') {
         sendMethodNotAllowed(res, 'GET')
         return

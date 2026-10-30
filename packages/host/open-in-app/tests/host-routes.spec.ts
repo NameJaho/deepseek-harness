@@ -30,7 +30,10 @@ import type { OpenInAppLauncher } from '../src/resolver.ts'
 let root: string | undefined
 let context: Context | undefined
 /** Answer the connection stub gives every route until a test changes it. */
-const trust: { rejection: 401 | 403 | undefined } = { rejection: undefined }
+const trust: {
+  rejection: 401 | 403 | undefined
+  principal: 'owner' | 'wecom-user'
+} = { rejection: undefined, principal: 'owner' }
 
 afterEach(async () => {
   await context?.fiber.dispose()
@@ -39,6 +42,7 @@ afterEach(async () => {
   root = undefined
   internals.catalog = {}
   trust.rejection = undefined
+  trust.principal = 'owner'
   vi.unstubAllEnvs()
 })
 
@@ -68,7 +72,14 @@ async function boot(layers: readonly LaunchEnvironmentLayerInput[] = []): Promis
   context = new Context()
   context.provide(DSH_LAUNCH_ENVIRONMENT_KEY, createLaunchEnvironmentSnapshot(layers))
   context.baseUrl = pathToFileURL(root).href + '/'
-  context.provide('connection', { requestRejection: () => trust.rejection } as never)
+  context.provide('connection', {
+    requestRejection: () => trust.rejection,
+    admit: () => trust.rejection === undefined
+      ? { peer: { principal: { kind: trust.principal } } }
+      : trust.principal === 'wecom-user'
+        ? { peer: { principal: { kind: trust.principal } } }
+        : { rejection: trust.rejection },
+  } as never)
   // The plugin resolves PATH names through the composition's subprocess
   // capability; the not-found rejection is the provider's real signal.
   context.provide('subprocess', {
@@ -179,12 +190,17 @@ describe('open-in-app host routes (real Loader composition)', () => {
     trust.rejection = 403
     expect((await fetch(`${base}/open-in-app/apps`)).status).toBe(403)
     expect((await fetch(`${base}/open-in-app/icon/finder`)).status).toBe(403)
+    trust.principal = 'wecom-user'
+    const memberApps = await fetch(`${base}/open-in-app/apps`)
+    expect(memberApps.status).toBe(200)
+    expect(await memberApps.json()).toEqual({ apps: [] })
     expect((await fetch(`${base}/open-in-app/open`, { method: 'POST' })).status).toBe(403)
     // Rejected requests never reached the lazy catalog resolution.
     expect(run).not.toHaveBeenCalled()
     trust.rejection = 401
     expect((await fetch(`${base}/open-in-app/apps`)).status).toBe(401)
     trust.rejection = undefined
+    trust.principal = 'owner'
     expect((await fetch(`${base}/open-in-app/apps`)).status).toBe(200)
   })
 
