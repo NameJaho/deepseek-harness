@@ -9,7 +9,7 @@ English | [中文](guide.zh.md)
 
 ## Change
 
-WeCom members no longer create or browse host directories. Each member receives one private `default` Workspace under the server-managed root, and the browser hides its filesystem path. The member Remote policy now grants the settings, model, plugin inventory, plugin manager, and plugin market endpoints required by the existing UI. The login projection also exposes the member name, user ID, corporation ID, and a reserved `admin`/`user` role.
+WeCom members no longer create or browse host directories. Each member receives one private `default` Workspace under the server-managed root, and the browser hides its filesystem path. The member Remote policy now grants the settings, model, Agent preset, plugin inventory, plugin manager, and plugin market endpoints required by the existing UI. The login projection also exposes the member name, user ID, corporation ID, and a reserved `admin`/`user` role.
 
 ## Migration
 

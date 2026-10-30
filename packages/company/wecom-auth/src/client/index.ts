@@ -9,7 +9,7 @@ import { z } from 'zod'
 import { WecomAccount } from './account.tsx'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
-  interface LocaleNamespaceMap { 'company.wecomAuth': 'account' }
+  interface LocaleNamespaceMap { 'company.wecomAuth': 'account' | 'admin' | 'user' }
 }
 
 /** Services used for account navigation and reconnection. */

@@ -9,7 +9,8 @@ const text = z.string().min(1).max(16384)
 const ids = z.array(z.number().int().positive())
 // `status: 1` already excludes disabled members; `enable` is checked only when the API returns it.
 const memberSchema = z.object({
-  userid: text, name: text.optional(), department: ids, enable: z.literal(1).optional(), status: z.literal(1),
+  userid: text, name: text.optional(), nickname: text.optional(), alias: text.optional(), department: ids,
+  enable: z.literal(1).optional(), status: z.literal(1),
 })
 const appSchema = z.object({
   agentid: z.number().int().positive(),
@@ -54,8 +55,9 @@ export class WecomOfficial {
       app.data.allow_partys?.partyid ?? [], app.data.allow_tags?.tagid ?? [])) {
       throw new WecomAuthError('wecom-auth/forbidden', 403)
     }
+    const displayName = member.data.name ?? member.data.nickname ?? member.data.alias
     return { corpId: brandString<WecomCorpId>(this.config.corpId), userId: brandString<WecomUserId>(member.data.userid),
-      ...member.data.name === undefined ? {} : { displayName: member.data.name },
+      ...displayName === undefined ? {} : { displayName },
       departments: member.data.department.map(String) }
   }
 

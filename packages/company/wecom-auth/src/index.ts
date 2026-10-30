@@ -294,13 +294,14 @@ export class CompanyWecomAuthService extends Service {
       'session/observeProjections', 'session/observeState', 'session/page', 'session/prompt',
       'session/attachment',
       'session/projections', 'session/rename', 'session/selectModel', 'session/state', 'session/updateQueue',
-      'session/wait', 'skills/list', 'toolResults/watch', 'workspaceFiles/read', 'workspaceFiles/readBytes',
+      'session/wait', 'agentPresets/select', 'skills/list', 'toolResults/watch', 'workspaceFiles/read', 'workspaceFiles/readBytes',
       'workspaceFiles/stat', 'workspaceFiles/list', 'workspaceFiles/changes',
       'event:api-session/activity', 'event:api-session/added', 'event:api-session/error',
       'event:api-session/removed', 'event:api-session/status',
     ]
     const bindings: RemoteAccessBinding[] = [{
       role: { name: 'wecom:global', resource: 'global', actions: [
+        'agentPresets/list', 'agentPresets/read', 'agentPresets/select',
         'credentials/describe', 'credentials/set', 'credentials/unset',
         'dynamicCordisRunner/inventory', 'dynamicCordisRunner/syncInspectManifest',
         'llm/discoverModels', 'llm/listProviders', 'llm/listConfigurableProviders',
@@ -315,6 +316,7 @@ export class CompanyWecomAuthService extends Service {
         'session/canOpenWorkspacePath', 'session/control', 'session/create', 'session/list', 'session/modelCatalog',
         'session/search', 'workspace/follow',
         'event:settings/document-updated', 'event:credentials/reference-updated', 'event:credentials/record-updated',
+        'event:agent-preset/selected',
         'event:llm/adapters-updated', 'event:llm/models-updated', 'event:permission-presets/catalog-changed',
         'event:plugin-manager/changed', 'event:plugin-manager/install-log', 'event:plugin-manager/install-state',
         'event:plugin-manager/update-state', 'event:plugin-market/changed',
