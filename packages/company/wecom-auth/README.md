@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-This opt-in layer lets visible members of a self-built WeCom application sign in to the Web site. WeCom browsers use silent OAuth; desktop browsers receive an official QR panel. The test deployment launcher applies this layer and denies Owner launch credentials. The server verifies application visibility before issuing a local session.
+This opt-in layer lets visible members of a self-built WeCom application sign in to the Web site. WeCom browsers use silent OAuth; desktop browsers receive an official QR panel in the enterprise portal's branded layout, with a packaged background image and a responsive single-column layout on narrow screens. Only QR sign-in is offered; password and verification-code sign-in are not configured. The test deployment launcher applies this layer and denies Owner launch credentials. The server verifies application visibility before issuing a local session.
 
 ## Table of Contents
 
