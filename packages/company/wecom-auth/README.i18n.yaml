@@ -15,20 +15,29 @@
   en: 76368b6b1da79c80
   zh: 20d3097b9bcc8b72
 /deepseek-ai-dsh-company-wecom-auth/use-this-package:
-  en: 5aa53d34804ea22e
-  zh: 00bd46ca14ef084e
+  en: 8e49de79ca629e41
+  zh: 53fa8fd009f1b03c
 /deepseek-ai-dsh-company-wecom-auth/understand-the-implementation:
-  en: 1dff114849c1b18b
-  zh: 186ed466480ad99a
+  en: 80afd617da212ccf
+  zh: 0bac49f008a458fa
 /deepseek-ai-dsh-company-wecom-auth/model-experience:
-  en: 209fb533d1d96014
-  zh: 63f3b622da9ad3bb
-/deepseek-ai-dsh-company-wecom-auth/model-experience/kv-cache-effect:
-  en: b170dd17c47c6cde
-  zh: 8f203e64329e49a8
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-company-wecom-auth/model-experience/authentication:
+  en: cc84445df013ed33
+  zh: c42364a52665ace1
+/deepseek-ai-dsh-company-wecom-auth/model-experience/authentication/what-the-model-sees:
+  en: c59f742ab745ea97
+  zh: 7f421cfc62bd2e98
+/deepseek-ai-dsh-company-wecom-auth/model-experience/authentication/token-effect:
+  en: 1f356c44a0964bf8
+  zh: 58fcd25b0929c34e
+/deepseek-ai-dsh-company-wecom-auth/model-experience/authentication/kv-cache-effect:
+  en: 032dcb65a3a09e62
+  zh: a66d37490061d11b
 /deepseek-ai-dsh-company-wecom-auth/known-limitations-and-deferred-work:
-  en: 73684a5b5b1f296c
-  zh: 62e9cf84bfa80c24
+  en: c54f996cf131527c
+  zh: bf7ad1ffa6c4d392
 /deepseek-ai-dsh-company-wecom-auth/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 8ec3e73528ddb1a6

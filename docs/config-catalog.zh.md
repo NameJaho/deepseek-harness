@@ -460,7 +460,7 @@ export type Config = LocalConfig
 ## `@deepseek-ai/dsh-client-connection`
 
 - `inject`: `credentials`
-- `source`: [`packages/client/connection/src/index.ts:96`](../packages/client/connection/src/index.ts)
+- `source`: [`packages/client/connection/src/index.ts:100`](../packages/client/connection/src/index.ts)
 
 ```ts config-catalog
 /** Browser authentication, request limits, and connection recovery configuration. */
@@ -478,6 +478,8 @@ export interface ConnectionConfig {
   cookieMaxAgeDays?: number
   /** Maximum buffered JSON body for every `/api` request. Default: 300 MiB. */
   maxRequestBodyBytes?: number
+  /** Deny built-in Owner credentials even when no browser provider is available. */
+  requireBrowserLogin?: boolean
 }
 
 /** Timing for generation readiness and automatic reconnection. */
@@ -794,6 +796,39 @@ export interface ToolResultPruneConfig {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-compaction-tool-result-pruner -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-company-wecom-auth -->
+<a id="deepseek-aidsh-company-wecom-auth"></a>
+
+## `@deepseek-ai/dsh-company-wecom-auth`
+
+- `inject`: `credentials` · `storageDomain` · `connection` · `webServer`
+- `source`: [`packages/company/wecom-auth/src/config.ts:5`](../packages/company/wecom-auth/src/config.ts)
+
+```ts config-catalog
+/** Public identifiers and limits; the app secret is read exclusively from the server environment. */
+export interface Config {
+  /** WeCom corporation identifier used by the self-built application. */
+  corpId: string
+  /** Numeric self-built application agent identifier. */
+  agentId: string
+  /** Bare HTTPS origin exposed by the reverse proxy. */
+  publicOrigin: string
+  /** Lifetime of a signed local browser session in milliseconds. */
+  sessionTtlMs: number
+  /** Lifetime of a browser-bound OAuth attempt in milliseconds. */
+  loginAttemptTtlMs: number
+  /** Maximum number of active login attempts, including in-flight exchanges. */
+  maxLoginAttempts: number
+  /** Timeout for one official WeCom API request in milliseconds. */
+  requestTimeoutMs: number
+  /** Maximum response body size accepted from an official API in bytes. */
+  maxResponseBytes: number
+  /** Root directory under which each member receives one private default Workspace. */
+  workspaceRoot?: string
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-company-wecom-auth -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-cordis-host-runner -->
 <a id="deepseek-aidsh-cordis-host-runner"></a>

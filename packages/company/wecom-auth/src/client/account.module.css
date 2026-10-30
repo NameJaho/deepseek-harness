@@ -1,0 +1,15 @@
+.action {
+  width: 100%;
+  min-width: 0;
+}
+
+.action[data-wide='true'] {
+  justify-content: flex-start;
+}
+
+.label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

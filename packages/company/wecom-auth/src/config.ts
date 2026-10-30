@@ -3,14 +3,24 @@ import z from '@deepseek-ai/schemastery'
 
 /** Public identifiers and limits; the app secret is read exclusively from the server environment. */
 export interface Config {
+  /** WeCom corporation identifier used by the self-built application. */
   corpId: string
+  /** Numeric self-built application agent identifier. */
   agentId: string
+  /** Bare HTTPS origin exposed by the reverse proxy. */
   publicOrigin: string
+  /** Lifetime of a signed local browser session in milliseconds. */
   sessionTtlMs: number
+  /** Lifetime of a browser-bound OAuth attempt in milliseconds. */
   loginAttemptTtlMs: number
+  /** Maximum number of active login attempts, including in-flight exchanges. */
   maxLoginAttempts: number
+  /** Timeout for one official WeCom API request in milliseconds. */
   requestTimeoutMs: number
+  /** Maximum response body size accepted from an official API in bytes. */
   maxResponseBytes: number
+  /** Root directory under which each member receives one private default Workspace. */
+  workspaceRoot?: string
 }
 
 /** Loader validation; enabled deployments must provide identifiers and a public HTTPS origin. */
@@ -23,4 +33,5 @@ export const Config: z<Config> = z.object({
   maxLoginAttempts: z.natural().min(1).default(1000),
   requestTimeoutMs: z.natural().min(1).default(15_000),
   maxResponseBytes: z.natural().min(1).default(1024 * 1024),
+  workspaceRoot: z.string(),
 })

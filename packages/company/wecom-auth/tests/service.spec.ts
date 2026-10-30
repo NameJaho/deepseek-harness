@@ -2,9 +2,13 @@
 import { request as httpRequest } from 'node:http'
 import { Context } from '@deepseek-ai/cordis'
 import Storage, { storageBackendServiceKey } from '@deepseek-ai/dsh-storage'
+import { brandString } from '@deepseek-ai/dsh-brand'
+import type { SessionId } from '@deepseek-ai/dsh-session'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import WebServer from '@deepseek-ai/dsh-host-webserver'
 import * as Connection from '@deepseek-ai/dsh-client-connection'
+import RemoteAccessService from '@deepseek-ai/dsh-api-remote-access'
+import WorkspaceRegistry from '@deepseek-ai/dsh-workspace'
 import { afterEach, expect, it, onTestFinished, vi } from 'vitest'
 import { MemoryCredentials } from '../../../credentials/credentials/tests/memory.ts'
 import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
@@ -51,7 +55,14 @@ async function fixture() {
   ctx.storage.backend.register('test', backend)
   ctx.provide(storageBackendServiceKey('test'), backend)
   await ctx.plugin(StorageDomain, { backend: 'test' })
+  const storedHeaders: Array<{
+    header: { version: 4; id: SessionId; createdAt: number; cwd: string; isSeeded: false }
+    revision: number
+  }> = []
+  ctx.provide('sessionPersistence', { list: async () => storedHeaders } as never)
+  await ctx.plugin(WorkspaceRegistry)
   await ctx.plugin(WebServer, { host: '127.0.0.1', port: 0 })
+  new RemoteAccessService(ctx)
   await ctx.plugin(Connection, { trustedHosts: ['login.example'], requireBrowserLogin: true })
   const fiber = ctx.plugin(Auth, config)
   await fiber
@@ -89,7 +100,7 @@ async function fixture() {
   }
   const exchange = (attempt: Awaited<ReturnType<typeof begin>>, state = attempt.attempt.state, binding = attempt.binding) => request(
     '/auth/wecom/callback?' + new URLSearchParams({ code: 'PRIVATE_CODE', state }), { headers: { cookie: binding } })
-  return { ctx, fiber, request, begin, exchange, warnings, ...official }
+  return { ctx, fiber, request, begin, exchange, warnings, storedHeaders, ...official }
 }
 
 it('redirects protected root, offers desktop QR and automatically authorizes a WeCom browser', async () => {
@@ -159,6 +170,13 @@ it('establishes distinct member Peers and revokes sessions and streams on logout
   const admitted = f.ctx.connection.admit({ headers })
   if (!('peer' in admitted)) throw new Error('Expected member Peer')
   expect(admitted.peer.principal.kind).toBe('wecom-user')
+  const workspace = f.ctx.workspaceRegistry.list()[0]
+  expect(workspace?.title).toBe('default')
+  expect(workspace?.path).toContain('i-')
+  const grants = f.ctx.remoteAccess.snapshotFor(admitted.peer.principal)
+  expect(grants.type).toBe('baseline')
+  if (grants.type !== 'baseline' || grants.owner) throw new Error('Expected member access baseline')
+  expect(grants.grants.some(grant => grant.resource.kind === 'workspace' && grant.resource.id === workspace?.id)).toBe(true)
   expect(f.ctx.connection.admit({ headers })).toEqual(admitted)
   expect(f.ctx.connection.requestRejection({ headers })).toBe(403)
   expect((await f.request('/', { headers: { cookie } })).status).toBe(200)
@@ -170,6 +188,65 @@ it('establishes distinct member Peers and revokes sessions and streams on logout
   expect(logout.status).toBe(200)
   expect(admitted.peer.signal.aborted).toBe(true)
   expect(f.ctx.connection.admit({ headers })).toEqual({ rejection: 401 })
+})
+
+
+it('isolates each member to one default Workspace and its Sessions', async () => {
+  const f = await fixture()
+  const first = await f.exchange(await f.begin())
+  const firstCookie = first.headers.getSetCookie()[0]?.split(';')[0]
+  if (firstCookie === undefined) throw new Error('Missing first member session cookie')
+  const firstWorkspace = f.ctx.workspaceRegistry.list()[0]
+  if (firstWorkspace === undefined) throw new Error('Missing first member Workspace')
+  const firstSessionId = brandString<SessionId>('session-wecom-first')
+  f.storedHeaders.push({
+    header: { version: 4, id: firstSessionId, createdAt: Date.now(), cwd: firstWorkspace.path, isSeeded: false }, revision: 1,
+  })
+  await firstWorkspace.attachSession(firstSessionId)
+
+  f.overrides.set('/auth/getuserinfo', { userid: 'other', user_ticket: 'PRIVATE_TICKET' })
+  f.overrides.set('/user/get', { userid: 'other', name: 'Other', department: [3], status: 1 })
+  f.overrides.set('/agent/get', { agentid: 1000239, allow_userinfos: { user: [{ userid: 'other' }] } })
+  const second = await f.exchange(await f.begin())
+  const secondCookie = second.headers.getSetCookie()[0]?.split(';')[0]
+  if (secondCookie === undefined) throw new Error('Missing second member session cookie')
+  const workspaces = f.ctx.workspaceRegistry.list()
+  expect(workspaces).toHaveLength(2)
+  const secondWorkspace = workspaces.find(workspace => workspace.id !== firstWorkspace.id)
+  if (secondWorkspace === undefined) throw new Error('Missing second member Workspace')
+  const secondSessionId = brandString<SessionId>('session-wecom-second')
+  f.storedHeaders.push({
+    header: { version: 4, id: secondSessionId, createdAt: Date.now(), cwd: secondWorkspace.path, isSeeded: false }, revision: 2,
+  })
+  await secondWorkspace.attachSession(secondSessionId)
+
+  const firstRequest = { headers: { host: 'login.example', cookie: firstCookie } }
+  const secondRequest = { headers: { host: 'login.example', cookie: secondCookie } }
+  const firstPeer = f.ctx.connection.admit(firstRequest)
+  const secondPeer = f.ctx.connection.admit(secondRequest)
+  if (!('peer' in firstPeer) || !('peer' in secondPeer)) throw new Error('Expected both member Peers')
+  const firstPrincipal = firstPeer.peer.principal
+  const secondPrincipal = secondPeer.peer.principal
+  const firstSnapshot = f.ctx.remoteAccess.snapshotFor(firstPrincipal)
+  const secondSnapshot = f.ctx.remoteAccess.snapshotFor(secondPrincipal)
+  expect(firstSnapshot.type).toBe('baseline')
+  expect(secondSnapshot.type).toBe('baseline')
+  if (firstSnapshot.type !== 'baseline' || secondSnapshot.type !== 'baseline' || firstSnapshot.owner || secondSnapshot.owner) {
+    throw new Error('Expected non-owner access baselines')
+  }
+  expect(firstSnapshot.grants).toEqual(expect.arrayContaining([
+    { resource: { kind: 'workspace', id: firstWorkspace.id }, actions: expect.any(Array) },
+    { resource: { kind: 'session', id: firstSessionId }, actions: expect.any(Array) },
+  ]))
+  expect(firstSnapshot.grants).not.toEqual(expect.arrayContaining([
+    { resource: { kind: 'workspace', id: secondWorkspace.id }, actions: expect.any(Array) },
+    { resource: { kind: 'session', id: secondSessionId }, actions: expect.any(Array) },
+  ]))
+  expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'workspace/follow', resources: [{ kind: 'workspace', id: secondWorkspace.id }] })).toEqual({ kind: 'deny', reason: 'no-allow' })
+  expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'session/control', resources: [{ kind: 'session', id: secondSessionId }] })).toEqual({ kind: 'deny', reason: 'no-allow' })
+  expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'session/create', resources: [{ kind: 'global' }], args: { request: { workspaceId: secondWorkspace.id } } })).toEqual({ kind: 'deny', reason: 'workspace-not-owned' })
+  expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'session/create', resources: [{ kind: 'global' }], args: { request: { cwd: secondWorkspace.path } } })).toEqual({ kind: 'deny', reason: 'cwd-not-allowed' })
+  expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'session/create', resources: [{ kind: 'workspace', id: firstWorkspace.id }], args: { request: { workspaceId: firstWorkspace.id } } })).toEqual({ kind: 'allow' })
 })
 
 it('keeps required admission closed after provider disposal and rejects Owner launch credentials', async () => {

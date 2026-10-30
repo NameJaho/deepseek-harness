@@ -1,11 +1,17 @@
 /** Official WeCom login and durable credential-free browser sessions. */
 import { randomBytes, randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { isAbsolute, join } from 'node:path'
+import { mkdir } from 'node:fs/promises'
 import { Service, type Context } from '@deepseek-ai/cordis'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { credentialKey } from '@deepseek-ai/dsh-credentials'
 import type { BrowserPrincipalRegistration, BrowserSessionKey, ConnectionTrustRequest } from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
+import type {} from '@deepseek-ai/dsh-api-remote-access'
+import type { RemoteAccessAction, RemoteAccessBinding, RemoteAccessCondition, RemoteAccessDecision } from '@deepseek-ai/dsh-api-remote-access/types'
+import type {} from '@deepseek-ai/dsh-workspace'
+import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
 import { z } from 'zod'
 import { Config } from './config.ts'
@@ -38,6 +44,7 @@ export class CompanyWecomAuthService extends Service {
   static inject = ['credentials', 'storageDomain', 'connection', 'webServer']
   static Config = Config
   private readonly config: Config
+  private readonly workspaceRoot: string
   private readonly lifetime = new AbortController()
   private readonly upstream: WecomOfficial
   private state: State | undefined
@@ -46,6 +53,7 @@ export class CompanyWecomAuthService extends Service {
   private readonly consuming = new Set<WecomLoginAttemptId>()
   private pendingAttempts = 0
   private readonly revoked = new Set<WecomSessionId>()
+  private readonly workspaces = new Map<WecomIdentityId, Workspace>()
   private timer: ReturnType<typeof setTimeout> | undefined
 
   /** @param owner - Host HTTP, cookie-key and domain providers.
@@ -54,7 +62,11 @@ export class CompanyWecomAuthService extends Service {
    */
   constructor(private readonly owner: Context, config: Config) {
     super(owner, 'companyWecomAuth')
-    this.config = Config(config)
+    this.config = Config({ ...config, workspaceRoot: config.workspaceRoot ?? join(process.cwd(), '.dsh-wecom-workspaces') })
+    if (this.config.workspaceRoot === undefined || !isAbsolute(this.config.workspaceRoot)) {
+      throw new Error('wecom-auth: workspaceRoot must be an absolute path')
+    }
+    this.workspaceRoot = this.config.workspaceRoot
     const origin = new URL(this.config.publicOrigin)
     if (origin.protocol !== 'https:' || origin.username !== '' || origin.password !== '' || origin.pathname !== '/'
       || origin.search !== '' || origin.hash !== '') throw new Error('wecom-auth: publicOrigin must be a bare HTTPS origin')
@@ -87,6 +99,17 @@ export class CompanyWecomAuthService extends Service {
       }
       this.state = { domain, secret: Buffer.from(parsed.data.secret, 'base64url') }
     } catch (error) { await domain.close(); throw error }
+    const remoteAccess = this.owner.get('remoteAccess')
+    const workspaceRegistry = this.owner.get('workspaceRegistry')
+    if (remoteAccess !== undefined && workspaceRegistry !== undefined) {
+      for (const [, identity] of this.state.domain.table('identities').entries()) {
+        if (identity.enabled && identity.corpId === this.config.corpId) await this.ensureWorkspace(identity.id)
+      }
+      remoteAccess.registerPolicy('wecom-user', { bindings: principal => this.bindings(principal.identityId) })
+      this.owner.on('domain/changed', (change) => {
+        if (change.domain === 'workspace') remoteAccess.invalidate()
+      })
+    }
     this.registration = this.owner.connection.registerBrowserPrincipalProvider({
       loginPath: '/login', requireLogin: true,
       authenticate: (request) => {
@@ -101,8 +124,8 @@ export class CompanyWecomAuthService extends Service {
     this.owner.on('webserver/index-inject', (table, peer) => {
       if (peer.principal.kind !== 'wecom-user') return
       const identity = this.state?.domain.table('identities').get(peer.principal.identityId)
-      if (identity !== undefined) table.push({ kind: 'global', name: '__DSH_WECOM_MEMBER__', value: {
-        corpId: identity.corpId, userId: identity.userId, displayName: identity.displayName,
+      if (identity !== undefined) table.push({ kind: 'global', name: '__DSH_WECOM_SESSION__', value: {
+        identityId: identity.id, corpId: identity.corpId, userId: identity.userId, displayName: identity.displayName,
       } })
     })
     for (const path of ['/login', '/auth/wecom/callback', '/auth/wecom/logout', '/auth/me']) {
@@ -178,10 +201,12 @@ export class CompanyWecomAuthService extends Service {
     const id = brandString<WecomSessionId>(`s-${randomUUID()}`)
     const session: WecomSessionRecord = { id, identityId, agentId: this.config.agentId, browserAuthority: this.config.publicOrigin,
       issuedAt: now, expiresAt: now + this.config.sessionTtlMs, lastSeenAt: now }
+    await this.ensureWorkspace(identityId)
     const previous = this.current(request)
     if (previous !== undefined) await this.revoke(previous)
     await state.domain.table('identities').put(identityId, identity)
     await state.domain.table('sessions').put(id, session)
+    this.owner.get('remoteAccess')?.invalidate()
     this.scheduleExpiry()
     return { session: { identityId, ...login, expiresAt: session.expiresAt }, redirect,
       cookie: cookieHeader(SESSION_COOKIE, signCookie({ version: 1, sessionId: id, authority: this.config.publicOrigin,
@@ -223,8 +248,97 @@ export class CompanyWecomAuthService extends Service {
     return identity?.enabled === true && identity.corpId === this.config.corpId ? session : undefined
   }
 
+  /** Ensure one durable default Workspace exists for a member. */
+  private async ensureWorkspace(identityId: WecomIdentityId): Promise<Workspace | undefined> {
+    const registry = this.owner.get('workspaceRegistry')
+    if (registry === undefined) return undefined
+    const existing = this.workspaces.get(identityId)
+    if (existing !== undefined && registry.get(existing.id) !== undefined) return existing
+    const path = join(this.workspaceRoot, identityId)
+    await mkdir(path, { recursive: true, mode: 0o700 })
+    const workspace = await registry.create(path, 'default')
+    this.workspaces.set(identityId, workspace)
+    return workspace
+  }
+
+  /** Compute all Remote grants for one authenticated member. */
+  private bindings(identityId: WecomIdentityId): readonly RemoteAccessBinding[] {
+    const state = this.state
+    const identity = state?.domain.table('identities').get(identityId)
+    if (state === undefined) return []
+    if (identity?.enabled !== true || identity.corpId !== this.config.corpId
+      || ![...state.domain.table('sessions').entries()].some(([id, session]) => session.identityId === identityId
+        && session.agentId === this.config.agentId && session.browserAuthority === this.config.publicOrigin
+        && !this.revoked.has(id) && session.revokedAt === undefined && session.expiresAt > Date.now())) return []
+    const workspace = this.workspaces.get(identityId)
+    if (workspace === undefined || this.owner.get('workspaceRegistry')?.get(workspace.id) === undefined) return []
+    const sessionIds = [...workspace.sessionIds]
+    const actions: readonly RemoteAccessAction[] = [
+      'commands/list', 'fileUploads/upload', 'goals/get', 'session/list', 'session/search', 'session/control',
+      'session/create', 'workspace/follow', 'workspace/archiveSession', 'workspace/unarchiveSession',
+      'workspace/pinSession', 'workspace/unpinSession', 'workspace/insertSessionBefore',
+      'session/cancel', 'session/events', 'session/follow', 'session/fork', 'session/observeEvent',
+      'session/observeProjections', 'session/observeState', 'session/page', 'session/prompt',
+      'session/attachment',
+      'session/projections', 'session/rename', 'session/selectModel', 'session/state', 'session/updateQueue',
+      'session/wait', 'skills/list', 'toolResults/watch', 'workspaceFiles/read', 'workspaceFiles/readBytes',
+      'workspaceFiles/stat', 'workspaceFiles/list', 'workspaceFiles/changes',
+      'event:api-session/activity', 'event:api-session/added', 'event:api-session/error',
+      'event:api-session/removed', 'event:api-session/status',
+    ]
+    const bindings: RemoteAccessBinding[] = [{
+      role: { name: 'wecom:global', resource: 'global', actions: [
+        'dynamicCordisRunner/inventory', 'dynamicCordisRunner/syncInspectManifest',
+        'permissionPresets/catalog',
+        'session/canOpenWorkspacePath', 'session/control', 'session/create', 'session/list', 'session/modelCatalog',
+        'session/search', 'workspace/follow', 'llm/listProviders', 'llm/listConfigurableProviders',
+        'settings/document-updated', 'credentials/reference-updated', 'credentials/record-updated',
+        'llm/adapters-updated', 'llm/models-updated', 'permission-presets/catalog-changed',
+      ] },
+      resource: { kind: 'global' },
+      condition: ({ action, args }: Parameters<RemoteAccessCondition<'global'>>[0]): RemoteAccessDecision =>
+        action === 'session/create' ? this.canCreateSession(workspace, args) : { kind: 'allow' },
+    }]
+    for (const id of sessionIds) {
+      bindings.push({ role: { name: 'wecom:session', resource: 'session', actions }, resource: { kind: 'session', id } })
+      bindings.push({
+        role: { name: 'wecom:commands', resource: 'session', actions: ['commands/execute'] },
+        resource: { kind: 'session', id },
+        condition: ({ args }: Parameters<RemoteAccessCondition<'session'>>[0]): RemoteAccessDecision =>
+          args === undefined || (typeof args.line === 'string' && /^\/(?:permission|compact|goal|plan)(?:\s|$)/u.test(args.line))
+            ? { kind: 'allow' } : { kind: 'deny', reason: 'command-not-granted' },
+      })
+    }
+    bindings.push({
+      role: { name: 'wecom:workspace', resource: 'workspace', actions: [
+        'workspace/follow', 'workspace/insertSessionBefore', 'session/create',
+      ] },
+      resource: { kind: 'workspace', id: workspace.id },
+      condition: ({ action, args }: Parameters<RemoteAccessCondition<'workspace'>>[0]): RemoteAccessDecision =>
+        action === 'session/create' ? this.canCreateSession(workspace, args) : { kind: 'allow' },
+    })
+    return bindings
+  }
+
+  private canCreateSession(workspace: Workspace, args: Readonly<Record<string, unknown>> | undefined): RemoteAccessDecision {
+    if (args === undefined) return { kind: 'allow' }
+    const request = args.request
+    if (typeof request !== 'object' || request === null || Array.isArray(request)) {
+      return { kind: 'deny', reason: 'invalid-request' }
+    }
+    const input = request as { readonly workspaceId?: string; readonly cwd?: string; readonly sessionId?: string }
+    if (input.cwd !== undefined) return { kind: 'deny', reason: 'cwd-not-allowed' }
+    if (input.workspaceId !== workspace.id) return { kind: 'deny', reason: 'workspace-not-owned' }
+    const sessionId = input.sessionId
+    if (sessionId !== undefined && !workspace.sessionIds.some(id => String(id) === String(sessionId))) {
+      return { kind: 'deny', reason: 'session-not-owned' }
+    }
+    return { kind: 'allow' }
+  }
+
   private async revoke(session: WecomSessionRecord): Promise<void> {
     this.revoked.add(session.id)
+    this.owner.get('remoteAccess')?.invalidate()
     await this.registration?.revoke(brandString<BrowserSessionKey>(session.id))
     await this.requireState().domain.table('sessions').put(session.id, { ...session, revokedAt: session.revokedAt ?? Date.now() })
   }

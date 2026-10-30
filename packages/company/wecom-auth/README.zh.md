@@ -24,7 +24,7 @@ kind: "package-bundle"
 <a id="use-this-package"></a>
 ## 使用本包
 
-仓库的 `start-dsh-test.sh` 将 `cordis.patch.yml` 应用到独立 Web profile。其他部署可设置 `DSH_WECOM_CORP_ID`、`DSH_WECOM_AGENT_ID` 和 `DSH_PUBLIC_URL`。启动器默认使用 CorpId `ww2ec793812513c257`、AgentId `1000239` 和 `https://test-hmwork.busyming.com/`。插件要求纯 HTTPS origin，并在 origin 根路径提供认证。
+仓库的 `start-dsh-test.sh` 将 `cordis.patch.yml` 应用到独立 Web profile。其他部署可设置 `DSH_WECOM_CORP_ID`、`DSH_WECOM_AGENT_ID`、`DSH_PUBLIC_URL`，以及需要时设置 `DSH_WECOM_WORKSPACE_ROOT`。启动器默认使用 CorpId `ww2ec793812513c257`、AgentId `1000239`、`https://test-hmwork.busyming.com/` 和 `$DSH_BASE/workspaces`。插件要求纯 HTTPS origin，并在 origin 根路径提供认证。
 
 仅在服务端进程环境中设置 `DSH_WECOM_APP_SECRET`，使用轮换后的自建应用 Secret。不得放入 YAML、profile、浏览器代码、命令行参数或日志。插件配置没有 Secret 字段。缺失 Secret 或标识符非法会拒绝激活；启动器在没有 Secret 时拒绝启动。
 
@@ -32,7 +32,7 @@ kind: "package-bundle"
 
 `GET /login?redirect=/path` 开始登录。`GET /auth/me` 返回当前成员或 401。`POST /auth/wecom/logout` 要求公网 `Origin` 和 `X-DSH-Auth: 1`，撤销本地会话并清除 cookie。外部重定向值变为 `/`；合法路径和查询参数在登录后保留，凭据参数除外。
 
-此层设置 Connection 的 `requireBrowserLogin: true`。Owner 浏览器 cookie、根路径启动令牌和 `/connect` 凭据均不能接纳公网调用方，即使登录提供方卸载也不会恢复。成员 principal 保持 `wecom-user`，不是 Owner；业务 Remote 权限必须通过独立的显式策略授予。
+此层设置 Connection 的 `requireBrowserLogin: true`。Owner 浏览器 cookie、根路径启动令牌和 `/connect` 凭据均不能接纳公网调用方，即使登录提供方卸载也不会恢复。每个成员都会在 `DSH_WECOM_WORKSPACE_ROOT` 下获得一个持久的 `default` Workspace；Remote 列表和命令只会返回该 Workspace 及其中的会话，`session/create` 也会拒绝其他 Workspace 或原始 `cwd`。成员 principal 保持 `wecom-user`，不是 Owner。
 
 -----
 
@@ -44,7 +44,7 @@ kind: "package-bundle"
 
 登录保存不可预测 state 的哈希及 HttpOnly 浏览器绑定的哈希。回调先预占并持久化消费 state，再调用官方 `gettoken` 和 `auth/getuserinfo`。提供方通过 `user/get` 验证活跃成员，再根据 `agent/get` 可见名单、`tag/get` 成员及 `department/list` 中的部门祖先验证可见范围。缺失字段、API 权限不足及上游错误均拒绝登录，不会将企业成员身份视为充分条件。
 
-提供方仅在服务端内存中缓存一个应用 access token，与成员会话相互独立。身份和会话记录没有应用 Secret、code 或 access token。凭据提供方仅保留本地 cookie 签名密钥。签名后的 host-only `HttpOnly; Secure; SameSite=Lax` cookie 引用持久化本地会话。退出及过期会撤销成员 Peer 和流。存储失败返回脱敏错误；持久化撤销失败时，必须修复存储后再重启。
+提供方仅在服务端内存中缓存一个应用 access token，与成员会话相互独立。身份和会话记录没有应用 Secret、code 或 access token。凭据提供方仅保留本地 cookie 签名密钥。签名后的 host-only `HttpOnly; Secure; SameSite=Lax` cookie 引用持久化本地会话。登录会先恢复或创建成员专属的确定性 Workspace 目录，再接纳 Peer。Workspace 变化会使 Remote 快照失效，新会话只会出现在所属成员的列表中。退出及过期会撤销成员 Peer 和流。存储失败返回脱敏错误；持久化撤销失败时，必须修复存储后再重启。
 
 </details>
 
@@ -53,18 +53,26 @@ kind: "package-bundle"
 <a id="model-experience"></a>
 ## 模型体验
 
-无；认证不组装模型请求，也不添加提示内容。
+### 认证
+
+#### 模型看到的内容
+
+认证层不会把成员身份或登录数据加入模型上下文；`wecom-user` 只用于 Remote 访问控制。
+
+#### Token 影响
+
+认证层不会添加模型请求内容，也不会增加 token 使用量。
 
 #### KV Cache 影响
 
-无；登录不改变模型请求缓存。
+认证层不会改变模型请求缓存。
 
 ## 已知限制与暂缓事项
 
 <a id="known-limitations-and-deferred-work"></a>
 
 - 登录时验证可见范围；应用可见范围变更在下次登录或本地会话过期时生效，默认八小时。
-- 此层建立身份，不授予业务权限。官方 Web profile 不会自动授予成员 Owner 权限或既有业务资源访问权限。
+- 此层不会授予 Owner 权限；在成员专属 Workspace 外创建的既有 Workspace 和会话对该成员不可见。
 - 认证挂载于公网 origin 根路径；不支持子路径部署。
 - 官方二维码 SDK 要求浏览器可访问企业微信 CDN 和面板域名。API 访问要求应用具有目录和标签权限；权限不足会拒绝登录。
 
