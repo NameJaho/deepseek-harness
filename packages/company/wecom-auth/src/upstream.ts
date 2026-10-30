@@ -7,7 +7,10 @@ import type { WecomCorpId, WecomUserId } from './types.ts'
 
 const text = z.string().min(1).max(16384)
 const ids = z.array(z.number().int().positive())
-const memberSchema = z.object({ userid: text, name: text.optional(), department: ids, enable: z.literal(1), status: z.literal(1) })
+// `status: 1` already excludes disabled members; `enable` is checked only when the API returns it.
+const memberSchema = z.object({
+  userid: text, name: text.optional(), department: ids, enable: z.literal(1).optional(), status: z.literal(1),
+})
 const appSchema = z.object({
   agentid: z.number().int().positive(),
   allow_userinfos: z.object({ user: z.array(z.object({ userid: text })) }).optional(),
@@ -39,10 +42,11 @@ export class WecomOfficial {
    * @returns credential-free verified member; external users and invisible members reject with 403.
    */
   async exchange(code: string): Promise<WecomMemberLogin> {
-    const auth = z.object({ UserId: text }).safeParse(await this.api('/auth/getuserinfo', { code }))
+    // Non-members receive `openid`/`external_userid` instead of `userid`.
+    const auth = z.object({ userid: text }).safeParse(await this.api('/auth/getuserinfo', { code }))
     if (!auth.success) throw new WecomAuthError('wecom-auth/forbidden', 403)
-    const member = memberSchema.safeParse(await this.api('/user/get', { userid: auth.data.UserId }))
-    if (!member.success || member.data.userid !== auth.data.UserId) throw new WecomAuthError('wecom-auth/forbidden', 403)
+    const member = memberSchema.safeParse(await this.api('/user/get', { userid: auth.data.userid }))
+    if (!member.success || member.data.userid !== auth.data.userid) throw new WecomAuthError('wecom-auth/forbidden', 403)
     const app = appSchema.safeParse(await this.api('/agent/get', { agentid: this.config.agentId }))
     if (!app.success || String(app.data.agentid) !== this.config.agentId) throw new WecomAuthError('wecom-auth/remote-failure', 502)
     const visible = app.data.allow_userinfos?.user.some(user => user.userid === member.data.userid) === true

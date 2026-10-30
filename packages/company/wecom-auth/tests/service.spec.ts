@@ -22,8 +22,8 @@ function officialFixture() {
   const overrides = new Map<string, unknown>()
   const responses: Record<string, object> = {
     '/gettoken': { access_token: 'PRIVATE_APP_TOKEN', expires_in: 7200 },
-    '/auth/getuserinfo': { UserId: 'member' },
-    '/user/get': { userid: 'member', name: 'Member', department: [3], enable: 1, status: 1 },
+    '/auth/getuserinfo': { userid: 'member', user_ticket: 'PRIVATE_TICKET' },
+    '/user/get': { userid: 'member', name: 'Member', department: [3], status: 1 },
     '/agent/get': { agentid: 1000239, allow_userinfos: { user: [{ userid: 'member' }] } },
     '/department/list': { department: [{ id: 3, parentid: 2 }, { id: 2, parentid: 1 }, { id: 1, parentid: 0 }] },
     '/tag/get': { userlist: [], partylist: [2] },
@@ -182,8 +182,10 @@ it('keeps required admission closed after provider disposal and rejects Owner la
 })
 
 it.each([
-  ['/auth/getuserinfo', { errcode: 0, OpenId: 'external' }, 403],
+  ['/auth/getuserinfo', { errcode: 0, openid: 'external', external_userid: 'external' }, 403],
+  ['/auth/getuserinfo', { errcode: 0, UserId: 'legacy-field' }, 403],
   ['/user/get', { errcode: 0, userid: 'member', department: [3], enable: 0, status: 1 }, 403],
+  ['/user/get', { errcode: 0, userid: 'member', department: [3], status: 2 }, 403],
   ['/agent/get', { errcode: 0, agentid: 1000239, allow_userinfos: { user: [{ userid: 'other' }] } }, 403],
   ['/gettoken', { errcode: 40013, errmsg: 'PRIVATE_REFUSAL' }, 502],
 ])('fails closed for refused official response %s', async (path, response, status) => {
