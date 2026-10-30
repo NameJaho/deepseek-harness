@@ -78,7 +78,31 @@ if ! command -v corepack > /dev/null 2>&1; then
   exit 1
 fi
 
-# 只停止本脚本 PID 文件记录的进程；其他服务占用端口时如实报错，不越权终止。
+# 只停止本脚本 PID 文件记录的进程组；其他服务占用端口时如实报错，不越权终止。
+process_group_of() {
+  ps -o pgid= -p "$1" 2> /dev/null | tr -d ' '
+}
+
+stop_recorded_process() {
+  local pid="$1" signal="$2" pgid
+  pgid="$(process_group_of "$pid")"
+  if [[ "$pgid" =~ ^[0-9]+$ && "$pgid" == "$pid" ]]; then
+    kill -"$signal" -- -"$pgid" 2> /dev/null || true
+  else
+    kill -"$signal" "$pid" 2> /dev/null || true
+  fi
+}
+
+recorded_process_alive() {
+  local pid="$1" pgid
+  pgid="$(process_group_of "$pid")"
+  if [[ "$pgid" =~ ^[0-9]+$ && "$pgid" == "$pid" ]]; then
+    kill -0 -- -"$pgid" 2> /dev/null
+  else
+    kill -0 "$pid" 2> /dev/null
+  fi
+}
+
 stop_previous() {
   local pid
   [[ -f "$DSH_PID_FILE" ]] || return 0
@@ -95,10 +119,10 @@ stop_previous() {
     exit 1
   fi
   printf '正在停止旧服务 PID：%s\n' "$pid"
-  kill "$pid" 2> /dev/null || true
+  stop_recorded_process "$pid" TERM
   local attempt
   for (( attempt = 0; attempt < DSH_STOP_TIMEOUT_SECONDS * 2; attempt++ )); do
-    kill -0 "$pid" 2> /dev/null || { rm -f "$DSH_PID_FILE"; return 0; }
+    recorded_process_alive "$pid" || { rm -f "$DSH_PID_FILE"; return 0; }
     sleep 0.5
   done
   printf '旧服务未能在 %s 秒内停止，拒绝启动新服务：%s\n' "$DSH_STOP_TIMEOUT_SECONDS" "$pid" >&2
@@ -186,7 +210,13 @@ if [[ "${DSH_FOREGROUND:-0}" == "1" ]]; then
   exec "${DSH_COMMAND[@]}"
 fi
 
-nohup "${DSH_COMMAND[@]}" > "$DSH_BASE/dsh.log" 2>&1 < /dev/null &
+# 创建独立进程组，让停止旧服务时 TERM 能传给 pnpm、Node 和它们的子进程。
+# macOS 没有系统 setsid 时退回普通启动；Linux 测试服务器会使用进程组清理。
+if command -v setsid > /dev/null 2>&1; then
+  nohup setsid "${DSH_COMMAND[@]}" > "$DSH_BASE/dsh.log" 2>&1 < /dev/null &
+else
+  nohup "${DSH_COMMAND[@]}" > "$DSH_BASE/dsh.log" 2>&1 < /dev/null &
+fi
 
 pid="$!"
 printf '%s\n' "$pid" > "$DSH_PID_FILE"
