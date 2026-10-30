@@ -72,7 +72,10 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
     const buildVersion = version
       + (commit === undefined ? '' : `-${commit}`)
       + (clientBuildValue('DSH_CLIENT_GIT_DIRTY') === 'true' ? '-dirty' : '')
-    screen.getByText('DSH Local Build')
+    const title = clientBuildValue('DSH_CLIENT_TITLE')
+    if (title === undefined) throw new Error('default client build record must carry DSH_CLIENT_TITLE')
+    expect(screen.getAllByText(title, { exact: true }).length).toBeGreaterThan(0)
+    expect(screen.queryByText('DSH Local Build')).toBeNull()
     screen.getByText(buildVersion)
   }
   // The compact layout dropped group session counts; the fixture workspace

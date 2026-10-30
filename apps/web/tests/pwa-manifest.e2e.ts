@@ -47,11 +47,16 @@ function svgUrl(svg: string): string {
 
 it('ships install metadata with the built web application', async () => {
   const index = await readFile(join(DIST_ROOT, 'index.html'), 'utf8')
+  // The build-configured product title names the document, the home-screen
+  // entry, and the install manifest alike.
+  const productTitle = /<title>([^<]+)<\/title>/.exec(index)?.[1]
+  if (productTitle === undefined) throw new Error('built index.html lacks a <title>')
+  expect(productTitle).not.toBe('DSH Local Build')
   expect(index).toContain('<meta name="viewport" content="width=device-width, initial-scale=1" />')
   expect(index).toContain('<link rel="manifest" href="./manifest.webmanifest" />')
   expect(index).toContain('<link rel="apple-touch-icon" href="./apple-touch-icon.png" />')
   expect(index).toContain('<meta name="mobile-web-app-capable" content="yes" />')
-  expect(index).toContain('<meta name="apple-mobile-web-app-title" content="DSH" />')
+  expect(index).toContain(`<meta name="apple-mobile-web-app-title" content="${productTitle}" />`)
   // No `theme-color` here: `ThemePresenter` owns the single metadata node and
   // follows the resolved in-application theme, which a static media query
   // cannot. The manifest's `theme_color` covers the surrounding chrome before
@@ -62,8 +67,8 @@ it('ships install metadata with the built web application', async () => {
   // so only an absent `id`, which defaults to the resolved `start_url`, gives
   // each mount its own identity. `public-mount.e2e.ts` reads the resolved form.
   expect(manifest).toEqual({
-    name: 'DeepSeek Harness',
-    short_name: 'DSH',
+    name: productTitle,
+    short_name: productTitle,
     start_url: './',
     scope: './',
     // `standalone` keeps the phone's status bar; `fullscreen` hides it and the
@@ -110,6 +115,11 @@ it('decodes every generated and shipped icon with its full artwork and opaque co
 
 it('ships fixed-color favicons selected by document media queries', async () => {
   const index = await readFile(join(DIST_ROOT, 'index.html'), 'utf8')
+  // The build-configured product title names the document, the home-screen
+  // entry, and the install manifest alike.
+  const productTitle = /<title>([^<]+)<\/title>/.exec(index)?.[1]
+  if (productTitle === undefined) throw new Error('built index.html lacks a <title>')
+  expect(productTitle).not.toBe('DSH Local Build')
   expect(index).toContain('<link rel="icon" type="image/svg+xml" href="./favicon-dark.svg" media="(prefers-color-scheme: dark)" />')
   expect(index).toContain('<link rel="icon" type="image/svg+xml" href="./favicon.svg" media="(prefers-color-scheme: light)" />')
   const light = await readFile(join(DIST_ROOT, 'favicon.svg'), 'utf8')
