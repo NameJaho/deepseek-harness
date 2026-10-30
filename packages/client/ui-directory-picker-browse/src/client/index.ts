@@ -19,6 +19,12 @@ import { BrowseDirectoryFlow } from './flow.ts'
 /** Locale namespace owning the browser dialog's copy. */
 const LOCALE_NS = 'directory-browser'
 
+/** Member pages use one server-owned default Workspace and cannot browse directories. */
+function isMemberWorkspaceView(): boolean {
+  const value: unknown = Reflect.get(globalThis, '__DSH_WECOM_SESSION__')
+  return typeof value === 'object' && value !== null && typeof Reflect.get(value, 'userId') === 'string'
+}
+
 /** Required services (cordis fiber inject): the slot registry, workspace UI service, and locale. */
 export const inject = ['slots', 'uiWorkspace', 'locale']
 
@@ -164,6 +170,8 @@ export function apply(ctx: ClientContext): void {
     }
     return () => { for (const dispose of disposers) dispose() }
   }, 'directory-picker-browse: dialog dictionaries')
+
+  if (isMemberWorkspaceView()) return
 
   const injected = (): BrowseFlowInjected => ({
     listDirectory: (path, signal) => ctx.uiWorkspace.listDirectory(path, signal),

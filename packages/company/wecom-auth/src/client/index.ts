@@ -19,10 +19,10 @@ export const inject = ['connection', 'slots', 'locale']
  * @param ctx - browser plugin context; unload cancels recovery requests and subscriptions.
  */
 export function apply(ctx: Context): void {
-  const parsed = z.object({ userId: z.string(), displayName: z.string().optional() }).safeParse(Reflect.get(globalThis, '__DSH_WECOM_SESSION__'))
+  const parsed = z.object({ userId: z.string(), displayName: z.string().optional(), role: z.enum(['admin', 'user']).default('user') }).safeParse(Reflect.get(globalThis, '__DSH_WECOM_SESSION__'))
   if (!parsed.success) return
   const connection = ctx.get('connection') as ConnectionHandle
-  ctx.effect(() => ctx.locale.register('company.wecomAuth', { en: { account: 'WeCom account' }, zh: { account: '企业微信账号' } }))
+  ctx.effect(() => ctx.locale.register('company.wecomAuth', { en: { account: 'WeCom account', admin: 'Administrator', user: 'Standard user' }, zh: { account: '企业微信账号', admin: '管理员', user: '普通用户' } }))
   const loginUrl = (account: boolean): URL => {
     const url = new URL('login', document.baseURI)
     url.searchParams.set('redirect', location.pathname + location.search)
@@ -30,7 +30,7 @@ export function apply(ctx: Context): void {
     return url
   }
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({ name: 'sidebar.footer.action', id: 'wecom-account',
-    locale: 'company.wecomAuth', inject: () => ({ displayName: parsed.data.displayName ?? parsed.data.userId,
+    locale: 'company.wecomAuth', inject: () => ({ displayName: parsed.data.displayName ?? parsed.data.userId, roleLabel: parsed.data.role === 'admin' ? ctx.locale.bind('company.wecomAuth')('admin') : ctx.locale.bind('company.wecomAuth')('user'),
       openAccount: () => { location.assign(loginUrl(true)) } }),
   }, WecomAccount))
   ctx.effect(() => {

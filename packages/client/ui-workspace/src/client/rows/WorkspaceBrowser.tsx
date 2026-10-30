@@ -55,6 +55,12 @@ const SESSION_WATERMARK_BASE = 5
 /** Highest watermark that attention-bearing Sessions raise automatically; Show more and search reveals may exceed it. */
 const SESSION_WATERMARK_AUTO_MAX = 50
 
+/** Members receive one fixed default Workspace and no directory-management affordance. */
+function isMemberWorkspaceView(): boolean {
+  const value: unknown = Reflect.get(globalThis, '__DSH_WECOM_SESSION__')
+  return typeof value === 'object' && value !== null && typeof Reflect.get(value, 'userId') === 'string'
+}
+
 /** Show the blank row plus the first `watermark` non-blank rows, in list order. */
 function watermarkRows(sessions: readonly SessionNode[], watermark: number): {
   rows: readonly SessionNode[]
@@ -944,6 +950,7 @@ export function WorkspaceBrowser({
   const shortcuts = useShortcuts(rows => rows)
   const searchShortcut = shortcuts.find(row => row.id === 'session.search')
   const addShortcut = shortcuts.find(row => row.id === 'workspace.add')
+  const memberOnly = isMemberWorkspaceView()
   const shortcutState = useWorkspaceShortcuts(state => state)
   // Ordering remains live while the rail or search replaces the list body.
   const list = useSessions(state => state)
@@ -964,7 +971,7 @@ export function WorkspaceBrowser({
   const pinnedSessionIds = useWorkspaces(state => state.pinnedSessionIds)
   // Live occupancy of this surface's directory-flow hole (the same source the
   // flow reads): a composition without a picking affordance can add nothing.
-  const directoryFlowAvailable = useDirectoryFlow(occupied => occupied)
+  const directoryFlowAvailable = useDirectoryFlow(occupied => occupied && !memberOnly)
   const groupBy = useStore(s => s.groupBy)
   const orderBy = useStore(s => s.orderBy)
   // Persisted view blobs written before the archived filter existed rehydrate

@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.2-alpha.2/wecom-member-workspace-access/guide.md
+/:
+  en: 9bcee151fa665988
+  zh: cef8ebbda40f2591
+/wecom-members-use-a-server-managed-default-workspace:
+  en: 8accfecb26181ba4
+  zh: e61a6169a5cb1880
+/wecom-members-use-a-server-managed-default-workspace/change:
+  en: 2d2c4eda693fc946
+  zh: e4e1de6f38806821
+/wecom-members-use-a-server-managed-default-workspace/migration:
+  en: 0835cd40d0773d39
+  zh: c098fa8e8a84fe09

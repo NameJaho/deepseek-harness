@@ -1,8 +1,9 @@
 /** Official WeCom login and durable credential-free browser sessions. */
 import { randomBytes, randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { isAbsolute, join } from 'node:path'
+import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { mkdir } from 'node:fs/promises'
+import { realpathSync } from 'node:fs'
 import { Service, type Context } from '@deepseek-ai/cordis'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { credentialKey } from '@deepseek-ai/dsh-credentials'
@@ -16,11 +17,12 @@ import type { Domain } from '@deepseek-ai/dsh-storage-domain'
 import { z } from 'zod'
 import { Config } from './config.ts'
 import { wecomAuthDomain, type WecomSessionRecord } from './storage.ts'
-import type { WecomIdentityId, WecomLoginAttemptId, WecomLoginConfig, WecomLoginResult, WecomSessionId, WecomSessionView } from './types.ts'
+import type { WecomIdentityId, WecomLoginAttemptId, WecomLoginConfig, WecomLoginResult, WecomSessionId, WecomSessionView, WecomUserRole } from './types.ts'
 import { BROWSER_COOKIE, SESSION_COOKIE, cookie, cookieHeader, hash, hashMatches, header, readCookie, safeRedirect, signCookie } from './browser.ts'
 import { WecomAuthError } from './errors.ts'
 import { WecomOfficial, type WecomMemberLogin } from './upstream.ts'
 import { loginPage } from './login-page.ts'
+import { accountPage } from './account-page.ts'
 
 export { Config } from './config.ts'
 export type * from './types.ts'
@@ -34,6 +36,7 @@ declare module '@deepseek-ai/cordis' {
 
 interface State { readonly domain: Domain<typeof wecomAuthDomain>; readonly secret: Buffer }
 const SECRET = credentialKey('company-wecom-official-auth', 'cookie-secret')
+const DEFAULT_WECOM_ROLE: WecomUserRole = 'user'
 const exchangeSchema = z.object({
   state: z.string().max(200).regex(/^[a-f0-9-]{36}\.[A-Za-z0-9_-]{43}$/),
   code: z.string().min(1).max(4096),
@@ -54,6 +57,7 @@ export class CompanyWecomAuthService extends Service {
   private pendingAttempts = 0
   private readonly revoked = new Set<WecomSessionId>()
   private readonly workspaces = new Map<WecomIdentityId, Workspace>()
+  private readonly workspaceRoots = new Map<WecomIdentityId, string>()
   private timer: ReturnType<typeof setTimeout> | undefined
 
   /** @param owner - Host HTTP, cookie-key and domain providers.
@@ -66,7 +70,7 @@ export class CompanyWecomAuthService extends Service {
     if (this.config.workspaceRoot === undefined || !isAbsolute(this.config.workspaceRoot)) {
       throw new Error('wecom-auth: workspaceRoot must be an absolute path')
     }
-    this.workspaceRoot = this.config.workspaceRoot
+    this.workspaceRoot = resolve(this.config.workspaceRoot)
     const origin = new URL(this.config.publicOrigin)
     if (origin.protocol !== 'https:' || origin.username !== '' || origin.password !== '' || origin.pathname !== '/'
       || origin.search !== '' || origin.hash !== '') throw new Error('wecom-auth: publicOrigin must be a bare HTTPS origin')
@@ -117,7 +121,7 @@ export class CompanyWecomAuthService extends Service {
         const identity = session === undefined ? undefined : this.state?.domain.table('identities').get(session.identityId)
         if (session === undefined || identity === undefined) return undefined
         return { sessionKey: brandString<BrowserSessionKey>(session.id), principal: {
-          kind: 'wecom-user', identityId: identity.id, corpId: identity.corpId, userId: identity.userId,
+          kind: 'wecom-user', identityId: identity.id, corpId: identity.corpId, userId: identity.userId, role: DEFAULT_WECOM_ROLE,
         } }
       },
     })
@@ -126,6 +130,7 @@ export class CompanyWecomAuthService extends Service {
       const identity = this.state?.domain.table('identities').get(peer.principal.identityId)
       if (identity !== undefined) table.push({ kind: 'global', name: '__DSH_WECOM_SESSION__', value: {
         identityId: identity.id, corpId: identity.corpId, userId: identity.userId, displayName: identity.displayName,
+        role: DEFAULT_WECOM_ROLE,
       } })
     })
     for (const path of ['/login', '/auth/wecom/callback', '/auth/wecom/logout', '/auth/me']) {
@@ -208,7 +213,7 @@ export class CompanyWecomAuthService extends Service {
     await state.domain.table('sessions').put(id, session)
     this.owner.get('remoteAccess')?.invalidate()
     this.scheduleExpiry()
-    return { session: { identityId, ...login, expiresAt: session.expiresAt }, redirect,
+    return { session: { identityId, ...login, role: DEFAULT_WECOM_ROLE, expiresAt: session.expiresAt }, redirect,
       cookie: cookieHeader(SESSION_COOKIE, signCookie({ version: 1, sessionId: id, authority: this.config.publicOrigin,
         issuedAt: now, expiresAt: session.expiresAt }, state.secret), true, this.config.sessionTtlMs, '/') }
   }
@@ -221,7 +226,7 @@ export class CompanyWecomAuthService extends Service {
     const session = this.current(request)
     const identity = session === undefined ? undefined : this.state?.domain.table('identities').get(session.identityId)
     return identity === undefined || session === undefined ? null : { identityId: identity.id, corpId: identity.corpId,
-      userId: identity.userId, ...identity.displayName === undefined ? {} : { displayName: identity.displayName },
+      userId: identity.userId, role: DEFAULT_WECOM_ROLE, ...identity.displayName === undefined ? {} : { displayName: identity.displayName },
       expiresAt: session.expiresAt }
   }
 
@@ -253,10 +258,15 @@ export class CompanyWecomAuthService extends Service {
     const registry = this.owner.get('workspaceRegistry')
     if (registry === undefined) return undefined
     const existing = this.workspaces.get(identityId)
-    if (existing !== undefined && registry.get(existing.id) !== undefined) return existing
+    if (existing !== undefined && registry.get(existing.id) !== undefined) {
+      this.workspaceRoots.set(identityId, realpathSync(existing.path))
+      return existing
+    }
     const path = join(this.workspaceRoot, identityId)
     await mkdir(path, { recursive: true, mode: 0o700 })
-    const workspace = await registry.create(path, 'default')
+    const root = realpathSync(path)
+    this.workspaceRoots.set(identityId, root)
+    const workspace = await registry.create(root, 'default')
     this.workspaces.set(identityId, workspace)
     return workspace
   }
@@ -265,13 +275,16 @@ export class CompanyWecomAuthService extends Service {
   private bindings(identityId: WecomIdentityId): readonly RemoteAccessBinding[] {
     const state = this.state
     const identity = state?.domain.table('identities').get(identityId)
-    if (state === undefined) return []
+    const registry = this.owner.get('workspaceRegistry')
+    if (state === undefined || registry === undefined) return []
     if (identity?.enabled !== true || identity.corpId !== this.config.corpId
       || ![...state.domain.table('sessions').entries()].some(([id, session]) => session.identityId === identityId
         && session.agentId === this.config.agentId && session.browserAuthority === this.config.publicOrigin
         && !this.revoked.has(id) && session.revokedAt === undefined && session.expiresAt > Date.now())) return []
+    const root = this.workspaceRoots.get(identityId)
+    if (root === undefined) return []
     const workspace = this.workspaces.get(identityId)
-    if (workspace === undefined || this.owner.get('workspaceRegistry')?.get(workspace.id) === undefined) return []
+    if (workspace === undefined || registry.get(workspace.id) === undefined || !this.pathWithin(root, workspace.path)) return []
     const sessionIds = [...workspace.sessionIds]
     const actions: readonly RemoteAccessAction[] = [
       'commands/list', 'fileUploads/upload', 'goals/get', 'session/list', 'session/search', 'session/control',
@@ -288,12 +301,23 @@ export class CompanyWecomAuthService extends Service {
     ]
     const bindings: RemoteAccessBinding[] = [{
       role: { name: 'wecom:global', resource: 'global', actions: [
+        'credentials/describe', 'credentials/set', 'credentials/unset',
         'dynamicCordisRunner/inventory', 'dynamicCordisRunner/syncInspectManifest',
-        'permissionPresets/catalog',
+        'llm/discoverModels', 'llm/listProviders', 'llm/listConfigurableProviders',
+        'pluginInventory/list', 'pluginManager/listBundles', 'pluginManager/listPlugins',
+        'pluginManager/listVersionExemptions', 'pluginManager/listVersions', 'pluginManager/readBundleDetail',
+        'pluginManager/registries', 'pluginManager/inspect', 'pluginManager/setPluginEnabled',
+        'pluginManager/setBundleEnabled', 'pluginManager/installBundle', 'pluginManager/updateBundle',
+        'pluginManager/waitForInstall', 'pluginManager/cancelInstall', 'pluginManager/removeBundle',
+        'pluginMarket/listIndexes', 'pluginMarket/setIndexes', 'pluginMarket/search', 'pluginMarket/readEntryDetail',
+        'pluginRegistryProbe/fastest', 'permissionPresets/catalog',
+        'settings/describe', 'settings/update', 'settings/replace', 'settings/mutate', 'settings/openSettingsDocument',
         'session/canOpenWorkspacePath', 'session/control', 'session/create', 'session/list', 'session/modelCatalog',
-        'session/search', 'workspace/follow', 'llm/listProviders', 'llm/listConfigurableProviders',
-        'settings/document-updated', 'credentials/reference-updated', 'credentials/record-updated',
-        'llm/adapters-updated', 'llm/models-updated', 'permission-presets/catalog-changed',
+        'session/search', 'workspace/follow',
+        'event:settings/document-updated', 'event:credentials/reference-updated', 'event:credentials/record-updated',
+        'event:llm/adapters-updated', 'event:llm/models-updated', 'event:permission-presets/catalog-changed',
+        'event:plugin-manager/changed', 'event:plugin-manager/install-log', 'event:plugin-manager/install-state',
+        'event:plugin-manager/update-state', 'event:plugin-market/changed',
       ] },
       resource: { kind: 'global' },
       condition: ({ action, args }: Parameters<RemoteAccessCondition<'global'>>[0]): RemoteAccessDecision =>
@@ -330,10 +354,15 @@ export class CompanyWecomAuthService extends Service {
     if (input.cwd !== undefined) return { kind: 'deny', reason: 'cwd-not-allowed' }
     if (input.workspaceId !== workspace.id) return { kind: 'deny', reason: 'workspace-not-owned' }
     const sessionId = input.sessionId
-    if (sessionId !== undefined && !workspace.sessionIds.some(id => String(id) === String(sessionId))) {
+    if (sessionId !== undefined && !workspace.sessionIds.some(id => String(id) === sessionId)) {
       return { kind: 'deny', reason: 'session-not-owned' }
     }
     return { kind: 'allow' }
+  }
+
+  private pathWithin(root: string, path: string): boolean {
+    const child = relative(root, resolve(path))
+    return child === '' || (child !== '..' && !child.startsWith(`..${sep}`) && !isAbsolute(child))
   }
 
   private async revoke(session: WecomSessionRecord): Promise<void> {
@@ -391,6 +420,12 @@ export class CompanyWecomAuthService extends Service {
       const headers = { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff' }
       if (path === '/login') {
         const nonce = randomBytes(32).toString('base64url')
+        const current = url.searchParams.get('account') === '1' ? this.getCurrentSession(req) : null
+        if (current !== null) {
+          res.writeHead(200, { ...headers, 'content-type': 'text/html; charset=utf-8',
+            'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'` })
+          res.end(accountPage(current, nonce, /^zh\b/i.test(header(req, 'accept-language') ?? '') ? 'zh' : 'en')); return
+        }
         const existing = cookie(req, BROWSER_COOKIE)
         const binding = existing !== undefined && /^[A-Za-z0-9_-]{43}$/.test(existing) ? existing : randomBytes(32).toString('base64url')
         const attempt = await this.beginLogin(req, binding, url.searchParams.get('redirect'))

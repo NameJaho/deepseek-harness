@@ -24,6 +24,12 @@ import css from './WorkspacePicker.module.css'
 
 const ADD_WORKSPACE = '::add-workspace'
 
+/** Whether the current browser is an authenticated member with one fixed default Workspace. */
+function isMemberWorkspaceView(): boolean {
+  const value: unknown = Reflect.get(globalThis, '__DSH_WECOM_SESSION__')
+  return typeof value === 'object' && value !== null && typeof Reflect.get(value, 'userId') === 'string'
+}
+
 /** Core flow props: the owner supplies popover control and pick semantics. */
 export interface WorkspacePickFlowProps {
   /** The standard locale seat, forwarded by whichever slot entry hosts the flow. */
@@ -76,6 +82,7 @@ export function WorkspacePickFlow({
 }: WorkspacePickFlowProps) {
   const workspaceSnapshot = useWorkspaces(state => state)
   const workspaces = workspaceSnapshot.items
+  const memberOnly = isMemberWorkspaceView()
   const getAnchorRect = useCallback(
     () => anchorRef?.current?.getBoundingClientRect() ?? null,
     [anchorRef],
@@ -95,7 +102,7 @@ export function WorkspacePickFlow({
   // entry simply is not there (the seam's documented no-flow default). The
   // framework-bound hook keeps occupancy live: flow plugins activate (and
   // HMR-reload) independently of this menu's renders.
-  const flowAvailable = useDirectoryFlow(occupied => occupied)
+  const flowAvailable = useDirectoryFlow(occupied => occupied && !memberOnly)
   // An occupant that unloads mid-interaction leaves nobody to cancel: an
   // open flow over an empty hole withdraws so the menu actions come back.
   // flowOpen is a dependency because the flow can also OPEN over an already

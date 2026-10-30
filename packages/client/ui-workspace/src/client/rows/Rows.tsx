@@ -35,6 +35,12 @@ const DRAG_PREVIEW_PROPERTIES = [
   '--dsh-sidebar-paint-inset',
 ] as const
 
+/** Members must not see the server-side Workspace directory. */
+function isMemberWorkspaceView(): boolean {
+  const value: unknown = Reflect.get(globalThis, '__DSH_WECOM_SESSION__')
+  return typeof value === 'object' && value !== null && typeof Reflect.get(value, 'userId') === 'string'
+}
+
 /** The standard locale seat, prop-passed from the browser root. */
 type RowTranslate = WorkspaceBrowserProps['t']
 
@@ -176,7 +182,7 @@ function WorkspaceHoverContent({ label, cwd, createdAt, t }: {
   return (
     <div className={css.hoverContent}>
       <div className={css.hoverTitle}>{label}</div>
-      <div className={css.hoverPath}>{cwd}</div>
+      {cwd !== undefined && <div className={css.hoverPath}>{cwd}</div>}
       <div className={css.hoverTime}>{createdLabel(createdAt, t)}</div>
     </div>
   )
@@ -280,6 +286,7 @@ function WorkspaceProjectRow({ workspaceId, ...props }: ProjectRowItemProps & { 
 function ProjectRow({
   group, containsCurrentDescendant = false, onToggle, onCreate, actions, drag: offeredDrag, home, newShortcut, t, access,
 }: ProjectRowItemProps & { access: ProjectRowAccess }) {
+  const memberOnly = isMemberWorkspaceView()
   const drag = access.reorder ? offeredDrag : undefined
   const row = group
   // The ungrouped bucket has no workspace title: its label is dictionary copy.
@@ -370,14 +377,14 @@ function ProjectRow({
       anchor={ownRow}
       content={<WorkspaceHoverContent
         label={row.label}
-        cwd={row.cwd === undefined ? undefined : abbreviateHomePath(row.cwd, home)}
+        cwd={memberOnly || row.cwd === undefined ? undefined : abbreviateHomePath(row.cwd, home)}
         createdAt={row.createdAt}
         t={t}
       />}
       openDelayMs={800}
       grouped
       disabled={menuOpen}
-      copyText={row.cwd}
+      copyText={memberOnly ? undefined : row.cwd}
       copyLabel={t('copy')}
       copiedLabel={t('hover.copied')}
     />
@@ -636,6 +643,7 @@ export function SessionNodeItem({
   | 'sidebar.session.row.hover'
 >) {
   const row = node
+  const memberOnly = isMemberWorkspaceView()
   const title = displayTitle(node, t)
   const selected = node.id === currentId
   const statuses = sessionStatuses(node, t)
@@ -797,7 +805,7 @@ export function SessionNodeItem({
       anchor={ownRow}
       content={<SessionHoverContent
         node={node}
-        cwd={row.cwd === undefined ? undefined : abbreviateHomePath(row.cwd, home)}
+        cwd={memberOnly || row.cwd === undefined ? undefined : abbreviateHomePath(row.cwd, home)}
         now={now}
         renderSlot={renderSlot}
         t={t}

@@ -7,6 +7,8 @@ export type WecomIdentityId = Branded<'wecom-identity-id'>
 export type WecomCorpId = Branded<'wecom-corp-id'>
 /** Stable member identifier returned by official WeCom APIs. */
 export type WecomUserId = Branded<'wecom-user-id'>
+/** Enterprise role reserved for future administrator policy differences. */
+export type WecomUserRole = 'admin' | 'user'
 /** Browser-bound, single-use login attempt. */
 export type WecomLoginAttemptId = Branded<'wecom-login-attempt-id'>
 /** Signed local browser session. */
@@ -18,6 +20,7 @@ export interface WecomUserPrincipal {
   readonly identityId: WecomIdentityId
   readonly corpId: WecomCorpId
   readonly userId: WecomUserId
+  readonly role: WecomUserRole
 }
 
 /** Public QR/OAuth parameters and unpredictable state. */
@@ -35,6 +38,7 @@ export interface WecomSessionView {
   readonly identityId: WecomIdentityId
   readonly corpId: WecomCorpId
   readonly userId: WecomUserId
+  readonly role: WecomUserRole
   readonly displayName?: string
   readonly expiresAt: number
 }

@@ -170,6 +170,8 @@ it('establishes distinct member Peers and revokes sessions and streams on logout
   const admitted = f.ctx.connection.admit({ headers })
   if (!('peer' in admitted)) throw new Error('Expected member Peer')
   expect(admitted.peer.principal.kind).toBe('wecom-user')
+  if (admitted.peer.principal.kind !== 'wecom-user') throw new Error('Expected WeCom principal')
+  expect(admitted.peer.principal.role).toBe('user')
   const workspace = f.ctx.workspaceRegistry.list()[0]
   expect(workspace?.title).toBe('default')
   expect(workspace?.path).toContain('i-')
@@ -183,6 +185,9 @@ it('establishes distinct member Peers and revokes sessions and streams on logout
   const me = await f.request('/auth/me', { headers: { cookie } })
   expect(me.status).toBe(200)
   expect(await me.text()).toContain('member')
+  const account = await f.request('/login?account=1', { headers: { cookie, 'accept-language': 'zh-CN' } })
+  expect(account.status).toBe(200)
+  expect(await account.text()).toContain('普通用户')
   expect((await f.request('/auth/wecom/logout', { method: 'POST', headers: { cookie } })).status).toBe(403)
   const logout = await f.request('/auth/wecom/logout', { method: 'POST', headers: { cookie, origin: publicOrigin, 'x-dsh-auth': '1' } })
   expect(logout.status).toBe(200)
@@ -247,6 +252,9 @@ it('isolates each member to one default Workspace and its Sessions', async () =>
   expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'session/create', resources: [{ kind: 'global' }], args: { request: { workspaceId: secondWorkspace.id } } })).toEqual({ kind: 'deny', reason: 'workspace-not-owned' })
   expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'session/create', resources: [{ kind: 'global' }], args: { request: { cwd: secondWorkspace.path } } })).toEqual({ kind: 'deny', reason: 'cwd-not-allowed' })
   expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'session/create', resources: [{ kind: 'workspace', id: firstWorkspace.id }], args: { request: { workspaceId: firstWorkspace.id } } })).toEqual({ kind: 'allow' })
+  expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'settings/describe', resources: [{ kind: 'global' }] })).toEqual({ kind: 'allow' })
+  expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'directoryPicker/list', resources: [{ kind: 'global' }], args: { path: firstWorkspace.path } })).toEqual({ kind: 'deny', reason: 'no-allow' })
+  expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'workspace/create', resources: [{ kind: 'global' }], args: { request: { path: firstWorkspace.path } } })).toEqual({ kind: 'deny', reason: 'no-allow' })
 })
 
 it('keeps required admission closed after provider disposal and rejects Owner launch credentials', async () => {
