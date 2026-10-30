@@ -120,6 +120,44 @@ export type PeerAdmission =
   | { readonly peer: PeerScope }
   | { readonly rejection: 401 | 403 }
 
+/** Identity selected by a feature-owned browser authentication provider. */
+export interface BrowserPrincipalAuthentication {
+  /** Stable session key used to reuse one Peer while the browser session lives. */
+  readonly sessionKey: BrowserSessionKey
+  /** Caller identity fixed for every request in this browser session. */
+  readonly principal: Principal
+}
+
+/** Provider-local key for one authenticated browser session. */
+export type BrowserSessionKey = Branded<'browser-session-key'>
+
+/** Synchronous browser identity hook used by external login providers. */
+export interface BrowserPrincipalProvider {
+  /** Site-local route for unauthenticated index requests; omitted keeps Connection's default response. */
+  readonly loginPath?: string
+  /** Deny built-in Owner browser and API cookies while this provider requires external login. */
+  readonly requireLogin?: boolean
+  /**
+   * Authenticate one request after Connection's Host/Origin checks have run.
+   * @param request - trusted HTTP request headers.
+   * @param secure - whether Connection's listener terminates TLS.
+   * @returns a fixed browser identity, or undefined when this provider has no valid session.
+   */
+  authenticate(request: ConnectionTrustRequest, secure: boolean): BrowserPrincipalAuthentication | undefined
+}
+
+/** Provider-owned browser Peer revocation and scoped teardown. */
+export interface BrowserPrincipalRegistration {
+  /**
+   * Remove admission and abort every stream for one browser session.
+   * @param sessionKey - key previously returned by this provider.
+   * @returns completion after the removed Peer has quiesced; absent keys are harmless.
+   */
+  revoke(sessionKey: BrowserSessionKey): Promise<void>
+  /** Unregister this provider and await disposal of all its browser Peers. */
+  dispose(): Promise<void>
+}
+
 /** Socket admission claims API ownership until its carrier calls release, including failed upgrades. */
 export type ConnectionAdmission =
   | {
@@ -212,6 +250,26 @@ export interface HostConnectionHandle {
   readonly browserPeer: PeerScope
 
   /**
+   * Register one browser identity provider in the caller's Context.
+   * @param provider - synchronous authentication and optional login route.
+   * @returns scoped registration; providers revoke Peers on logout, expiry, and account disablement.
+   */
+  registerBrowserPrincipalProvider(provider: BrowserPrincipalProvider): BrowserPrincipalRegistration
+
+  /** Expire the built-in Owner cookie after an external login replaces browser identity.
+   * @param request - trusted headers for the cookie authority.
+   * @returns deletion Set-Cookie header, or undefined when no authority can be resolved.
+   */
+  clearOwnerCookie(request: ConnectionTrustRequest): string | undefined
+
+  /**
+   * Apply the Host/Origin fence to a public route without requiring a credential.
+   * @param request - request headers from the HTTP carrier.
+   * @returns 403 for an untrusted authority or Origin; undefined otherwise.
+   */
+  trustRejection(request: ConnectionTrustRequest): 403 | undefined
+
+  /**
    * Whether this deployment accepts authorities beyond loopback: true only
    * when a validated `trustedHosts` entry names a non-loopback hostname.
    */
@@ -226,7 +284,8 @@ export interface HostConnectionHandle {
 
   /**
    * Apply Connection's Host/Origin checks and browser authentication to
-   * another Web route.
+   * another Owner-only Web route. Non-owner Peers receive 403; business
+   * routes use admit() and their resource policy instead.
    * @param request - request headers from the HTTP or upgrade request.
    * @returns rejection status, or undefined when the route may accept the request.
    */

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# 纯官方 dev 分支的测试环境启动器：不加载任何公司 patch、不安装登录插件。
-# 公网域名在上游终止 TLS 并到达本机 3800 端口，由 nginx 转发到 DSH_PORT。
-# 没有登录插件时，凡能访问监听地址者即以 Owner 身份接入，务必只对可信网络开放。
+# 企业微信自建应用测试环境：强制登录，不接受公网 Owner 启动凭据。
+# 公网域名在上游终止 TLS，由反向代理保留 Host 并转发到 DSH_PORT。
+# 应用 Secret 仅从服务端环境读取，不写入 patch、profile 或日志。
 set -euo pipefail
 umask 077
 
@@ -13,6 +13,14 @@ DSH_PORT="${DSH_PORT:-3080}"
 DSH_PUBLIC_URL="${DSH_PUBLIC_URL:-https://test-hmwork.busyming.com/}"
 DSH_TRUSTED_HOST="${DSH_TRUSTED_HOST:-test-hmwork.busyming.com}"
 DSH_PROFILE="${DSH_PROFILE:-test-web}"
+export DSH_PUBLIC_URL
+export DSH_WECOM_CORP_ID="${DSH_WECOM_CORP_ID:-ww2ec793812513c257}"
+export DSH_WECOM_AGENT_ID="${DSH_WECOM_AGENT_ID:-1000239}"
+if [[ -z "${DSH_WECOM_APP_SECRET:-}" ]]; then
+  printf '请先在服务端环境设置 DSH_WECOM_APP_SECRET（使用轮换后的自建应用 Secret）；拒绝无登录启动\n' >&2
+  exit 1
+fi
+export DSH_WECOM_APP_SECRET
 DSH_PID_FILE="${DSH_PID_FILE:-$DSH_BASE/dsh.pid}"
 DSH_STOP_TIMEOUT_SECONDS="${DSH_STOP_TIMEOUT_SECONDS:-90}"
 # 独立的 harness home，避免继承公司 profile 的插件与会话数据。
@@ -111,6 +119,8 @@ DSH_COMMAND=(corepack pnpm dsh --profile "$DSH_PROFILE")
 if [[ "$DSH_PROFILE_INIT" == "1" ]]; then
   DSH_COMMAND+=(--from-default-profile web)
 fi
+# Profile overlays are outer CLI options and must precede runtime arguments.
+DSH_COMMAND+=(--patch "$DSH_REPO/packages/company/wecom-auth/cordis.patch.yml")
 DSH_COMMAND+=(--no-open --host "$DSH_HOST" --port "$DSH_PORT")
 if [[ -n "$DSH_PUBLIC_URL" ]]; then
   DSH_COMMAND+=(--public-url "$DSH_PUBLIC_URL")
@@ -135,4 +145,4 @@ printf '服务监听地址：http://%s:%s\n' "$DSH_HOST" "$DSH_PORT"
 if [[ -n "$DSH_PUBLIC_URL" ]]; then
   printf '对外访问地址：%s\n' "$DSH_PUBLIC_URL"
 fi
-printf '警告：本分支无登录插件，访问监听地址即获得 Owner 权限\n' >&2
+printf '企业微信登录已强制启用；应用可见成员验证成功后才签发本地会话\n'

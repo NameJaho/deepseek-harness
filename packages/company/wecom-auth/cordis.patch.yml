@@ -1,0 +1,11 @@
+- id: connection
+  config:
+    trustedHosts: !!js ctx.webStartup.trustedHosts
+    requireBrowserLogin: true
+- insert:
+    - id: company-wecom-auth
+      name: '@deepseek-ai/dsh-company-wecom-auth'
+      config:
+        corpId: !!js process.env.DSH_WECOM_CORP_ID ?? ''
+        agentId: !!js process.env.DSH_WECOM_AGENT_ID ?? ''
+        publicOrigin: !!js new URL(process.env.DSH_PUBLIC_URL ?? 'https://test-hmwork.busyming.com/').origin

@@ -1,0 +1,34 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/company/wecom-auth/README.md
+/:
+  en: 8a1beffa5b89b4bf
+  zh: f97e33bb4fc3d045
+/deepseek-ai-dsh-company-wecom-auth:
+  en: 2fc0d647a92d8054
+  zh: cfadae58ca1e6f17
+/deepseek-ai-dsh-company-wecom-auth/summary:
+  en: 9b5e61bc03b00457
+  zh: 1fef61f8eb006f81
+/deepseek-ai-dsh-company-wecom-auth/table-of-contents:
+  en: 76368b6b1da79c80
+  zh: 20d3097b9bcc8b72
+/deepseek-ai-dsh-company-wecom-auth/use-this-package:
+  en: 5aa53d34804ea22e
+  zh: 00bd46ca14ef084e
+/deepseek-ai-dsh-company-wecom-auth/understand-the-implementation:
+  en: 1dff114849c1b18b
+  zh: 186ed466480ad99a
+/deepseek-ai-dsh-company-wecom-auth/model-experience:
+  en: 209fb533d1d96014
+  zh: 63f3b622da9ad3bb
+/deepseek-ai-dsh-company-wecom-auth/model-experience/kv-cache-effect:
+  en: b170dd17c47c6cde
+  zh: 8f203e64329e49a8
+/deepseek-ai-dsh-company-wecom-auth/known-limitations-and-deferred-work:
+  en: 73684a5b5b1f296c
+  zh: 62e9cf84bfa80c24
+/deepseek-ai-dsh-company-wecom-auth/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 8ec3e73528ddb1a6

@@ -247,6 +247,16 @@ export class BrowserAuth {
     return url.href
   }
 
+  /** Expire the built-in cookie when an external login replaces it.
+   * @param request - trusted authority headers.
+   * @param secure - whether the listener terminates TLS.
+   * @returns cookie deletion header, or undefined for an absent authority.
+   */
+  clearCookie(request: ConnectionTrustRequest, secure: boolean): string | undefined {
+    const authority = requestAudience(request.headers, secure)
+    return authority === undefined ? undefined : sessionCookie(cookieName(authority), '', 0, 0, secure)
+  }
+
   /**
    * Authenticate an index request. A valid root query token mints the cookie
    * and redirects to the directory-relative clean `./`; a valid cookie lets

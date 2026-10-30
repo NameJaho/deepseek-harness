@@ -29,6 +29,9 @@ import type {
   ConnectionRpcResult,
   ConnectionRequestRejection,
   ConnectionTrustRequest,
+  BrowserPrincipalProvider,
+  BrowserPrincipalRegistration,
+  BrowserSessionKey,
   HostConnectionHandle,
   HostConnectionRpc,
 } from './rpc.ts'
@@ -40,6 +43,11 @@ const ENDPOINT_SEGMENT_PATTERN = /^[A-Za-z0-9_$.-]+$/
 interface PeerRecord {
   readonly peer: Peer
   ownsSocket: boolean
+}
+
+interface BrowserProviderRecord {
+  readonly provider: BrowserPrincipalProvider
+  readonly peers: Map<BrowserSessionKey, Peer>
 }
 
 interface ConnectionRpcInterceptor {
@@ -71,6 +79,7 @@ export class HostConnectionService extends Service implements HostConnectionHand
   /** The Peer every authenticated browser connection shares. */
   readonly browserPeer: PeerScope
   private readonly peers = new Map<PeerId, PeerRecord>()
+  private readonly browserPrincipalProviders = new Set<BrowserProviderRecord>()
   private readonly owner: Context
   private disposed = false
   private readonly interceptors = new Map<string, ConnectionRpcInterceptor>()
@@ -88,15 +97,21 @@ export class HostConnectionService extends Service implements HostConnectionHand
     ctx: Context,
     private readonly trustedHosts: readonly string[],
     private readonly browserAuth: BrowserAuth,
+    private readonly requireBrowserLogin = false,
   ) {
     super(ctx, 'connection')
     this.owner = ctx
     this.browserPeer = new Peer(ctx, { principal: { kind: 'owner' } })
     ctx.effect(() => async () => {
       this.disposed = true
-      const peers = [this.browserPeer, ...Array.from(this.peers.values(), record => record.peer)]
+      const peers = new Set<PeerScope>([this.browserPeer, ...Array.from(this.peers.values(), record => record.peer)])
       this.peers.clear()
-      await Promise.all(peers.map(peer => peer.dispose()))
+      for (const record of this.browserPrincipalProviders) {
+        for (const peer of record.peers.values()) peers.add(peer)
+        record.peers.clear()
+      }
+      this.browserPrincipalProviders.clear()
+      await Promise.all([...peers].map(peer => peer.dispose()))
     }, 'client-connection: Peer scopes')
     this.allowsRemoteAuthorities = trustedHosts.some(isRemoteAuthority)
   }
@@ -119,10 +134,47 @@ export class HostConnectionService extends Service implements HostConnectionHand
     }
   }
 
+  registerBrowserPrincipalProvider(provider: BrowserPrincipalProvider): BrowserPrincipalRegistration {
+    if (provider.loginPath !== undefined && !/^\/(?!\/)[A-Za-z0-9._~/-]+$/.test(provider.loginPath)) {
+      throw new Error('connection: browser loginPath must be an absolute site-local path')
+    }
+    const record: BrowserProviderRecord = { provider, peers: new Map() }
+    const dispose = this.ctx.effect(() => {
+      this.browserPrincipalProviders.add(record)
+      return async () => {
+        this.browserPrincipalProviders.delete(record)
+        const peers = [...record.peers.values()]
+        for (const peer of peers) this.peers.delete(peer.id)
+        record.peers.clear()
+        await Promise.all(peers.map(peer => peer.dispose()))
+      }
+    }, 'connection: browser identity provider')
+    return {
+      revoke: async (key) => {
+        const peer = record.peers.get(key)
+        record.peers.delete(key)
+        if (peer !== undefined) this.peers.delete(peer.id)
+        await peer?.dispose()
+      },
+      dispose,
+    }
+  }
+
+  trustRejection(request: ConnectionTrustRequest): 403 | undefined {
+    return this.isTrusted(request) ? undefined : 403
+  }
+
+  clearOwnerCookie(request: ConnectionTrustRequest): string | undefined {
+    return this.browserAuth.clearCookie(request, this.owner.get('webServer')?.protocol === 'https:')
+  }
+
   /** Apply the Host/Origin fence and require an authenticated live Peer. */
   requestRejection(request: ConnectionTrustRequest): ConnectionRequestRejection {
     const admission = this.admit(request)
-    return 'rejection' in admission ? admission.rejection : undefined
+    if ('rejection' in admission) return admission.rejection
+    // PrincipalMap is extended by optional browser-auth plugins outside this package's compilation.
+    // oxlint-disable-next-line typescript/no-unnecessary-condition
+    return admission.peer.principal.kind === 'owner' ? undefined : 403
   }
 
   /** Browser requests share an owner Peer; API HTTP does not depend on an attached socket. */
@@ -130,10 +182,22 @@ export class HostConnectionService extends Service implements HostConnectionHand
     if (!this.isTrusted(request)) return { rejection: 403 }
     if (this.disposed) return { rejection: 401 }
     const secure = this.owner.get('webServer')?.protocol === 'https:'
-    if (this.browserAuth.isAuthenticated(request, secure)) return { peer: this.browserPeer }
-    const id = this.browserAuth.authenticateApi(request, secure)
-    const record = id === undefined ? undefined : this.peers.get(id)
-    return record === undefined ? { rejection: 401 } : { peer: record.peer }
+    if (this.acceptsOwner()) {
+      if (this.browserAuth.isAuthenticated(request, secure)) return { peer: this.browserPeer }
+      const id = this.browserAuth.authenticateApi(request, secure)
+      const record = id === undefined ? undefined : this.peers.get(id)
+      if (record !== undefined) return { peer: record.peer }
+    }
+    for (const { provider, peers } of this.browserPrincipalProviders) {
+      const authentication = provider.authenticate(request, secure)
+      if (authentication === undefined) continue
+      const existing = peers.get(authentication.sessionKey)
+      if (existing !== undefined) return { peer: existing }
+      const peer = new Peer(this.owner, { principal: authentication.principal })
+      peers.set(authentication.sessionKey, peer)
+      return { peer }
+    }
+    return { rejection: 401 }
   }
 
   /** Create one in-process Peer owned by the Context that read this service. */
@@ -155,6 +219,9 @@ export class HostConnectionService extends Service implements HostConnectionHand
       release: () => {
         if (released !== undefined) return released
         this.peers.delete(record.peer.id)
+        for (const provider of this.browserPrincipalProviders) {
+          for (const [key, peer] of provider.peers) if (peer === record.peer) provider.peers.delete(key)
+        }
         released = record.peer.dispose()
         return released
       },
@@ -164,6 +231,10 @@ export class HostConnectionService extends Service implements HostConnectionHand
   private isTrusted(request: ConnectionTrustRequest): boolean {
     const carrier = this.owner.get('webServer')
     return isTrustedApiRequest(request, this.trustedHosts, carrier?.host, carrier?.protocol ?? 'http:')
+  }
+
+  private acceptsOwner(): boolean {
+    return !this.requireBrowserLogin && ![...this.browserPrincipalProviders].some(record => record.provider.requireLogin === true)
   }
 
   private publishPeer(interactions: ConnectionInteractions): PeerId {
@@ -178,9 +249,10 @@ export class HostConnectionService extends Service implements HostConnectionHand
    * @param response - response owned to completion.
    */
   authorizeConnect(request: ConnectionIndexRequest, response: ConnectionIndexResponse): void {
-    if (!this.isTrusted(request) || this.disposed) {
-      response.writeHead(this.disposed ? 401 : 403)
-      response.end(this.disposed ? 'unauthorized' : 'forbidden')
+    if (!this.isTrusted(request) || this.disposed || !this.acceptsOwner()) {
+      const unauthorized = this.disposed || !this.acceptsOwner()
+      response.writeHead(unauthorized ? 401 : 403)
+      response.end(unauthorized ? 'unauthorized' : 'forbidden')
       return
     }
     this.browserAuth.authorizeConnect(request, response,
@@ -191,7 +263,34 @@ export class HostConnectionService extends Service implements HostConnectionHand
    * Authenticate an index request; native TLS listeners mint Secure cookies.
    */
   authorizeIndex(request: ConnectionIndexRequest, response: ConnectionIndexResponse): boolean {
-    return this.browserAuth.authorizeIndex(request, response, this.ctx.get('webServer')?.protocol === 'https:')
+    if (!this.isTrusted(request) || this.disposed) {
+      response.writeHead(this.disposed ? 401 : 403)
+      response.end()
+      return false
+    }
+    const secure = this.ctx.get('webServer')?.protocol === 'https:'
+    const url = new URL(request.url ?? '/', 'http://dsh.invalid')
+    if (url.searchParams.has('token') && this.acceptsOwner()) {
+      return this.browserAuth.authorizeIndex(request, response, secure)
+    }
+    if (this.acceptsOwner() && this.browserAuth.isAuthenticated(request, secure)) return true
+    for (const { provider } of this.browserPrincipalProviders) {
+      if (provider.authenticate(request, secure) !== undefined) return true
+    }
+    const loginPath = [...this.browserPrincipalProviders].find(record => record.provider.loginPath !== undefined)?.provider.loginPath
+    if (loginPath !== undefined && request.method === 'GET') {
+      for (const name of ['token', 'code', 'state', 'userId', 'deviceId', 'deviceID']) url.searchParams.delete(name)
+      response.writeHead(302, { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer',
+        location: `${loginPath}?redirect=${encodeURIComponent(url.pathname + url.search)}` })
+      response.end()
+      return false
+    }
+    if (!this.acceptsOwner()) {
+      response.writeHead(401, { 'cache-control': 'no-store' })
+      response.end()
+      return false
+    }
+    return this.browserAuth.authorizeIndex(request, response, secure)
   }
 
   /** Add this process's launch token to the clean application URL. */

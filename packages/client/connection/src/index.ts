@@ -31,6 +31,10 @@ export type {
   ConnectionRpcResult,
   ConnectionRequestBodyMode,
   ConnectionTrustRequest,
+  BrowserPrincipalAuthentication,
+  BrowserPrincipalProvider,
+  BrowserPrincipalRegistration,
+  BrowserSessionKey,
   ClientRequest,
   HostConnectionHandle,
   HostConnectionFetch,
@@ -107,6 +111,8 @@ export interface ConnectionConfig {
   cookieMaxAgeDays?: number
   /** Maximum buffered JSON body for every `/api` request. Default: 300 MiB. */
   maxRequestBodyBytes?: number
+  /** Deny built-in Owner credentials even when no browser provider is available. */
+  requireBrowserLogin?: boolean
 }
 
 export const Config: z<ConnectionConfig> = z.object({
@@ -114,6 +120,7 @@ export const Config: z<ConnectionConfig> = z.object({
   trustedHosts: z.array(String).default([]),
   cookieMaxAgeDays: z.natural().min(1).default(30),
   maxRequestBodyBytes: z.natural().min(1).default(DEFAULT_MAX_REQUEST_BODY_BYTES),
+  requireBrowserLogin: z.boolean().default(false),
 })
 
 /**
@@ -137,6 +144,7 @@ export async function apply(ctx: Context, config?: ConnectionConfig): Promise<vo
     ctx,
     trustedHosts,
     await BrowserAuth.create(ctx.root, ctx.credentials, cookieMaxAgeDays),
+    config?.requireBrowserLogin ?? false,
   )
   ctx.inject(['webServer'], (webCtx) => {
     assertImageBodyCapacity(webCtx, maxRequestBodyBytes)
