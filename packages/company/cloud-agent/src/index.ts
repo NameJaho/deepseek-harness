@@ -13,7 +13,7 @@ import type {} from '@deepseek-ai/dsh-permission-presets'
 import type { SessionForkPlacement, SessionPromptRequest } from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-company-mcp-provider'
 import type {} from '@deepseek-ai/dsh-company-knowledge'
-import type { CompanyKnowledgeBinding, CompanyKnowledgeSearchResult } from '@deepseek-ai/dsh-company-knowledge/types'
+import type { CompanyKnowledgeBinding, CompanyKnowledgeDetailedSearchResult, CompanyKnowledgeRetrieveOptions } from '@deepseek-ai/dsh-company-knowledge/types'
 import type {} from '@deepseek-ai/dsh-company-wecom-auth'
 import type { CompanyOwnerScope } from '@deepseek-ai/dsh-company-wecom-auth/types'
 import type { ToolDefinition, ToolRunContext } from '@deepseek-ai/dsh-tools'
@@ -609,16 +609,17 @@ export class CloudAgentService extends TypertRemoteService {
    * @param sourceId - logical source id; spaces and connection settings stay with the knowledge service.
    * @param query - natural-language question.
    * @param signal - tool cancellation.
+   * @param options - direct retrieve conversation history and method controls.
    * @returns validated relevant passages; a source outside the release or with changed permissions is refused.
    */
   searchKnowledge(agent: Agent | undefined, releaseId: string, sourceId: string, query: string,
-    signal: AbortSignal): Promise<CompanyKnowledgeSearchResult> {
-    const run = async (): Promise<CompanyKnowledgeSearchResult> => {
+    signal: AbortSignal, options?: CompanyKnowledgeRetrieveOptions): Promise<CompanyKnowledgeDetailedSearchResult> {
+    const run = async (): Promise<CompanyKnowledgeDetailedSearchResult> => {
       this.requireReleaseAgent(agent, releaseId)
       const binding = this.releases.get(brandString<CloudAgentReleaseId>(releaseId))?.knowledgeBindings?.find(item => item.id === sourceId)
       const knowledge = this.owner.get('companyKnowledge')
       if (binding === undefined || knowledge === undefined) throw unavailableCapability(sourceId)
-      const result = await knowledge.search(binding, query, AbortSignal.any([signal, this.capabilityLifetime.signal]))
+      const result = await knowledge.search(binding, query, AbortSignal.any([signal, this.capabilityLifetime.signal]), options)
       this.requireReleaseAgent(agent, releaseId)
       return result
     }

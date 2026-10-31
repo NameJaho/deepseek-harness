@@ -106,7 +106,9 @@ it('exposes cloud_knowledge for approved sources and forwards only the source id
   expect(renderPrompt(await f.ctx.systemPrompt.assemble({ scope: f.agent }))).toContain('Approved knowledge sources: hr, operations.')
   const result = await f.execute('cloud_knowledge', { sourceId: 'hr', query: 'Leave policy' })
   expect(result.content).toEqual([{ type: 'text', text: expect.stringContaining('"sourceId":"hr"') as string }])
-  expect(f.search).toHaveBeenCalledWith(f.agent, 'release-1', 'hr', 'Leave policy', expect.any(AbortSignal))
+  expect(f.search).toHaveBeenCalledWith(f.agent, 'release-1', 'hr', 'Leave policy', expect.any(AbortSignal), {
+    messages: [{ role: 'user', content: 'Leave policy' }],
+  })
   expect((await f.execute('cloud_knowledge', { sourceId: 'finance', query: 'Budget' })).isError).toBe(true)
   expect(f.search).toHaveBeenCalledOnce()
 })

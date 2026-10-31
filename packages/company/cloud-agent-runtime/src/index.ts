@@ -8,6 +8,46 @@ import { brandString } from '@deepseek-ai/dsh-brand'
 import type { AttachmentIdType } from '@deepseek-ai/dsh-attachment'
 import type {} from '@deepseek-ai/dsh-company-cloud-agent'
 
+type RetrieveMessage = { readonly role: 'user' | 'assistant'; readonly content: string }
+
+function messageText(message: { readonly content: readonly { readonly type: string; readonly text?: string }[] }): string {
+  return message.content.filter(block => block.type === 'text').map(block => block.text ?? '').join('\n')
+}
+
+function retrieveMessages(
+  agent: { readonly session?: { deriveMessages(): readonly { role: string; content: readonly { type: string; text?: string }[] }[] } },
+  query: string,
+): RetrieveMessage[] {
+  if (agent.session === undefined) return [{ role: 'user', content: query }]
+  const messages = agent.session.deriveMessages().filter((message): message is typeof message & { role: 'user' | 'assistant' } =>
+    message.role === 'user' || message.role === 'assistant').map(message => ({ role: message.role, content: messageText(message) }))
+  if (messages.at(-1)?.role !== 'user' || messages.at(-1)?.content !== query) messages.push({ role: 'user', content: query })
+  return messages
+}
+
+function recordOf(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : undefined
+}
+
+function previousMethodId(
+  agent: { readonly session?: { deriveMessages(): readonly { role: string; content: readonly { type: string; text?: string }[] }[] } },
+): string | undefined {
+  if (agent.session === undefined) return undefined
+  for (const message of agent.session.deriveMessages().toReversed()) {
+    if (message.role !== 'tool') continue
+    for (const text of message.content.filter(block => block.type === 'text').map(block => block.text ?? '').toReversed()) {
+      try {
+        const signals = recordOf(recordOf(JSON.parse(text))?.signals)
+        const method = recordOf(signals?.method)
+        if (typeof method?.knowledge_id === 'string' && method.knowledge_id !== '') return method.knowledge_id
+      } catch (_invalidResult: unknown) {
+        // Earlier tool results may be ordinary text; only retrieve JSON carries a method id.
+      }
+    }
+  }
+  return undefined
+}
+
 /** Scoped runtime plugin name. */
 export const name = 'company-cloud-agent-runtime'
 /** The catalog owns executable release authorization. */
@@ -175,12 +215,18 @@ export function apply(ctx: Context, config: Config): void {
     parameters: {
       sourceId: { type: 'string', required: true, enum: knowledgeSources, description: 'An approved logical source id.' },
       query: { type: 'string', required: true, description: 'The user question in natural language.' },
+      emotion: { type: 'string', description: 'Optional current-user emotion: 平和, 疑惑, 着急, 不满 or 愤怒.' },
+      verify: { type: 'boolean', description: 'Whether the retrieval service verifies sufficiency and supplements evidence; defaults to true.' },
     },
     output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
     presentCall: args => ({ card: 'generic', title: args.query, kind: 'search', rawInput: args }),
     async execute(args, execution) {
+      if (execution.agent === undefined) throw new Error('Knowledge search requires a live conversation')
+      const messages = retrieveMessages(execution.agent, args.query)
+      const methodId = previousMethodId(execution.agent)
       return JSON.stringify(await ctx.cloudAgents.searchKnowledge(execution.agent, config.releaseId,
-        args.sourceId, args.query, execution.signal))
+        args.sourceId, args.query, execution.signal, { messages, ...(args.emotion === undefined ? {} : { emotion: args.emotion }),
+          ...(args.verify === undefined ? {} : { verify: args.verify }), ...(methodId === undefined ? {} : { prevMethodId: methodId }) }))
     },
   }))
   if (skills.length > 0) ctx.tools.register(defineTool({

@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-This package defines `ctx.companyKnowledge`, the only Host path that searches company knowledge spaces. The Host configures each logical source with a private search endpoint, an optional bearer credential and an allowlist of upstream spaces. Browsers and models see only the source id, name, description and validated evidence. Cloud Agent drafts select sources; each release stores a fingerprint of the allowed spaces, and its runtime searches only through that fingerprint. Owners can test sources from **Plugins → Company knowledge**. This package connects an existing search service; it does not import documents or manage spaces.
+This package defines `ctx.companyKnowledge`, the only Host path that searches company knowledge spaces. The Host configures each logical source with a direct retrieve endpoint and an allowlist of upstream spaces. Browsers and models see only the source id, name, description and validated evidence. Cloud Agent drafts select sources; each release stores a fingerprint of the allowed spaces, and its runtime searches only through that fingerprint. Owners can test sources from **Plugins → Company knowledge**. This package connects an existing search service; it does not import documents or manage spaces.
 
 ## Table of Contents
 
@@ -25,25 +25,25 @@ This package defines `ctx.companyKnowledge`, the only Host path that searches co
 <a id="use-this-package"></a>
 ## Use this package
 
-Apply `cordis.patch.yml` to a Web profile and set `DSH_COMPANY_KNOWLEDGE_SOURCES` in the server environment to a JSON array of sources. An unset variable leaves the page in its unconfigured state. Each source has `id` (lowercase letters, digits and `-`, at most 64 characters), `name`, optional `description`, `searchUrl` (HTTP or HTTPS without embedded credentials), optional `tokenRef` and a nonempty `spaceIds` list. When the service needs a bearer token, store it under the credential reference named by `tokenRef`; it is resolved through `ctx.credentials` for every request, and an unset credential sends no `Authorization` header. Invalid URLs and duplicate ids reject activation without echoing the URL.
+Apply `cordis.patch.yml` to a Web profile and set `DSH_COMPANY_KNOWLEDGE_SOURCES` in the server environment to a JSON array of sources. An unset variable leaves the page in its unconfigured state. Each source has `id` (lowercase letters, digits and `-`, at most 64 characters), `name`, optional `description`, a direct HTTP(S) retrieve `searchUrl` and a nonempty `spaceIds` list. The direct endpoint does not require authentication; requests do not send an `Authorization` header. Invalid URLs and duplicate ids reject activation without echoing the URL.
 
 ```json
 [{ "id": "operations", "name": "Operations manuals", "description": "Store equipment and procedures",
-   "searchUrl": "https://knowledge.internal/search", "tokenRef": "DSH_KNOWLEDGE_TOKEN", "spaceIds": ["ops-space"] }]
+   "searchUrl": "https://workflow-engine.busyming.com/knowledge_search_api/retrieve", "spaceIds": ["207b3de8-ea9d-47ad-b6f8-044a2a1a7f37"] }]
 ```
 
 | Field | Default | Meaning |
 |---|---|---|
-| `sources` | `[]` | Host-owned logical sources with private endpoints, credentials and space allowlists |
+| `sources` | `[]` | Host-owned logical sources with direct endpoints and space allowlists |
 | `topK` | `5` | Requested passages, from 1 to 50 |
 | `minimumScore` | `0.5` | Minimum accepted rerank relevance |
-| `timeoutMs` | `30000` | Deadline for one retrieval |
+| `timeoutMs` | `60000` | Deadline for one retrieval |
 | `maxQueryChars` | `16000` | Maximum question characters after trimming |
 | `maxResponseBytes` | `8388608` | Complete upstream response byte limit |
 
-Each search sends `POST searchUrl` with `{ query, space_ids, top_k, mode: "hybrid", rerank: true }`. The response must be `{ results, total_hits }`; each result has `chunk_id`, `document_id`, `doc_title`, `breadcrumb`, `content`, `score` from 0 to 1 and `space_id`. A result from a space outside the allowlist, more results than `top_k`, a total below the result count, a non-UTF-8 body or a body over the byte limit rejects the whole response. Passages below `minimumScore` and blank passages are removed, and identical content is returned once. An empty result means no reliable evidence was found; it does not establish that a space exists. Transport, HTTP, timeout, credential and response failures stay failures with the codes `company-knowledge/search-failed` and a `reason`; they never become empty evidence and never include URLs, tokens or upstream bodies.
+Each search sends direct `POST searchUrl` using retrieve fields such as `messages`, `space_ids`, `emotion`, `prev_method_id`, `verify`, `image`, `kb_ids`, `sources`, `top_k`, `filter_doc_type` and `exclude_needs_review`. `messages` carries the complete user/assistant conversation, and the Host always injects `space_ids`. The response must contain `results` grouped as `chunks`, `images`, `im` and `graph`; `signals`, `same_topic`, `locked_method_id`, `verified`, `sufficient`, `missing`, `conflicts`, `reply_strategy`, `references` and `activity` remain available to Cloud Agent. A document result from a space outside the allowlist, invalid JSON, a non-UTF-8 body or a body over the byte limit rejects the whole response. Passages below `minimumScore` and blank passages are removed from the UI evidence list, while the original grouped results remain in `retrieve`. An empty result means no reliable evidence was found; it does not establish that a space exists. Transport, HTTP, timeout and response failures stay failures with the codes `company-knowledge/search-failed` and a `reason`; they never become empty evidence and never include URLs or upstream bodies.
 
-`catalog()` and `test()` are owner-only Remote methods for the management page. The page shows source cards with the latest test status, a question form with a character count and cancellation, and evidence cards with document title, section path, relevance and the complete passage. A failed search keeps the previous result visible. Same-process consumers call `sources()`, `binding(id)`, `validate(binding)` and `search(binding, query, signal)`. Changing a source's space list fails `validate` with `company-knowledge/binding-changed` until a new release is published; document updates inside the same spaces do not require republication.
+`catalog()` and `test()` are owner-only Remote methods for the management page. The page shows source cards with the latest test status, a question form with a character count and cancellation, and evidence cards with document title, section path, relevance and the complete passage. A failed search keeps the previous result visible. Same-process consumers call `sources()`, `binding(id)`, `validate(binding)` and `search(binding, query, signal, options)`. Changing a source's space list fails `validate` with `company-knowledge/binding-changed` until a new release is published; document updates inside the same spaces do not require republication.
 
 -----
 

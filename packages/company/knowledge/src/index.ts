@@ -1,8 +1,6 @@
 /** Host-owned approved knowledge sources (`ctx.companyKnowledge`) and owner-side retrieval checks. */
 import { createHash } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
-import { credentialRef } from '@deepseek-ai/dsh-credentials'
-import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { deadline, timeoutOf } from '@deepseek-ai/dsh-timeout'
 import type {} from '@deepseek-ai/dsh-company-wecom-auth'
@@ -10,7 +8,13 @@ import { Config } from './config.ts'
 import type { KnowledgeSourceConfig } from './config.ts'
 import { searchKnowledge } from './search.ts'
 import type {
-  CompanyKnowledgeBinding, CompanyKnowledgeCatalog, CompanyKnowledgeSearchRequest, CompanyKnowledgeSearchResult, CompanyKnowledgeSource,
+  CompanyKnowledgeBinding,
+  CompanyKnowledgeCatalog,
+  CompanyKnowledgeDetailedSearchResult,
+  CompanyKnowledgeRetrieveOptions,
+  CompanyKnowledgeSearchRequest,
+  CompanyKnowledgeSearchResult,
+  CompanyKnowledgeSource,
 } from './types.ts'
 
 export { Config } from './config.ts'
@@ -26,32 +30,16 @@ declare module '@deepseek-ai/cordis' {
 
 interface ResolvedSource {
   readonly config: KnowledgeSourceConfig
-  readonly tokenRef: CredentialRef | undefined
 }
 
-/** Await a credential lookup without allowing a stopped or timed-out request to linger. */
-function abortable<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = (): void => {
-      reject(signal.reason instanceof Error ? signal.reason : new Error(String(signal.reason)))
-    }
-    signal.addEventListener('abort', onAbort, { once: true })
-    void work.then((value) => { signal.removeEventListener('abort', onAbort); resolve(value) }, (error: unknown) => {
-      signal.removeEventListener('abort', onAbort)
-      reject(error instanceof Error ? error : new Error(String(error)))
-    })
-  })
-}
-
-/** Approved retrieval registry; public results omit endpoints, credentials and upstream space identities. */
+/** Approved retrieval registry; public results omit endpoints and upstream space identities. */
 export class CompanyKnowledgeService extends TypertRemoteService {
   static Config = Config
-  static inject = ['credentials']
   private readonly lifetime = new AbortController()
-  private readonly active = new Set<Promise<CompanyKnowledgeSearchResult>>()
+  private readonly active = new Set<Promise<CompanyKnowledgeDetailedSearchResult>>()
   private readonly sourceMap = new Map<string, ResolvedSource>()
 
-  /** @param ctx - Host with credential storage.
+  /** @param ctx - Host with the company member authorization provider.
    * @param config - validated sources and retrieval bounds; invalid endpoints or duplicate ids fail at load.
    */
   constructor(ctx: Context, private readonly config: Config) {
@@ -60,15 +48,14 @@ export class CompanyKnowledgeService extends TypertRemoteService {
       let url: URL
       try { url = new URL(source.searchUrl) }
       catch (_urlError: unknown) {
-        // The configured value may embed credentials, so it is not echoed.
+        // The configured value is not echoed in the load failure.
         throw new Error(`Company knowledge source "${source.id}" has an invalid searchUrl`)
       }
       if (!['http:', 'https:'].includes(url.protocol) || url.username !== '' || url.password !== '') {
-        throw new Error(`Company knowledge source "${source.id}" requires an HTTP searchUrl without embedded credentials`)
+        throw new Error(`Company knowledge source "${source.id}" requires an HTTP searchUrl`)
       }
       if (this.sourceMap.has(source.id)) throw new Error(`Company knowledge source id "${source.id}" is duplicated`)
-      const tokenRef = source.tokenRef === undefined ? undefined : credentialRef(source.tokenRef)
-      this.sourceMap.set(source.id, { config: source, tokenRef })
+      this.sourceMap.set(source.id, { config: source })
     }
     ctx.effect(() => async () => {
       this.lifetime.abort(new Error('Knowledge search service stopped'))
@@ -128,16 +115,25 @@ export class CompanyKnowledgeService extends TypertRemoteService {
   @Remote
   async test(request: CompanyKnowledgeSearchRequest, signal: AbortSignal): Promise<CompanyKnowledgeSearchResult> {
     this.requireMember()
-    return await this.search(this.binding(request.sourceId), request.query, signal)
+    const result = await this.search(this.binding(request.sourceId), request.query, signal, request.options)
+    return {
+      sourceId: result.sourceId,
+      hits: result.hits,
+      returned: result.returned,
+      totalHits: result.totalHits,
+      belowThreshold: result.belowThreshold,
+    }
   }
 
   /** Search only the spaces granted by a trusted release binding.
    * @param binding - source authorization already checked by the calling Agent owner.
    * @param query - untrusted question, validated before dispatch.
    * @param signal - invoking operation cancellation.
+   * @param options - direct retrieve conversation history and method controls.
    * @returns verified evidence after complete bounded response validation.
    */
-  async search(binding: CompanyKnowledgeBinding, query: string, signal: AbortSignal): Promise<CompanyKnowledgeSearchResult> {
+  async search(binding: CompanyKnowledgeBinding, query: string, signal: AbortSignal,
+    options?: CompanyKnowledgeRetrieveOptions): Promise<CompanyKnowledgeDetailedSearchResult> {
     if (this.lifetime.signal.aborted) throw new RemoteError('company-knowledge/unavailable', 'Knowledge service stopped', {})
     this.validate(binding)
     const trimmed = query.trim()
@@ -145,7 +141,7 @@ export class CompanyKnowledgeService extends TypertRemoteService {
       throw new RemoteError('company-knowledge/invalid-input',
         `Enter a question with 1–${String(this.config.maxQueryChars)} characters`, { field: 'query' })
     }
-    const pending = this.runSearch(this.source(binding.id), trimmed, signal)
+    const pending = this.runSearch(this.source(binding.id), trimmed, options, signal)
     this.active.add(pending)
     try { return await pending }
     finally { this.active.delete(pending) }
@@ -157,13 +153,13 @@ export class CompanyKnowledgeService extends TypertRemoteService {
     return source
   }
 
-  private async runSearch(source: ResolvedSource, query: string, signal: AbortSignal): Promise<CompanyKnowledgeSearchResult> {
+  private async runSearch(source: ResolvedSource, query: string, options: CompanyKnowledgeRetrieveOptions | undefined,
+    signal: AbortSignal): Promise<CompanyKnowledgeDetailedSearchResult> {
     const upstream = AbortSignal.any([signal, this.lifetime.signal])
     using time = deadline(upstream, this.config.timeoutMs, 'COMPANY_KNOWLEDGE_TIMEOUT')
     try {
-      const authorization = await this.authorization(source.tokenRef, time.signal)
       time.signal.throwIfAborted()
-      return await searchKnowledge(source.config, query, authorization, this.config, time.signal)
+      return await searchKnowledge(source.config, query, options, this.config, time.signal)
     } catch (error) {
       upstream.throwIfAborted()
       if (timeoutOf(time.signal, 'COMPANY_KNOWLEDGE_TIMEOUT') !== undefined) {
@@ -171,22 +167,6 @@ export class CompanyKnowledgeService extends TypertRemoteService {
       }
       throw error
     }
-  }
-
-  private async authorization(ref: CredentialRef | undefined, signal: AbortSignal): Promise<Record<string, string>> {
-    if (ref === undefined) return {}
-    if (signal.aborted) signal.throwIfAborted()
-    let credential: Awaited<ReturnType<Context['credentials']['resolve']>>
-    try { credential = await abortable(this.ctx.credentials.resolve(ref), signal) }
-    catch (_credentialFailure: unknown) {
-      // Credential provider errors can name storage locations; only the classification is reported.
-      throw new RemoteError('company-knowledge/search-failed', 'Knowledge search credential is unavailable', { reason: 'credential' })
-    }
-    if (credential === undefined) return {}
-    if (!/^[\x21-\x7e]+$/.test(credential.value)) {
-      throw new RemoteError('company-knowledge/search-failed', 'Knowledge search credential is not a valid token', { reason: 'credential' })
-    }
-    return { authorization: `Bearer ${credential.value}` }
   }
 
   private requireMember(): void {

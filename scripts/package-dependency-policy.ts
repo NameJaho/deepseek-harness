@@ -75,7 +75,6 @@ const PEER_REQUIRED_HOST_EXPORTS = {
   '@deepseek-ai/dsh-tools': ['defineTool'],
   '@deepseek-ai/dsh-company-mcp-provider': ['companyMcpFingerprint'],
   '@deepseek-ai/dsh-storage-domain': ['domainTable'],
-  '@deepseek-ai/dsh-credentials': ['credentialRef'],
   // Profile settings must match the installed Node provider's configuration schema.
   '@deepseek-ai/dsh-ptc-runtime-node/configuration': ['resolvePersistentExecution'],
   // CUA checks UserQuestionError and preserves AttachmentError from image admission.

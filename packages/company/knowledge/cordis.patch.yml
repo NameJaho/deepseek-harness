@@ -1,4 +1,4 @@
-# Host deployments supply the source list as JSON; bearer tokens stay in credential storage under each source's tokenRef.
+# Host deployments supply the direct retrieve source list as JSON; the endpoint is protected by the internal network.
 - insert:
     - id: company-knowledge
       name: '@deepseek-ai/dsh-company-knowledge'

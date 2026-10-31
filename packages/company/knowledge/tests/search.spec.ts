@@ -1,8 +1,7 @@
-/** Real local HTTP retrieval, permission isolation, credentials and cancellation for the knowledge service. */
+/** Real local direct retrieval, permission isolation and cancellation for the knowledge service. */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { once } from 'node:events'
-import { Context, Service } from '@deepseek-ai/cordis'
-import type { CredentialRef, ResolvedCredential } from '@deepseek-ai/dsh-credentials'
+import { Context } from '@deepseek-ai/cordis'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { RemoteInvocation } from '@deepseek-ai/dsh-typert-protocol'
 import type { WecomUserPrincipal } from '@deepseek-ai/dsh-company-wecom-auth/types'
@@ -36,26 +35,16 @@ async function server(test: TestContext, answer: Answer): Promise<string> {
 
 const json = (value: object): Answer => (_request, _body, response) => {
   response.setHeader('content-type', 'application/json')
-  response.end(JSON.stringify(value))
+  const legacy = value as { results?: unknown; total_hits?: unknown }
+  const body = Array.isArray(legacy.results) ? {
+    query: 'question', signals: { per_source: { chunks: { hits: typeof legacy.total_hits === 'number' ? legacy.total_hits : legacy.results.length } } },
+    results: { chunks: legacy.results, images: [], im: [], graph: [] },
+  } : value
+  response.end(JSON.stringify(body))
 }
-
-class FixtureCredentials extends Service {
-  constructor(ctx: Context, private readonly config: { resolve: (ref: CredentialRef) => Promise<ResolvedCredential | undefined> }) {
-    super(ctx, 'credentials')
-  }
-
-  resolve(ref: CredentialRef): Promise<ResolvedCredential | undefined> { return this.config.resolve(ref) }
-}
-
-interface Fixture {
-  readonly ctx: Context
-  readonly resolve?: (ref: CredentialRef) => Promise<ResolvedCredential | undefined>
-}
-
-async function context(test: TestContext, resolve: Fixture['resolve'] = () => Promise.resolve(undefined)): Promise<Context> {
+async function context(test: TestContext): Promise<Context> {
   const ctx = new Context()
   test.onTestFinished(() => ctx.fiber.dispose())
-  await ctx.plugin(FixtureCredentials, { resolve })
   return ctx
 }
 
@@ -63,8 +52,8 @@ const source = (url: string, overrides: Partial<Config['sources'][number]> = {})
   id: 'operations', name: 'Operations', description: 'Approved space', searchUrl: url, spaceIds: ['approved-space'], ...overrides,
 })
 
-async function service(test: TestContext, url: string, options: Partial<Config> = {}, resolve?: Fixture['resolve']) {
-  const ctx = await context(test, resolve)
+async function service(test: TestContext, url: string, options: Partial<Config> = {}) {
+  const ctx = await context(test)
   await ctx.plugin(Knowledge, Config({ sources: [source(url)], ...options }))
   return ctx.companyKnowledge
 }
@@ -78,6 +67,34 @@ const signal = () => new AbortController().signal
 const ask = { sourceId: 'operations', query: 'question' }
 
 describe('approved knowledge search', () => {
+  it('sends the direct retrieve request and preserves method and sufficiency signals', async (test) => {
+    const received: string[] = []
+    const url = await server(test, (request, body, response) => {
+      received.push(body)
+      json({
+        query: 'still not working', rewritten: 'printer remains out of paper after reload', same_topic: true,
+        locked_method_id: 'im_cc344d1020cb', verified: true, sufficient: true, missing: '', conflicts: [],
+        signals: { method: { knowledge_id: 'im_cc344d1020cb', current_step: 2 }, per_source: { chunks: { hits: 1 } } },
+        reply_strategy: { do: ['give one step'] }, references: [{ lineage: ['operations'] }], activity: { elapsed_ms: 10 },
+        results: { chunks: [hit()], images: [{ image_id: 'image-1' }], im: [{ chunk_id: 'im_cc344d1020cb' }], graph: [] },
+      })(request, body, response)
+    })
+    const api = await service(test, url)
+    const result = await api.search(api.binding('operations'), '还是不行', signal(), {
+      messages: [{ role: 'user', content: '打印机不出纸' }, { role: 'assistant', content: '重新装纸' }, { role: 'user', content: '还是不行' }],
+      emotion: '不满', prevMethodId: 'im_cc344d1020cb', verify: true, image: 'https://img.example/photo.png', kbIds: ['kb-1'],
+      sources: ['chunks', 'im'], topK: 3, filterDocType: 'qa', excludeNeedsReview: true,
+    })
+    expect(JSON.parse(received[0] ?? '')).toEqual({ messages: [
+      { role: 'user', content: '打印机不出纸' }, { role: 'assistant', content: '重新装纸' }, { role: 'user', content: '还是不行' },
+    ], space_ids: ['approved-space'], emotion: '不满', prev_method_id: 'im_cc344d1020cb', verify: true,
+    image: 'https://img.example/photo.png', kb_ids: ['kb-1'], sources: ['chunks', 'im'], top_k: 3,
+    filter_doc_type: 'qa', exclude_needs_review: true })
+    expect(result.retrieve).toMatchObject({ rewritten: 'printer remains out of paper after reload', sameTopic: true,
+      lockedMethodId: 'im_cc344d1020cb', verified: true, sufficient: true, signals: { method: { knowledge_id: 'im_cc344d1020cb' } } })
+    expect(result.hits).toHaveLength(1)
+  })
+
   it('injects only approved spaces, preserves full content, filters weak or empty passages and removes duplicates', async (test) => {
     const received: string[] = []
     const url = await server(test, (request, body, response) => {
@@ -90,9 +107,8 @@ describe('approved knowledge search', () => {
     expect(catalog).toEqual({ sources: [{ id: 'operations', name: 'Operations', description: 'Approved space' }], maxQueryChars: 16000 })
     expect(JSON.stringify(catalog)).not.toContain('approved-space')
     const result = await api.test({ sourceId: 'operations', query: '  钱箱打不开怎么办  ' }, signal())
-    expect(JSON.parse(received[0] ?? '')).toEqual({ query: '钱箱打不开怎么办', space_ids: ['approved-space'],
-      top_k: 5, mode: 'hybrid', rerank: true })
-    expect(result).toEqual({ sourceId: 'operations', returned: 4, totalHits: 9, belowThreshold: 1, hits: [{
+    expect(JSON.parse(received[0] ?? '')).toEqual({ messages: [{ role: 'user', content: '钱箱打不开怎么办' }], space_ids: ['approved-space'] })
+    expect(result).toMatchObject({ sourceId: 'operations', returned: 4, totalHits: 9, belowThreshold: 1, hits: [{
       chunkId: 'chunk', documentId: 'document', documentTitle: 'Device manual', breadcrumb: 'Cash drawer > Troubleshooting',
       content: hit().content, score: 0.96 }] })
   })
@@ -105,8 +121,6 @@ describe('approved knowledge search', () => {
 
   it.for([
     ['a passage from a space outside the source', json({ results: [hit({ space_id: 'other' })], total_hits: 1 })],
-    ['more passages than requested', json({ results: [hit(), hit({ chunk_id: 'b', content: 'b' })], total_hits: 2 })],
-    ['a total below the returned count', json({ results: [hit()], total_hits: 0 })],
     ['a score outside 0 to 1', json({ results: [hit({ score: 1.5 })], total_hits: 1 })],
     ['a body that is not JSON', ((_request, _body, response) => { response.end('<html>') }) satisfies Answer],
     ['a response without a body', ((_request, _body, response) => { response.writeHead(204); response.end() }) satisfies Answer],
@@ -210,78 +224,11 @@ describe('release bindings', () => {
   })
 })
 
-describe('credentials', () => {
-  it('sends the referenced token as a bearer header', async (test) => {
-    const headers: Array<string | undefined> = []
-    const url = await server(test, (request, body, response) => {
-      headers.push(request.headers.authorization)
-      json({ results: [], total_hits: 0 })(request, body, response)
-    })
-    const resolve = vi.fn((ref: CredentialRef) => Promise.resolve({ value: 'knowledge-token', source: `env:${ref}` }))
-    const ctx = await context(test, resolve)
-    await ctx.plugin(Knowledge, Config({ sources: [source(url, { tokenRef: 'DSH_KNOWLEDGE_TOKEN' })] }))
-    await ctx.companyKnowledge.test(ask, signal())
-    expect(resolve).toHaveBeenCalledWith('DSH_KNOWLEDGE_TOKEN')
-    expect(headers).toEqual(['Bearer knowledge-token'])
-  })
-
-  it('sends no authorization header when the referenced credential is unset', async (test) => {
-    const headers: Array<string | undefined> = []
-    const url = await server(test, (request, body, response) => {
-      headers.push(request.headers.authorization)
-      json({ results: [], total_hits: 0 })(request, body, response)
-    })
-    const ctx = await context(test)
-    await ctx.plugin(Knowledge, Config({ sources: [source(url, { tokenRef: 'DSH_KNOWLEDGE_TOKEN' })] }))
-    await ctx.companyKnowledge.test(ask, signal())
-    expect(headers).toEqual([undefined])
-  })
-
-  it('does not resolve a credential after the request is already cancelled', async (test) => {
-    const url = await server(test, json({ results: [], total_hits: 0 }))
-    const resolve = vi.fn(() => Promise.resolve({ value: 'unused', source: 'env:x' }))
-    const ctx = await context(test, resolve)
-    await ctx.plugin(Knowledge, Config({ sources: [source(url, { tokenRef: 'DSH_KNOWLEDGE_TOKEN' })] }))
-    const controller = new AbortController()
-    controller.abort(new Error('caller left'))
-    await expect(ctx.companyKnowledge.test(ask, controller.signal)).rejects.toThrow('caller left')
-    expect(resolve).not.toHaveBeenCalled()
-  })
-
-  it('cancels an in-flight credential lookup with the caller signal', async (test) => {
-    const url = await server(test, json({ results: [], total_hits: 0 }))
-    const pending = Promise.withResolvers<ResolvedCredential | undefined>()
-    const resolve = vi.fn(() => pending.promise)
-    const ctx = await context(test, resolve)
-    await ctx.plugin(Knowledge, Config({ sources: [source(url, { tokenRef: 'DSH_KNOWLEDGE_TOKEN' })] }))
-    const controller = new AbortController()
-    const request = ctx.companyKnowledge.test(ask, controller.signal)
-    await vi.waitFor(() => { expect(resolve).toHaveBeenCalled() })
-    controller.abort(new Error('caller left'))
-    await expect(request).rejects.toThrow('caller left')
-    pending.resolve(undefined)
-  })
-
-  it.for([
-    ['an unavailable credential store', () => Promise.reject(new Error('/private/keychain/path'))],
-    ['a token with header-unsafe characters', () => Promise.resolve({ value: 'bad\ntoken', source: 'env:x' })],
-  ] as const)('classifies %s as a credential failure without contacting the service', async ([, resolve], test) => {
-    let calls = 0
-    const url = await server(test, (_request, _body, response) => { calls++; response.end('{}') })
-    const ctx = await context(test, resolve)
-    await ctx.plugin(Knowledge, Config({ sources: [source(url, { tokenRef: 'DSH_KNOWLEDGE_TOKEN' })] }))
-    const failure = await ctx.companyKnowledge.test(ask, signal()).catch((error: unknown) => error)
-    expect(failure).toMatchObject({ code: 'company-knowledge/search-failed', details: { reason: 'credential' } })
-    expect(String(failure)).not.toContain('/private/keychain/path')
-    expect(calls).toBe(0)
-  })
-})
-
 describe('configuration and access', () => {
   it.for([
     ['an unparsable URL', [source('not a url')], 'invalid searchUrl'],
     ['a non-HTTP URL', [source('file:///etc/passwd')], 'HTTP searchUrl'],
-    ['embedded credentials', [source('https://user:secret@knowledge.example/search')], 'without embedded credentials'],
+    ['embedded credentials', [source('https://user:secret@knowledge.example/search')], 'HTTP searchUrl'],
     ['duplicate ids', [source('https://knowledge.example/a'), source('https://knowledge.example/b')], 'duplicated'],
   ] as const)('fails at load for %s without echoing the URL', async ([, sources, message], test) => {
     const ctx = await context(test)

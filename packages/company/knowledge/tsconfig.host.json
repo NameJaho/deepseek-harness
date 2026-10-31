@@ -8,7 +8,6 @@
     { "path": "../../util/brand" },
     { "path": "../../util/timeout" },
     { "path": "../../typert/protocol" },
-    { "path": "../../credentials/credentials" },
     { "path": "../wecom-auth" }
   ]
 }

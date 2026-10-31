@@ -430,7 +430,7 @@ it('publishes knowledge-only releases without an MCP provider and rejects foreig
     knowledgeSources: [{ id: 'operations', name: 'Operations', description: 'Approved evidence' }] })
   const usage = await f.ctx.cloudAgents.startSession({ id: record.id, releaseId }, new AbortController().signal)
   const agent = f.agents.get(usage.sessionId)!
-  const evidence = { sourceId: 'operations', returned: 0, totalHits: 0, belowThreshold: 0, hits: [] }
+  const evidence = { sourceId: 'operations', returned: 0, totalHits: 0, belowThreshold: 0, hits: [], retrieve: { results: { chunks: [], images: [], im: [], graph: [] } } }
   const search = vi.spyOn(f.ctx.companyKnowledge, 'search').mockResolvedValue(evidence)
   expect(await f.ctx.cloudAgents.searchKnowledge(agent, releaseId, 'operations', 'Question', new AbortController().signal)).toEqual(evidence)
   await expect(f.ctx.cloudAgents.searchKnowledge(agent, releaseId, 'foreign', 'Question', new AbortController().signal))

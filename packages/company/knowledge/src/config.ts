@@ -1,4 +1,4 @@
-/** Host-only retrieval endpoints, approved spaces and response bounds. */
+/** Host-only direct retrieve endpoints, approved spaces and response bounds. */
 import z from '@deepseek-ai/schemastery'
 
 /** Deployment-owned knowledge source. Models and browsers cannot submit or read these endpoint or space fields. */
@@ -11,8 +11,6 @@ export interface KnowledgeSourceConfig {
   description: string
   /** HTTP search endpoint used only by the Host. */
   searchUrl: string
-  /** Credential reference for the bearer token; an unset credential sends no `Authorization` header. */
-  tokenRef?: string
   /** Exact nonempty upstream space allowlist injected into every request. */
   spaceIds: string[]
 }
@@ -25,7 +23,7 @@ export interface Config {
   topK: number
   /** Minimum rerank score accepted as evidence. Every request enables rerank. */
   minimumScore: number
-  /** Deadline for one read-only upstream request. */
+  /** Deadline for one read-only upstream request. The direct service may verify and supplement for up to 30 seconds. */
   timeoutMs: number
   /** Maximum characters in one natural-language query. */
   maxQueryChars: number
@@ -40,12 +38,11 @@ export const Config: z<Partial<Config>, Config> = z.object({
     name: z.string().min(1).required(),
     description: z.string().default(''),
     searchUrl: z.string().min(1).required(),
-    tokenRef: z.string(),
     spaceIds: z.array(z.string().min(1)).min(1).required(),
   })).default([]),
   topK: z.natural().min(1).max(50).default(5),
   minimumScore: z.number().min(0).max(1).default(0.5),
-  timeoutMs: z.natural().min(1).default(30000),
+  timeoutMs: z.natural().min(1).default(60000),
   maxQueryChars: z.natural().min(1).default(16000),
   maxResponseBytes: z.natural().min(1).default(8388608),
 })

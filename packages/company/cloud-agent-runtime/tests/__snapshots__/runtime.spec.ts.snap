@@ -11,6 +11,10 @@ Approved knowledge sources: hr, operations. Search with cloud_knowledge before a
       "name": "cloud_knowledge",
       "parameters": {
         "properties": {
+          "emotion": {
+            "description": "Optional current-user emotion: 平和, 疑惑, 着急, 不满 or 愤怒.",
+            "type": "string",
+          },
           "query": {
             "description": "The user question in natural language.",
             "type": "string",
@@ -22,6 +26,10 @@ Approved knowledge sources: hr, operations. Search with cloud_knowledge before a
               "operations",
             ],
             "type": "string",
+          },
+          "verify": {
+            "description": "Whether the retrieval service verifies sufficiency and supplements evidence; defaults to true.",
+            "type": "boolean",
           },
         },
         "required": [
