@@ -44,7 +44,7 @@ const exchangeSchema = z.object({
 
 /** Required browser login; local revocation stops admission before durable writes. */
 export class CompanyWecomAuthService extends Service {
-  static inject = ['credentials', 'storageDomain', 'connection', 'webServer']
+  static inject = ['credentials', 'storageDomain', 'connection', 'webServer', 'remoteAccess', 'workspaceRegistry']
   static Config = Config
   private readonly config: Config
   private readonly workspaceRoot: string
