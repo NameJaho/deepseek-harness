@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-31-gateway-user-identity-bridge.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-31-gateway-user-identity-bridge.md
+/agent-note-trusted-gateway-user-identity-bridge:
+  en: 20be2517f0fcc588
+  zh: 66d2c37d1bb81454
+/agent-note-trusted-gateway-user-identity-bridge/problem:
+  en: 3dd59b5fa9f597a2
+  zh: 4fcf3fe9f7b58294
+/agent-note-trusted-gateway-user-identity-bridge/decision:
+  en: 449a06a08b1c78a3
+  zh: 68f46c85c93ec96b
+/agent-note-trusted-gateway-user-identity-bridge/alternatives-considered:
+  en: 8f4ca33ff7c68948
+  zh: 990aac7796c64df9
+/agent-note-trusted-gateway-user-identity-bridge/consequences:
+  en: ff6a872bf8443f71
+  zh: a5f00a5c9a9e4e8a

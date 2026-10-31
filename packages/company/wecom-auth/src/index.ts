@@ -1,5 +1,5 @@
 /** Official WeCom login and durable credential-free browser sessions. */
-import { randomBytes, randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { mkdir } from 'node:fs/promises'
@@ -20,8 +20,8 @@ import { z } from 'zod'
 import { Config } from './config.ts'
 import { wecomAuthDomain, type WecomSessionRecord } from './storage.ts'
 import type {
-  CompanyOwnerScope, WecomIdentityId, WecomLoginAttemptId, WecomLoginConfig, WecomLoginResult, WecomResourceProvider, WecomSessionId,
-  WecomSessionView, WecomUserPrincipal, WecomUserRole,
+  CompanyOwnerScope, CompanyUserPrincipal, GatewayUserPrincipal, WecomCorpId, WecomIdentityId, WecomLoginAttemptId,
+  WecomLoginConfig, WecomLoginResult, WecomResourceProvider, WecomSessionId, WecomSessionView, WecomUserId, WecomUserRole,
 } from './types.ts'
 import { BROWSER_COOKIE, SESSION_COOKIE, cookie, cookieHeader, hash, hashMatches, header, readCookie, safeRedirect, signCookie } from './browser.ts'
 import { WecomAuthError } from './errors.ts'
@@ -40,6 +40,7 @@ declare module '@deepseek-ai/cordis' {
 }
 
 interface State { readonly domain: Domain<typeof wecomAuthDomain>; readonly secret: Buffer }
+interface GatewayIdentity { readonly principal: GatewayUserPrincipal; readonly workspace?: Workspace }
 const SECRET = credentialKey('company-wecom-official-auth', 'cookie-secret')
 const DEFAULT_WECOM_ROLE: WecomUserRole = 'user'
 const SESSION_ACTIONS: readonly RemoteAccessAction[] = ['session/list', 'session/search', 'session/control', 'session/page',
@@ -59,7 +60,7 @@ const exchangeSchema = z.object({
 
 /** Required browser login; local revocation stops admission before durable writes. */
 export class CompanyWecomAuthService extends Service {
-  static inject = ['credentials', 'storageDomain', 'connection', 'webServer']
+  static inject = ['credentials', 'storageDomain', 'connection', 'webServer', 'remoteAccess', 'workspaceRegistry']
   static Config = Config
   private readonly config: Config
   private readonly workspaceRoot: string
@@ -74,6 +75,10 @@ export class CompanyWecomAuthService extends Service {
   private readonly workspaces = new Map<WecomIdentityId, Workspace>()
   private readonly workspaceRoots = new Map<WecomIdentityId, string>()
   private readonly resources = new Set<WecomResourceProvider>()
+
+  private readonly gatewayIdentities = new Map<WecomIdentityId, GatewayIdentity>()
+  private readonly gatewayProvisioning = new Map<WecomIdentityId, Promise<void>>()
+  private readonly gatewayDiagnostics = new Set<string>()
   private timer: ReturnType<typeof setTimeout> | undefined
 
   /** @param owner - Host HTTP, cookie-key and domain providers.
@@ -92,6 +97,14 @@ export class CompanyWecomAuthService extends Service {
     if (origin.protocol !== 'https:' || origin.username !== '' || origin.password !== '' || origin.pathname !== '/'
       || origin.search !== '' || origin.hash !== '') throw new Error('wecom-auth: publicOrigin must be a bare HTTPS origin')
     this.config.publicOrigin = origin.origin
+    if (this.config.gatewayLogoutUrl !== '') {
+      const logout = new URL(this.config.gatewayLogoutUrl)
+      if (!['http:', 'https:'].includes(logout.protocol)) throw new Error('wecom-auth: gatewayLogoutUrl must use HTTP or HTTPS')
+    }
+    if (this.config.gatewayIdentityEnabled && this.config.gatewayLogoutUrl === '') {
+      throw new Error('wecom-auth: gatewayLogoutUrl is required when gatewayIdentityEnabled is enabled')
+    }
+    this.diagnostic('gateway identity diagnostics enabled')
     const secret = process.env.DSH_WECOM_APP_SECRET
     if (secret === undefined || secret.trim() === '') throw new Error('wecom-auth: set DSH_WECOM_APP_SECRET in the server environment')
     this.upstream = new WecomOfficial(this.config, secret, this.lifetime.signal)
@@ -127,6 +140,7 @@ export class CompanyWecomAuthService extends Service {
         if (identity.enabled && identity.corpId === this.config.corpId) await this.ensureWorkspace(identity.id)
       }
       remoteAccess.registerPolicy('wecom-user', { bindings: principal => this.bindings(principal) })
+      remoteAccess.registerPolicy('gateway-user', { bindings: principal => this.bindings(principal) })
       this.owner.on('domain/changed', (change) => {
         if (change.domain === 'workspace') remoteAccess.invalidate()
       })
@@ -134,6 +148,8 @@ export class CompanyWecomAuthService extends Service {
     this.registration = this.owner.connection.registerBrowserPrincipalProvider({
       loginPath: '/login', requireLogin: true,
       authenticate: (request) => {
+        const gateway = this.gatewayPrincipal(request)
+        if (gateway !== undefined) return { sessionKey: brandString<BrowserSessionKey>(`gateway-${gateway.identityId}`), principal: gateway }
         const session = this.current(request)
         const identity = session === undefined ? undefined : this.state?.domain.table('identities').get(session.identityId)
         if (session === undefined || identity === undefined) return undefined
@@ -143,6 +159,13 @@ export class CompanyWecomAuthService extends Service {
       },
     })
     this.owner.on('webserver/index-inject', (table, peer) => {
+      if (peer.principal.kind === 'gateway-user') {
+        table.push({ kind: 'global', name: '__DSH_WECOM_SESSION__', value: {
+          identityId: peer.principal.identityId, corpId: 'gateway', userId: peer.principal.userId,
+          displayName: peer.principal.displayName, role: peer.principal.role,
+        } })
+        return
+      }
       if (peer.principal.kind !== 'wecom-user') return
       const identity = this.state?.domain.table('identities').get(peer.principal.identityId)
       if (identity !== undefined) table.push({ kind: 'global', name: '__DSH_WECOM_SESSION__', value: {
@@ -194,12 +217,14 @@ export class CompanyWecomAuthService extends Service {
   }
 
   /** Resolve the current Remote caller or trusted tool initiator's company ownership scope.
+   * @param member - authenticated company principal from an access-policy dispatch; omission resolves the caller.
    * @returns stable enterprise scope, or `local-owner` outside an enterprise call or initiating Session.
    * @throws WecomAuthError for unsupported non-owner principals.
    */
-  ownerScope(): CompanyOwnerScope {
-    const principal = this.ctx.invocation?.peer.principal
+  ownerScope(member?: CompanyUserPrincipal): CompanyOwnerScope {
+    const principal = member ?? this.ctx.invocation?.peer.principal
     if (principal?.kind === 'wecom-user') return brandString<CompanyOwnerScope>(`wecom:${principal.corpId}:${principal.userId}`)
+    if (principal?.kind === 'gateway-user') return brandString<CompanyOwnerScope>(`gateway:${principal.userId}`)
     // oxlint-disable-next-line typescript/no-unnecessary-condition -- other packages merge non-owner kinds into PrincipalMap.
     if (principal !== undefined && principal.kind !== 'owner') throw new WecomAuthError('wecom-auth/forbidden', 403)
     if (principal === undefined) {
@@ -214,9 +239,13 @@ export class CompanyWecomAuthService extends Service {
    * @param principal - authenticated member supplied by the access-policy dispatcher.
    * @returns owned Session identities; unknown or mismatched identities return an empty list.
    */
-  defaultWorkspaceSessions(principal: WecomUserPrincipal): readonly SessionId[] {
-    const identity = this.state?.domain.table('identities').get(principal.identityId)
-    if (identity?.corpId !== principal.corpId || identity.userId !== principal.userId) return []
+  defaultWorkspaceSessions(principal: CompanyUserPrincipal): readonly SessionId[] {
+    if (principal.kind === 'gateway-user') {
+      if (this.gatewayIdentities.get(principal.identityId)?.principal.userId !== principal.userId) return []
+    } else {
+      const identity = this.state?.domain.table('identities').get(principal.identityId)
+      if (identity?.corpId !== principal.corpId || identity.userId !== principal.userId) return []
+    }
     const workspace = this.workspaces.get(principal.identityId)
     return workspace === undefined ? [] : [...this.owner.get('workspaceRegistry')?.get(workspace.id)?.sessionIds ?? []]
   }
@@ -229,6 +258,8 @@ export class CompanyWecomAuthService extends Service {
     const registry = this.owner.get('workspaceRegistry')
     for (const [identityId, workspace] of this.workspaces) {
       if (registry?.get(workspace.id)?.sessionIds.includes(sessionId) !== true) continue
+      const gateway = this.gatewayIdentities.get(identityId)
+      if (gateway !== undefined) return this.ownerScope(gateway.principal)
       const identity = this.state?.domain.table('identities').get(identityId)
       if (identity !== undefined) return brandString<CompanyOwnerScope>(`wecom:${identity.corpId}:${identity.userId}`)
     }
@@ -237,6 +268,70 @@ export class CompanyWecomAuthService extends Service {
       if (scope !== undefined) return scope
     }
     return undefined
+  }
+
+  /** Parse one trusted portal identity and start its Workspace provisioning.
+   * @param request - request headers supplied by the trusted reverse proxy.
+   * @returns gateway principal, or undefined when the feature is disabled or the header is invalid.
+   */
+  private gatewayPrincipal(request: ConnectionTrustRequest): GatewayUserPrincipal | undefined {
+    if (!this.config.gatewayIdentityEnabled || this.lifetime.signal.aborted) return undefined
+    const encoded = header(request, 'x-user-info')
+    if (encoded === undefined) {
+      this.gatewayDiagnostic('missing-header', 'gateway X-User-Info header missing')
+      return undefined
+    }
+    if (encoded.length > 16_384) {
+      this.gatewayDiagnostic('header-too-large', 'gateway X-User-Info header exceeds 16 KiB')
+      return undefined
+    }
+    let input: unknown
+    try { input = JSON.parse(decodeURIComponent(encoded)) }
+    catch (_invalidGatewayIdentity) {
+      this.gatewayDiagnostic('invalid-json', 'gateway X-User-Info header is not URL-encoded JSON')
+      return undefined
+    }
+    const parsed = z.object({ userId: z.string().trim().min(1).max(256), userName: z.string().trim().min(1).max(256) })
+      .passthrough().safeParse(input)
+    if (!parsed.success) {
+      this.gatewayDiagnostic('invalid-fields', 'gateway X-User-Info is missing a valid userId or userName')
+      return undefined
+    }
+    const identityId = brandString<WecomIdentityId>(`i-${createHash('sha256').update(`gateway:${parsed.data.userId}`).digest('hex')}`)
+    const principal: GatewayUserPrincipal = { kind: 'gateway-user', identityId,
+      userId: brandString<WecomUserId>(parsed.data.userId), displayName: parsed.data.userName, role: DEFAULT_WECOM_ROLE }
+    const current = this.gatewayIdentities.get(identityId)
+    this.gatewayIdentities.set(identityId, { principal, ...(current?.workspace === undefined ? {} : { workspace: current.workspace }) })
+    if (current === undefined) {
+      this.diagnostic(`gateway identity received userId=${parsed.data.userId} userName=${parsed.data.userName}`)
+      this.provisionGatewayIdentity(identityId)
+    }
+    return principal
+  }
+
+  private gatewayDiagnostic(key: string, message: string): void {
+    if (this.gatewayDiagnostics.has(key)) return
+    this.gatewayDiagnostics.add(key)
+    this.diagnostic(message)
+  }
+
+  /** Web profiles mount no logger exporter, so diagnostics also go to stdout, which the launcher writes to dsh.log. */
+  private diagnostic(message: string): void {
+    if (!this.config.gatewayIdentityEnabled) return
+    this.owner.logger.info(`wecom-auth: ${message}`)
+    process.stdout.write(`wecom-auth: ${message}\n`)
+  }
+
+  private provisionGatewayIdentity(identityId: WecomIdentityId): void {
+    if (this.gatewayProvisioning.has(identityId)) return
+    const task = this.track(this.ensureWorkspace(identityId).then((workspace) => {
+      if (workspace === undefined) return
+      const identity = this.gatewayIdentities.get(identityId)
+      if (identity !== undefined) this.gatewayIdentities.set(identityId, { ...identity, workspace })
+      this.owner.get('remoteAccess')?.invalidate()
+    }).finally(() => { this.gatewayProvisioning.delete(identityId) }))
+    this.gatewayProvisioning.set(identityId, task)
+    void task.catch((error: unknown) => { this.owner.logger.warn(`wecom-auth: gateway Workspace provisioning failed: ${String(error)}`) })
   }
 
   /** Begin a durable, browser-bound, single-use login attempt.
@@ -311,6 +406,7 @@ export class CompanyWecomAuthService extends Service {
     await state.domain.table('sessions').put(id, session)
     this.owner.get('remoteAccess')?.invalidate()
     this.scheduleExpiry()
+    this.diagnostic(`WeCom login received userId=${login.userId} userName=${login.displayName ?? '<missing>'}`)
     return { session: { identityId, ...login, role: DEFAULT_WECOM_ROLE, expiresAt: session.expiresAt }, redirect,
       cookie: cookieHeader(SESSION_COOKIE, signCookie({ version: 1, sessionId: id, authority: this.config.publicOrigin,
         issuedAt: now, expiresAt: session.expiresAt }, state.secret), true, this.config.sessionTtlMs, '/') }
@@ -321,6 +417,10 @@ export class CompanyWecomAuthService extends Service {
    * @returns credential-free member view, or null when admission is denied.
    */
   getCurrentSession(request: ConnectionTrustRequest): WecomSessionView | null {
+    const gateway = this.gatewayPrincipal(request)
+    if (gateway !== undefined) return { identityId: gateway.identityId, corpId: brandString<WecomCorpId>('gateway'),
+      userId: gateway.userId, role: gateway.role, displayName: gateway.displayName, expiresAt: Date.now() + this.config.sessionTtlMs,
+      ...this.config.gatewayLogoutUrl === '' ? {} : { logoutUrl: this.config.gatewayLogoutUrl } }
     const session = this.current(request)
     const identity = session === undefined ? undefined : this.state?.domain.table('identities').get(session.identityId)
     return identity === undefined || session === undefined ? null : { identityId: identity.id, corpId: identity.corpId,
@@ -370,7 +470,7 @@ export class CompanyWecomAuthService extends Service {
   }
 
   /** Compute all Remote grants for one authenticated member. */
-  private bindings(principal: WecomUserPrincipal): readonly RemoteAccessBinding[] {
+  private bindings(principal: CompanyUserPrincipal): readonly RemoteAccessBinding[] {
     const own = this.workspaceBindings(principal.identityId)
     if (own.length === 0) return own
     return [...own, ...[...this.resources].flatMap(provider => provider.bindings(principal))]
@@ -381,10 +481,12 @@ export class CompanyWecomAuthService extends Service {
     const identity = state?.domain.table('identities').get(identityId)
     const registry = this.owner.get('workspaceRegistry')
     if (state === undefined || registry === undefined) return []
-    if (identity?.enabled !== true || identity.corpId !== this.config.corpId
-      || ![...state.domain.table('sessions').entries()].some(([id, session]) => session.identityId === identityId
+    const gateway = this.gatewayIdentities.get(identityId)
+    const localActive = identity?.enabled === true && identity.corpId === this.config.corpId
+      && [...state.domain.table('sessions').entries()].some(([id, session]) => session.identityId === identityId
         && session.agentId === this.config.agentId && session.browserAuthority === this.config.publicOrigin
-        && !this.revoked.has(id) && session.revokedAt === undefined && session.expiresAt > Date.now())) return []
+        && !this.revoked.has(id) && session.revokedAt === undefined && session.expiresAt > Date.now())
+    if (gateway === undefined && !localActive) return []
     const root = this.workspaceRoots.get(identityId)
     if (root === undefined) return []
     const workspace = this.workspaces.get(identityId)
@@ -398,13 +500,14 @@ export class CompanyWecomAuthService extends Service {
       'session/observeProjections', 'session/observeState', 'session/page', 'session/prompt',
       'session/attachment',
       'session/projections', 'session/rename', 'session/selectModel', 'session/state', 'session/updateQueue',
-      'session/wait', 'skills/list', 'toolResults/watch', 'workspaceFiles/read', 'workspaceFiles/readBytes',
+      'session/wait', 'agentPresets/select', 'skills/list', 'toolResults/watch', 'workspaceFiles/read', 'workspaceFiles/readBytes',
       'workspaceFiles/stat', 'workspaceFiles/list', 'workspaceFiles/changes',
       'event:api-session/activity', 'event:api-session/added', 'event:api-session/error',
       'event:api-session/removed', 'event:api-session/status',
     ]
     const bindings: RemoteAccessBinding[] = [{
       role: { name: 'wecom:global', resource: 'global', actions: [
+        'agentPresets/list', 'agentPresets/read', 'agentPresets/select',
         'credentials/describe', 'credentials/set', 'credentials/unset',
         'dynamicCordisRunner/inventory', 'dynamicCordisRunner/syncInspectManifest',
         'llm/discoverModels', 'llm/listProviders', 'llm/listConfigurableProviders',
@@ -419,6 +522,7 @@ export class CompanyWecomAuthService extends Service {
         'session/canOpenWorkspacePath', 'session/control', 'session/create', 'session/list', 'session/modelCatalog',
         'session/search', 'workspace/follow',
         'event:settings/document-updated', 'event:credentials/reference-updated', 'event:credentials/record-updated',
+        'event:agent-preset/selected',
         'event:llm/adapters-updated', 'event:llm/models-updated', 'event:permission-presets/catalog-changed',
         'event:plugin-manager/changed', 'event:plugin-manager/install-log', 'event:plugin-manager/install-state',
         'event:plugin-manager/update-state', 'event:plugin-market/changed',
@@ -529,11 +633,16 @@ export class CompanyWecomAuthService extends Service {
       const headers = { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff' }
       if (path === '/login') {
         const nonce = randomBytes(32).toString('base64url')
-        const current = url.searchParams.get('account') === '1' ? this.getCurrentSession(req) : null
+        const gatewayCurrent = this.gatewayPrincipal(req) === undefined ? null : this.getCurrentSession(req)
+        const current = url.searchParams.get('account') === '1' ? gatewayCurrent ?? this.getCurrentSession(req) : null
         if (current !== null) {
           res.writeHead(200, { ...headers, 'content-type': 'text/html; charset=utf-8',
             'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'` })
           res.end(accountPage(current, nonce, /^zh\b/i.test(header(req, 'accept-language') ?? '') ? 'zh' : 'en')); return
+        }
+        if (gatewayCurrent !== null) {
+          const redirect = safeRedirect(url.searchParams.get('redirect'), ['/'])
+          res.writeHead(303, { ...headers, location: redirect }); res.end(); return
         }
         const existing = cookie(req, BROWSER_COOKIE)
         const binding = existing !== undefined && /^[A-Za-z0-9_-]{43}$/.test(existing) ? existing : randomBytes(32).toString('base64url')

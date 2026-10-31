@@ -1,5 +1,8 @@
 /** Real HTTP admission with only official external API calls mocked. */
 import { request as httpRequest } from 'node:http'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import Storage, { storageBackendServiceKey } from '@deepseek-ai/dsh-storage'
 import { brandString } from '@deepseek-ai/dsh-brand'
@@ -14,6 +17,7 @@ import { MemoryCredentials } from '../../../credentials/credentials/tests/memory
 import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 import Auth, { Config } from '../src/index.ts'
 import { WecomOfficial } from '../src/upstream.ts'
+import type {} from '../src/types.ts'
 import type { WecomLoginConfig } from '../src/types.ts'
 
 const publicOrigin = 'https://login.example'
@@ -43,11 +47,12 @@ function officialFixture() {
   return { calls, overrides }
 }
 
-async function fixture() {
+async function fixture(overrides: Partial<{ gatewayIdentityEnabled: boolean; gatewayLogoutUrl: string }> = {}) {
   vi.stubEnv('DSH_WECOM_APP_SECRET', 'PRIVATE_TEST_SECRET')
   const official = officialFixture()
+  const workspaceRoot = await mkdtemp(join(tmpdir(), 'dsh-wecom-'))
   const ctx = new Context()
-  onTestFinished(() => ctx.fiber.dispose())
+  onTestFinished(async () => { await ctx.fiber.dispose(); await rm(workspaceRoot, { recursive: true, force: true }) })
   const warnings = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
   new MemoryCredentials(ctx)
   await ctx.plugin(Storage)
@@ -64,7 +69,8 @@ async function fixture() {
   await ctx.plugin(WebServer, { host: '127.0.0.1', port: 0 })
   new RemoteAccessService(ctx)
   await ctx.plugin(Connection, { trustedHosts: ['login.example'], requireBrowserLogin: true })
-  const fiber = ctx.plugin(Auth, config)
+  const resolved = Config({ ...config, workspaceRoot, ...overrides } as Config)
+  const fiber = ctx.plugin(Auth, resolved)
   await fiber
   ctx.effect(() => ctx.webServer.registerFallback((req, res) => {
     if (ctx.connection.authorizeIndex(req, res)) { res.writeHead(200); res.end('APPLICATION') }
@@ -100,8 +106,60 @@ async function fixture() {
   }
   const exchange = (attempt: Awaited<ReturnType<typeof begin>>, state = attempt.attempt.state, binding = attempt.binding) => request(
     '/auth/wecom/callback?' + new URLSearchParams({ code: 'PRIVATE_CODE', state }).toString(), { headers: { cookie: binding } })
-  return { ctx, fiber, request, begin, exchange, warnings, storedHeaders, ...official }
+  return { ctx, fiber, request, begin, exchange, warnings, storedHeaders, config: resolved, ...official }
 }
+
+it('admits a trusted gateway identity and exposes its configured logout destination', async () => {
+  const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+  onTestFinished(() => { stdout.mockRestore() })
+  const f = await fixture({ gatewayIdentityEnabled: true, gatewayLogoutUrl: 'https://portal.example/logout' })
+  const gatewayHeaders = { host: 'login.example', 'x-user-info': encodeURIComponent(JSON.stringify({ userId: 'portal-user', userName: 'Portal User', department: 'ops' })) }
+  const admitted = f.ctx.connection.admit({ headers: gatewayHeaders })
+  if (!('peer' in admitted)) throw new Error('Expected gateway Peer')
+  expect(admitted.peer.principal.kind).toBe('gateway-user')
+  const me = await f.request('/auth/me', { headers: gatewayHeaders })
+  expect(me.status).toBe(200)
+  expect(await me.json()).toMatchObject({ session: { userId: 'portal-user', displayName: 'Portal User', logoutUrl: 'https://portal.example/logout' } })
+  await vi.waitFor(() => { expect(f.ctx.workspaceRegistry.list()).toHaveLength(1) })
+  const principal = admitted.peer.principal
+  if (principal.kind !== 'gateway-user') throw new Error('Expected gateway principal')
+  const auth = f.ctx.companyWecomAuth
+  const workspace = f.ctx.workspaceRegistry.list()[0]!
+  const sessionId = brandString<SessionId>('gateway-owned-session')
+  f.storedHeaders.push({ header: { version: 4, id: sessionId, createdAt: Date.now(), cwd: workspace.path, isSeeded: false }, revision: 1 })
+  await workspace.attachSession(sessionId)
+  expect(auth.ownerScope(principal)).toBe('gateway:portal-user')
+  expect(auth.defaultWorkspaceSessions(principal)).toEqual([sessionId])
+  expect(auth.defaultWorkspaceSessions({ ...principal, userId: brandString<typeof principal.userId>('other') })).toEqual([])
+  expect(auth.sessionOwner(sessionId)).toBe('gateway:portal-user')
+  const command = () => f.ctx.remoteAccess.decide({ principal, action: 'commands/execute',
+    resources: [{ kind: 'session', id: sessionId }], args: { line: '/create-agent requirements' } })
+  expect(command().kind).toBe('deny')
+  const stop = auth.registerResourceProvider({ defaultWorkspaceCommands: ['create-agent'],
+    bindings: member => auth.ownerScope(member) === 'gateway:portal-user' ? auth.sessionBindings([sessionId]) : [],
+    sessionOwner: () => undefined })
+  expect(command().kind).toBe('allow')
+  const other = f.ctx.connection.admit({ headers: { ...gatewayHeaders,
+    'x-user-info': encodeURIComponent(JSON.stringify({ userId: 'other', userName: 'Other User' })) } })
+  if (!('peer' in other)) throw new Error('Expected second gateway Peer')
+  expect(f.ctx.remoteAccess.decide({ principal: other.peer.principal, action: 'session/control',
+    resources: [{ kind: 'session', id: sessionId }] }).kind).toBe('deny')
+  await stop()
+  expect(command().kind).toBe('deny')
+  expect(f.ctx.remoteAccess.decide({ principal: admitted.peer.principal, action: 'agentPresets/list', resources: [{ kind: 'global' }] })).toEqual({ kind: 'allow' })
+  const account = await f.request('/login?account=1', { headers: gatewayHeaders })
+  expect(await account.text()).toContain('https://portal.example/logout')
+})
+
+it('falls back to WeCom OAuth when gateway identity is enabled but the request has no gateway header', async () => {
+  const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+  onTestFinished(() => { stdout.mockRestore() })
+  const f = await fixture({ gatewayIdentityEnabled: true, gatewayLogoutUrl: 'https://portal.example/logout' })
+  const { attempt } = await f.begin()
+  expect(attempt.state).toEqual(expect.any(String))
+  expect((await f.request('/auth/me')).status).toBe(401)
+  expect(stdout).toHaveBeenCalledWith('wecom-auth: gateway X-User-Info header missing\n')
+})
 
 it('redirects protected root, offers desktop QR and automatically authorizes a WeCom browser', async () => {
   const f = await fixture()
@@ -187,7 +245,9 @@ it('establishes distinct member Peers and revokes sessions and streams on logout
   expect(await me.text()).toContain('member')
   const account = await f.request('/login?account=1', { headers: { cookie, 'accept-language': 'zh-CN' } })
   expect(account.status).toBe(200)
-  expect(await account.text()).toContain('普通用户')
+  const accountBody = await account.text()
+  expect(accountBody).toContain('Member')
+  expect(accountBody).toContain('普通用户')
   expect((await f.request('/auth/wecom/logout', { method: 'POST', headers: { cookie } })).status).toBe(403)
   const logout = await f.request('/auth/wecom/logout', { method: 'POST', headers: { cookie, origin: publicOrigin, 'x-dsh-auth': '1' } })
   expect(logout.status).toBe(200)
@@ -253,6 +313,7 @@ it('isolates each member to one default Workspace and its Sessions', async () =>
   expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'session/create', resources: [{ kind: 'global' }], args: { request: { cwd: secondWorkspace.path } } })).toEqual({ kind: 'deny', reason: 'cwd-not-allowed' })
   expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'session/create', resources: [{ kind: 'workspace', id: firstWorkspace.id }], args: { request: { workspaceId: firstWorkspace.id } } })).toEqual({ kind: 'allow' })
   expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'settings/describe', resources: [{ kind: 'global' }] })).toEqual({ kind: 'allow' })
+  expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'agentPresets/list', resources: [{ kind: 'global' }] })).toEqual({ kind: 'allow' })
   expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'directoryPicker/list', resources: [{ kind: 'global' }], args: { path: firstWorkspace.path } })).toEqual({ kind: 'deny', reason: 'no-allow' })
   expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'workspace/create', resources: [{ kind: 'global' }], args: { request: { path: firstWorkspace.path } } })).toEqual({ kind: 'deny', reason: 'no-allow' })
   if (firstPrincipal.kind !== 'wecom-user' || secondPrincipal.kind !== 'wecom-user') throw new Error('Expected WeCom principals')
@@ -327,7 +388,7 @@ it('restores local sessions after plugin reload and expires them without app-tok
   if (cookie === undefined) throw new Error('Missing session cookie')
   const request = { headers: { host: 'login.example', cookie } }
   await f.fiber.dispose()
-  await f.ctx.plugin(Auth, config)
+  await f.ctx.plugin(Auth, f.config)
   expect(f.ctx.companyWecomAuth.getCurrentSession(request)).toMatchObject({ userId: 'member' })
   const now = Date.now()
   vi.spyOn(Date, 'now').mockReturnValue(now + config.sessionTtlMs + 1)

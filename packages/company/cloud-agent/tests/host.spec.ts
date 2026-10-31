@@ -7,7 +7,7 @@ import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import AgentRegistry, { type Agent, type AgentHandle, type CreateAgentOptions } from '@deepseek-ai/dsh-agent'
 import RemoteAccess from '@deepseek-ai/dsh-api-remote-access'
 import { remoteMethods, type RemoteInvocation } from '@deepseek-ai/dsh-typert-protocol'
-import type { WecomResourceProvider, WecomUserPrincipal } from '@deepseek-ai/dsh-company-wecom-auth/types'
+import type { CompanyUserPrincipal, WecomResourceProvider, WecomUserPrincipal } from '@deepseek-ai/dsh-company-wecom-auth/types'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import Projections from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
@@ -116,8 +116,11 @@ async function fixture(test: TestContext, pool = new MemoryMediaPool(), storedSe
   let initiatorOwnership = false
   const resources = new Set<WecomResourceProvider>()
   ctx.remoteAccess.registerPolicy('wecom-user', { bindings: principal => [...resources].flatMap(provider => provider.bindings(principal)) })
+  ctx.remoteAccess.registerPolicy('gateway-user', { bindings: principal => [...resources].flatMap(provider => provider.bindings(principal)) })
   ctx.provide('companyWecomAuth', {
-    ownerScope: () => {
+    ownerScope: (principal?: CompanyUserPrincipal) => {
+      if (principal !== undefined) return brandString<CloudAgentOwnerId>(principal.kind === 'wecom-user'
+        ? `wecom:${principal.corpId}:${principal.userId}` : `gateway:${principal.userId}`)
       const agent = ctx.agents.currentInitiator()
       return brandString<CloudAgentOwnerId>(initiatorOwnership ? owners.get(agent?.id ?? SessionId('missing')) ?? 'local-owner' : owner)
     },
@@ -150,6 +153,7 @@ async function fixture(test: TestContext, pool = new MemoryMediaPool(), storedSe
   return { ctx, fiber, editor, agents, declared, guards, queued, call, draft, workspaces,
     initiatorOwnership: () => { initiatorOwnership = true },
     setOwner: (id: string) => { owner = `wecom:corp:${id}` }, changeTool: () => { description = 'Changed schema' },
+    setGatewayOwner: (id: string) => { owner = `gateway:${id}` },
     disable: () => { enabled = false }, fork: (header: Session['header'], id: SessionId) => forkPlacement?.(header, id) }
 }
 
@@ -291,32 +295,38 @@ it('confirms a member draft from a command without inheriting another caller or 
   expect(f.ctx.agents.currentInitiator()).toBeUndefined()
 })
 
-it('returns owned conversation rows through authenticated catalog and follow item filtering', async (test) => {
-  const f = await fixture(test)
-  const editor = await f.editor()
-  const saved = await f.ctx.cloudAgents.create(f.draft, editor)
-  const record = await f.ctx.cloudAgents.publish({ id: saved.id, expectedRevision: saved.revision, authoringSessionId: editor })
-  f.setOwner('bob')
-  const usage = await f.ctx.cloudAgents.startSession({ id: record.id, releaseId: record.publishedReleaseId! }, new AbortController().signal)
-  const principal: WecomUserPrincipal = { kind: 'wecom-user', corpId: brandString<WecomUserPrincipal['corpId']>('corp'),
-    userId: brandString<WecomUserPrincipal['userId']>('bob'), identityId: brandString<WecomUserPrincipal['identityId']>('bob'), role: 'user' }
-  const invoke = (method: string) => {
-    const signal = new AbortController().signal
-    const invocation: RemoteInvocation = { request: { namespace: 'cloudAgents', method, args: {} }, service: 'cloudAgents', signal,
-      peer: { id: brandString<RemoteInvocation['peer']['id']>('member-peer'), ctx: f.ctx, principal, interactions: 'answer', signal, dispose: async () => {} },
-      uplink: <In>(): AsyncIterable<In> => ({ [Symbol.asyncIterator]: () => ({ next: async () => ({ done: true, value: undefined }) }) }),
+for (const kind of ['wecom-user', 'gateway-user'] as const) {
+  it(`returns only owned conversation rows for ${kind} catalog and follow`, async (test) => {
+    const f = await fixture(test)
+    const editor = await f.editor()
+    const saved = await f.ctx.cloudAgents.create(f.draft, editor)
+    const record = await f.ctx.cloudAgents.publish({ id: saved.id, expectedRevision: saved.revision, authoringSessionId: editor })
+    if (kind === 'wecom-user') f.setOwner('bob')
+    else f.setGatewayOwner('bob')
+    const usage = await f.ctx.cloudAgents.startSession({ id: record.id, releaseId: record.publishedReleaseId! }, new AbortController().signal)
+    const member = { userId: brandString<WecomUserPrincipal['userId']>('bob'),
+      identityId: brandString<WecomUserPrincipal['identityId']>('bob'), role: 'user' as const }
+    const principal: CompanyUserPrincipal = kind === 'wecom-user'
+      ? { ...member, kind, corpId: brandString<WecomUserPrincipal['corpId']>('corp') }
+      : { ...member, kind, displayName: 'Bob' }
+    const invoke = (method: string) => {
+      const signal = new AbortController().signal
+      const invocation: RemoteInvocation = { request: { namespace: 'cloudAgents', method, args: {} }, service: 'cloudAgents', signal,
+        peer: { id: brandString<RemoteInvocation['peer']['id']>('member-peer'), ctx: f.ctx, principal, interactions: 'answer', signal, dispose: async () => {} },
+        uplink: <In>(): AsyncIterable<In> => ({ [Symbol.asyncIterator]: () => ({ next: async () => ({ done: true, value: undefined }) }) }),
+      }
+      return f.ctx.extend({ invocation }).cloudAgents
     }
-    return f.ctx.extend({ invocation }).cloudAgents
-  }
-  expect((await invoke('catalog').catalog()).conversations.map(item => item.sessionId)).toEqual([usage.sessionId])
-  const follower = invoke('follow').follow(new AbortController().signal)[Symbol.asyncIterator]()
-  try {
-    const first = await follower.next()
-    if (first.done === true) throw new Error('Missing initial catalog')
-    expect(first.value.conversations.map((item: CloudAgentConversation) => item.sessionId)).toEqual([usage.sessionId])
-  } finally { await follower.return?.() }
-  expect(f.ctx.remoteAccess.decide({ principal, action: 'cloudAgents/catalog', resources: [{ kind: 'session', id: editor }] }).kind).toBe('deny')
-})
+    expect((await invoke('catalog').catalog()).conversations.map(item => item.sessionId)).toEqual([usage.sessionId])
+    const follower = invoke('follow').follow(new AbortController().signal)[Symbol.asyncIterator]()
+    try {
+      const first = await follower.next()
+      if (first.done === true) throw new Error('Missing initial catalog')
+      expect(first.value.conversations.map((item: CloudAgentConversation) => item.sessionId)).toEqual([usage.sessionId])
+    } finally { await follower.return?.() }
+    expect(f.ctx.remoteAccess.decide({ principal, action: 'cloudAgents/catalog', resources: [{ kind: 'session', id: editor }] }).kind).toBe('deny')
+  })
+}
 
 it('rejects a schema refresh between capability validation and wrapper registration', async (test) => {
   const f = await fixture(test)

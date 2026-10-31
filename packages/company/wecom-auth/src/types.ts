@@ -25,7 +25,10 @@ export interface WecomUserPrincipal {
   readonly role: WecomUserRole
 }
 
-/** Resource owner scope shared by company business plugins: `wecom:<corpId>:<userId>` or `local-owner`. */
+/** Authenticated company member supplied by OAuth or a trusted gateway. */
+export type CompanyUserPrincipal = WecomUserPrincipal | GatewayUserPrincipal
+
+/** Resource owner scope: `wecom:<corpId>:<userId>`, `gateway:<userId>`, or `local-owner`. */
 export type CompanyOwnerScope = Branded<'company-owner-scope'>
 
 /** Business-owned grants and Session ownership lookup contributed by another company plugin. */
@@ -33,7 +36,7 @@ export interface WecomResourceProvider {
   /** Additional command names allowed only in the member's default Workspace Sessions; omission grants none. */
   readonly defaultWorkspaceCommands?: readonly string[]
   /** Compute grants for one active member from current committed business records. */
-  bindings(principal: WecomUserPrincipal): readonly RemoteAccessBinding[]
+  bindings(principal: CompanyUserPrincipal): readonly RemoteAccessBinding[]
   /** Resolve the owner of a tool-initiating Session; `undefined` delegates to another provider. */
   sessionOwner(sessionId: SessionId): CompanyOwnerScope | undefined
 }
@@ -55,6 +58,8 @@ export interface WecomSessionView {
   readonly userId: WecomUserId
   readonly role: WecomUserRole
   readonly displayName?: string
+  /** Optional logout destination for identities managed by an upstream gateway. */
+  readonly logoutUrl?: string
   readonly expiresAt: number
 }
 
@@ -77,5 +82,16 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
   interface PrincipalMap {
     /** Authenticated member; no browser cookie or app access token. */
     'wecom-user': WecomUserPrincipal
+    /** Identity asserted by a trusted upstream portal gateway. */
+    'gateway-user': GatewayUserPrincipal
   }
+}
+
+/** Credential-free identity asserted by a trusted upstream portal gateway. */
+export interface GatewayUserPrincipal {
+  readonly kind: 'gateway-user'
+  readonly identityId: WecomIdentityId
+  readonly userId: WecomUserId
+  readonly displayName: string
+  readonly role: WecomUserRole
 }

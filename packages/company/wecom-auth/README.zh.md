@@ -26,13 +26,15 @@ kind: "package-bundle"
 
 仓库的 `start-dsh-test.sh` 将 `cordis.patch.yml` 应用到独立 Web profile。其他部署可设置 `DSH_WECOM_CORP_ID`、`DSH_WECOM_AGENT_ID`、`DSH_PUBLIC_URL`，以及需要时设置 `DSH_WECOM_WORKSPACE_ROOT`。启动器默认使用 CorpId `ww2ec793812513c257`、AgentId `1000239`、`https://test-hmwork.busyming.com/` 和 `$DSH_BASE/workspaces`。插件要求纯 HTTPS origin，并在 origin 根路径提供认证。
 
-仅在服务端进程环境中设置 `DSH_WECOM_APP_SECRET`，使用轮换后的自建应用 Secret。不得放入 YAML、profile、浏览器代码、命令行参数或日志。插件配置没有 Secret 字段。缺失 Secret 或标识符非法会拒绝激活；启动器在没有 Secret 时拒绝启动。
+本地 WeCom OAuth 模式仅在服务端进程环境中设置 `DSH_WECOM_APP_SECRET`，使用轮换后的自建应用 Secret。不得放入 YAML、profile、浏览器代码、命令行参数或日志。插件配置没有 Secret 字段。缺失 Secret 或标识符非法会拒绝激活；启动器在没有 Secret 时拒绝启动，启用网关身份时也是如此。
 
 将 `test-hmwork.busyming.com` 配置为自建应用的 OAuth 可信域名及 Web 登录域名，配置应用可见范围，并在企业微信可信 IP 设置中允许服务端出口 IP。TLS 反向代理必须保留公网 `Host`，转发根路径及 `/auth/` 路由，并支持常规 Web API 和 WebSocket 路由。回调为 `https://test-hmwork.busyming.com/auth/wecom/callback`。不得记录回调查询参数。配置轮换后的 Secret 后，部署管理员必须验证真实扫码及 OAuth 登录；自动测试不使用真实企业微信凭据。
 
-`GET /login?redirect=/path` 开始登录。`GET /auth/me` 返回当前成员或 401。`POST /auth/wecom/logout` 要求公网 `Origin` 和 `X-DSH-Auth: 1`，撤销本地会话并清除 cookie。外部重定向值变为 `/`；合法路径和查询参数在登录后保留，凭据参数除外。
+`GET /login?redirect=/path` 开始登录。`GET /auth/me` 返回当前成员或 401；首页可能按 Owner 共享的浏览器 Peer 渲染，因此首页没有 `__DSH_WECOM_SESSION__` 身份时，侧栏账号入口会读取该接口。`POST /auth/wecom/logout` 要求公网 `Origin` 和 `X-DSH-Auth: 1`，撤销本地会话并清除 cookie。外部重定向值变为 `/`；合法路径和查询参数在登录后保留，凭据参数除外。
 
-此层设置 Connection 的 `requireBrowserLogin: true`。Owner 浏览器 cookie、根路径启动令牌和 `/connect` 凭据均不能接纳公网调用方，即使登录提供方卸载也不会恢复。每个成员都会在 `DSH_WECOM_WORKSPACE_ROOT` 下获得一个持久的 `default` Workspace；Remote 列表和命令只会返回该 Workspace 及其中的会话，`session/create` 也会拒绝其他 Workspace 或原始 `cwd`。成员 principal 保持 `wecom-user`，不是 Owner。
+当 `gatewayIdentityEnabled` 为 true 时，部署可以位于可信门户网关后面，由网关清除外部身份头并注入包含 `userId` 和 `userName` 的 URL 编码 `X-User-Info` JSON。DSH 会校验这两个字段，使用同一套私有 Workspace 权限策略，并通过 `/auth/me` 和账号页面提供用户名称。没有合法 `X-User-Info` 的请求继续走 WeCom OAuth，因此开启该模式不会阻断直接登录。此时必须将 `gatewayLogoutUrl` 设置为门户退出地址。不要在没有网关保护的监听地址上启用此模式：`X-User-Info` 是可信代理的断言，不是浏览器凭据，应用无法分辨直接请求伪造的 header。
+
+此层设置 Connection 的 `requireBrowserLogin: true`。Owner 浏览器 cookie、根路径启动令牌和 `/connect` 凭据均不能接纳公网调用方，即使登录提供方卸载也不会恢复。每个成员都会在 `DSH_WECOM_WORKSPACE_ROOT` 下获得一个持久的 `default` Workspace；Remote 列表和命令只会返回该 Workspace 及其中的会话，`session/create` 也会拒绝其他 Workspace 或原始 `cwd`。OAuth 身份使用 `wecom-user`，可信网关身份使用 `gateway-user`。业务插件分别获得 `wecom:<corpId>:<userId>` 与 `gateway:<userId>` 归属范围，并可为自己管理的会话贡献显式授权。两种身份都不是 Owner。
 
 -----
 

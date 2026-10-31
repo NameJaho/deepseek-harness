@@ -1,5 +1,6 @@
 CLAUDE.local.md
 .env
+startup.env
 apps/desktop/.env.windows
 apps/desktop/.env.macos
 apps/desktop/*.p12

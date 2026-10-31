@@ -21,6 +21,10 @@ export interface Config {
   maxResponseBytes: number
   /** Root directory under which each member receives one private default Workspace. */
   workspaceRoot?: string
+  /** Accept URL-encoded X-User-Info identity data from a trusted upstream gateway. */
+  gatewayIdentityEnabled: boolean
+  /** Optional upstream logout URL used by gateway-authenticated account pages. */
+  gatewayLogoutUrl: string
 }
 
 /** Loader validation; enabled deployments must provide identifiers and a public HTTPS origin. */
@@ -34,4 +38,6 @@ export const Config: z<Config> = z.object({
   requestTimeoutMs: z.natural().min(1).default(15_000),
   maxResponseBytes: z.natural().min(1).default(1024 * 1024),
   workspaceRoot: z.string(),
+  gatewayIdentityEnabled: z.boolean().default(false),
+  gatewayLogoutUrl: z.string().default(''),
 })

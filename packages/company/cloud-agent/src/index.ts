@@ -89,7 +89,7 @@ export class CloudAgentService extends TypertRemoteService {
       authCtx.companyWecomAuth.registerResourceProvider({
         defaultWorkspaceCommands: ['create-agent', 'publish-agent'],
         bindings: (principal) => {
-          const ownerId = `wecom:${principal.corpId}:${principal.userId}`
+          const ownerId = authCtx.companyWecomAuth.ownerScope(principal)
           const ids = [...this.domain?.table('conversations').entries() ?? []]
             .filter(([, item]) => item.deletedAt === undefined && (item.ownerId ?? 'local-owner') === ownerId).map(([id]) => id)
           const editors = [...new Set([...ids, ...authCtx.companyWecomAuth.defaultWorkspaceSessions(principal)])]
