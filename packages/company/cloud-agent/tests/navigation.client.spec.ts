@@ -14,7 +14,7 @@ const old: CloudAgentRelease = { id: 'old' as CloudAgentRelease['id'], kind: 'pu
 const latest: CloudAgentRelease = { ...old, id: 'latest' as CloudAgentRelease['id'], version: 2, definition: { ...record.draft, mcpTools: ['new.tool'] } }
 const session = 'usage' as SessionId
 const catalog: CloudAgentCatalog = { mine: [record], published: [], usage: [], conversations: [], models: { groups: [], default: { provider: 'p', model: 'm' }, routableProviders: [], failures: [] },
-  capabilities: { mcpTools: [{ name: 'unselected.global', description: 'Do not show' }], mcpServers: [], skills: [] } }
+  capabilities: { mcpTools: [{ name: 'unselected.global', description: 'Do not show' }], mcpServers: [], skills: [], knowledgeSources: [] } }
 function source(initial: CloudAgentCatalog | null) {
   let view: CloudAgentView = { catalog: initial, presets: [], loading: false, busy: false, error: null, notice: null, editorRequest: null }
   const listeners = new Set<() => void>()
@@ -88,6 +88,6 @@ describe('bilingual Phase 2 copy', () => {
       expect(zh[key].trim()).not.toBe('')
       expect(en[key].match(/\{\w+\}/g)?.sort() ?? []).toEqual(zh[key].match(/\{\w+\}/g)?.sort() ?? [])
     }
-    expect(Object.keys(en).join(' ')).not.toMatch(/credential|endpoint|token|knowledge|codeExecution|html/i)
+    expect(Object.keys(en).join(' ')).not.toMatch(/credential|endpoint|token|codeExecution|html/i)
   })
 })

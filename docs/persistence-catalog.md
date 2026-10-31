@@ -334,7 +334,7 @@ Source: [`packages/core/session/src/types.ts:349`](../packages/core/session/src/
 'cloud-agent/binding': CloudAgentConversation
 ```
 
-Source: [`packages/company/cloud-agent/src/types.ts:263`](../packages/company/cloud-agent/src/types.ts)
+Source: [`packages/company/cloud-agent/src/types.ts:275`](../packages/company/cloud-agent/src/types.ts)
 
 ### `command/*`
 
@@ -3294,7 +3294,7 @@ Array of [`AssistantStreamRecord`](#persistence-type-sha256-33341aac09312300de5a
 
 SHA-256: `93932f22fd2a7bd0f7800c51d4d5727cfe4029b87682486c83f62adb89c16919`
 
-Sources: [`packages/company/cloud-agent/src/types.ts:165`](../packages/company/cloud-agent/src/types.ts)
+Sources: [`packages/company/cloud-agent/src/types.ts:177`](../packages/company/cloud-agent/src/types.ts)
 
 | Property | Presence | Type |
 |---|---|---|

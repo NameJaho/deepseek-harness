@@ -9,7 +9,7 @@ import { ToolExecutionPipeline } from '@deepseek-ai/dsh-tools/pipeline'
 import { expect, it, vi, type TestContext } from 'vitest'
 import * as Runtime from '../src/index.ts'
 
-async function fixture(test: TestContext, mode: 'authoring' | 'release', skills: Runtime.CloudAgentRuntimeSkill[] = []) {
+async function fixture(test: TestContext, mode: 'authoring' | 'release', skills: Runtime.CloudAgentRuntimeSkill[] = [], knowledgeSources: string[] = []) {
   const ctx = new Context()
   test.onTestFinished(() => ctx.fiber.dispose())
   await ctx.plugin(SystemPrompt, { personaPrefix: 'GLOBAL_PERSONA' })
@@ -23,8 +23,12 @@ async function fixture(test: TestContext, mode: 'authoring' | 'release', skills:
   const pinned = vi.fn(async () => 'PINNED_EXECUTION')
   const validate = vi.fn(async () => {})
   const files = vi.fn(() => [])
+  const searchKnowledge = vi.fn(async (_agent: Agent, _release: string, sourceId: string, query: string) => ({
+    sourceId, query, hits: [], returned: 0, totalHits: 0, belowThreshold: 0, retrieve: { results: {} },
+  }))
   ctx.provide('cloudAgents', {
     releaseMcpTools: async () => [tool('mcp__approved__ping', pinned)], validateCapabilities: validate,
+    searchKnowledge,
     conversationFiles: files, conversationReport: () => ({ name: 'report.txt', content: 'ok', bytes: 2, mediaType: 'text/plain' }),
     readConversationFile: async () => ({ text: 'uploaded text' }),
   } as never)
@@ -33,9 +37,9 @@ async function fixture(test: TestContext, mode: 'authoring' | 'release', skills:
   let scope!: ReturnType<typeof createScope>
   await ctx.plugin(Object.assign((inner: Context) => { scope = createScope(inner, agent) },
     { inject: ['tools', 'systemPrompt'] }))
-  Object.assign(agent, { ctx: scope.ctx, inbox: { nextTurn: [], nextStep: [] } })
+  Object.assign(agent, { ctx: scope.ctx, session: { deriveMessages: () => [] }, inbox: { nextTurn: [], nextStep: [] } })
   const fiber = scope.ctx.plugin(Runtime, Runtime.Config({ mode, releaseId: 'release-1',
-    instructions: 'Literal {{not_an_expression}}', mcpTools: ['mcp__approved__ping'], skills }))
+    instructions: 'Literal {{not_an_expression}}', mcpTools: ['mcp__approved__ping'], skills, knowledgeSources }))
   await fiber
   await ctx.serial('agent/created', { agent, source: 'startup' })
   const execute = async (name: string, args: object = {}) => {
@@ -46,7 +50,7 @@ async function fixture(test: TestContext, mode: 'authoring' | 'release', skills:
     const outcome = prepared.kind === 'dispatch' ? await pipeline.dispatch(prepared.exec) : prepared
     return pipeline.complete(prepared.exec, outcome)
   }
-  return { ctx, agent, scope, fiber, external, pinned, validate, files, execute }
+  return { ctx, agent, scope, fiber, external, pinned, validate, files, searchKnowledge, execute }
 }
 
 it('exposes pinned MCP, reports and selected skills, rejects global execution and retains Agent policy through runtime unload', async (test) => {
@@ -93,4 +97,22 @@ it('restricts retained authoring to cloud_agent and never resolves release execu
   expect((await f.execute('cloud_report')).isError).toBe(true)
   expect(f.pinned).not.toHaveBeenCalled()
   expect(renderPrompt(await f.ctx.systemPrompt.assemble({ scope: f.agent }))).toContain('Literal {{not_an_expression}}')
+})
+
+it('keeps direct knowledge retrieval out of authoring and exposes it to a release', async (test) => {
+  const authoring = await fixture(test, 'authoring', [], ['operations'])
+  expect(authoring.ctx.tools.schemas(authoring.agent).map(schema => schema.name).join(',')).toBe('cloud_agent')
+  const release = await fixture(test, 'release', [], ['operations'])
+  expect(release.ctx.tools.schemas(release.agent).map(schema => schema.name).includes('cloud_knowledge')).toBe(true)
+  const result = await release.execute('cloud_knowledge', { sourceId: 'operations', query: 'printer issue' })
+  expect(result.content.length).toBeGreaterThan(0)
+  const text = result.content[0]?.type === 'text' ? result.content[0].text : ''
+  expect(text.includes('operations')).toBe(true)
+  expect(release.searchKnowledge).toHaveBeenCalledTimes(1)
+  const call = release.searchKnowledge.mock.calls[0]
+  expect(call?.[0] === release.agent && call[1] === 'release-1' && call[2] === 'operations' && call[3] === 'printer issue').toBe(true)
+  expect({
+    prompt: renderPrompt(await release.ctx.systemPrompt.assemble({ scope: release.agent })),
+    tools: release.ctx.tools.schemas(release.agent).filter(schema => schema.name === 'cloud_knowledge'),
+  }).toMatchSnapshot()
 })

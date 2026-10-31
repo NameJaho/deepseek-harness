@@ -14,6 +14,8 @@ import type { SessionForkPlacement, SessionPromptRequest } from '@deepseek-ai/ds
 import type {} from '@deepseek-ai/dsh-company-mcp-provider'
 import type {} from '@deepseek-ai/dsh-company-wecom-auth'
 import type { CompanyMarketSubject, CompanyOwnerScope } from '@deepseek-ai/dsh-company-wecom-auth/types'
+import type {} from '@deepseek-ai/dsh-company-knowledge'
+import type { CompanyKnowledgeDetailedSearchResult, CompanyKnowledgeRetrieveOptions } from '@deepseek-ai/dsh-company-knowledge/types'
 import type { ToolDefinition, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import type { FileAttachmentRef } from '@deepseek-ai/dsh-attachment'
@@ -30,7 +32,7 @@ import type { ConversationFilePage, ConversationFileReadRequest } from './files.
 import type {
   CloudAgentCatalog, CloudAgentConversation, CloudAgentDraft, CloudAgentId, CloudAgentOwnerId,
   CloudAgentRecord, CloudAgentRelease, CloudAgentReleaseId, CloudAgentRevisionRequest, CloudAgentPublishRequest,
-  CloudAgentSession, CloudAgentStartRequest, CloudAgentUpdateRequest, CloudAgentReport, CloudAgentUsageEntry,
+  CloudAgentSession, CloudAgentStartRequest, CloudAgentUpdateRequest, CloudAgentReport, CloudAgentUsageEntry, CloudAgentKnowledgeBinding,
 } from './types.ts'
 
 export { Config } from './config.ts'
@@ -49,7 +51,7 @@ function digest(value: object): string { return createHash('sha256').update(JSON
 /** Durable directory retaining exact releases and per-member Session ownership. */
 export class CloudAgentService extends TypertRemoteService {
   static inject = ['storageDomain', 'agentPresets', 'agents', 'llm', 'sessionController', 'tools',
-    'workspaceRegistry', 'companyMcpProvider', 'sessionProjections', 'permissionPresets', 'sessionPersistence']
+    'workspaceRegistry', 'companyWecomAuth', 'sessionProjections', 'permissionPresets', 'sessionPersistence']
   static Config = Config
   private readonly config: Config
   private readonly ready: Promise<Domain<typeof cloudAgentDomain>>
@@ -62,7 +64,7 @@ export class CloudAgentService extends TypertRemoteService {
   private readonly unregister = new Map<CloudAgentReleaseId, () => Promise<void>>()
   private readonly handles = new Set<AgentHandle>()
   private readonly workspaces: SessionWorkspaces
-  private readonly mcpCalls = new Set<Promise<unknown>>()
+  private readonly capabilityCalls = new Set<Promise<unknown>>()
   private unregisterAuthoring: (() => Promise<void>) | undefined
   private chain: Promise<void> = Promise.resolve()
   private closing: Promise<void> | undefined
@@ -114,6 +116,7 @@ export class CloudAgentService extends TypertRemoteService {
       authCtx.on('domain/changed', (change) => {
         if (change.domain === cloudAgentDomain.name) authCtx.get('remoteAccess')?.invalidate()
       })
+      registerAuthoringTool(authCtx, this)
     })
     // Ordinary selectable/default creation belongs to the Session controller, not this provider.
     owner.sessionController.registerCreationProvider(async (request, create, caller) => {
@@ -129,7 +132,6 @@ export class CloudAgentService extends TypertRemoteService {
         caller.invocation?.signal ?? new AbortController().signal)
       return { sessionId: result.sessionId, agentPreset: request.agentPreset }
     })
-    registerAuthoringTool(owner, this)
     registerAuthoringCommands(owner, this)
     owner.effect(() => owner.permissionPresets.registerGuard((session, permission) => {
       const preset = owner.agentPresets.presetForSession(session)
@@ -161,7 +163,8 @@ export class CloudAgentService extends TypertRemoteService {
       id: 'cloud-agent-authoring', name: 'Cloud Agent authoring', availability: 'retained',
       plugins: [{ name: '@deepseek-ai/dsh-company-cloud-agent-runtime', config: {
         mode: 'authoring', releaseId: 'authoring', instructions: 'Help the user refine reusable Agent requirements. '
-          + 'Use cloud_agent catalog and save to preserve confirmed instructions and selected MCP tools and skills. '
+          + 'Use cloud_agent catalog and save to preserve confirmed instructions and selected MCP tools, skills and knowledgeSources. '
+          + 'Knowledge sources use direct HTTP retrieval independently of MCP; zero MCP servers does not mean knowledge is unavailable. '
           + 'Exclude credentials and one-off results. Publication requires the user to confirm the saved revision and visibility with /publish-agent.',
       } }, cloudAgentCompaction()],
     })
@@ -191,7 +194,7 @@ export class CloudAgentService extends TypertRemoteService {
     await this.restored.catch((_startupError: unknown) => { /* Initialization reports the failure. */ })
     await this.chain
     const settled = await Promise.allSettled([...this.handles].map(handle => handle.dispose()))
-    const calls = await Promise.allSettled([...this.mcpCalls])
+    const calls = await Promise.allSettled([...this.capabilityCalls])
     const cleanup = await Promise.allSettled([...this.unregister.values()].map(stop => stop()))
     const final = await Promise.allSettled([
       ...this.unregisterAuthoring === undefined ? [] : [this.unregisterAuthoring()],
@@ -215,7 +218,7 @@ export class CloudAgentService extends TypertRemoteService {
     const conversations = [...domain.table('conversations').entries()].map(([, item]) => item)
       .filter(item => item.deletedAt === undefined && (item.ownerId ?? 'local-owner') === ownerId
         && this.allowsSession(item.sessionId))
-    const servers = (await this.ctx.companyMcpProvider.catalog(this.subject())).servers
+    const servers = (await this.ctx.get('companyMcpProvider')?.catalog(this.subject()))?.servers ?? []
     const used = new Map<CloudAgentId, CloudAgentConversation>()
     for (const conversation of conversations) if (conversation.role === 'usage' && conversation.agentId !== null) {
       used.set(conversation.agentId, conversation)
@@ -226,7 +229,8 @@ export class CloudAgentService extends TypertRemoteService {
       const release = record?.releases.find(item => item.id === record.publishedReleaseId)
       const status = record === undefined || record.deletedAt !== undefined ? 'deleted'
         : release === undefined ? 'withdrawn' : !this.visible(record, release, ownerId) ? 'access-lost'
-          : (release.definition.mcpServers ?? []).some(id => !servers.some(server => server.id === id && server.enabled && server.status === 'available'))
+          : !this.knowledgeAvailable(release.knowledgeBindings)
+            || (release.definition.mcpServers ?? []).some(id => !servers.some(server => server.id === id && server.enabled && server.status === 'available'))
             || (release.mcpBindings ?? []).some(tool => !servers.some(server => server.enabled && server.status === 'available'
               && server.tools.some(current => current.name === tool.name && current.fingerprint === tool.fingerprint))) ? 'disabled'
             : release.id !== binding.releaseId ? 'updated' : 'available'
@@ -239,6 +243,7 @@ export class CloudAgentService extends TypertRemoteService {
       published: records.flatMap((record) => {
         const release = record.releases.find(item => item.id === record.publishedReleaseId)
         const unavailable = release === undefined || !this.visible(record, release, ownerId)
+          || !this.knowledgeAvailable(release.knowledgeBindings)
           || (release.definition.mcpServers ?? []).some(id => !servers.some(server => server.id === id))
           || (release.mcpBindings ?? []).some(binding => !servers.some(server =>
             server.tools.some(tool => tool.name === binding.name)))
@@ -498,6 +503,7 @@ export class CloudAgentService extends TypertRemoteService {
       await this.validateCapabilities(release.id)
       const record = { ...this.newRecord(this.parseDraft(release.definition), ownerId),
         draftMcpBindings: release.mcpBindings ?? [], draftSkillSnapshots: release.skillSnapshots ?? [],
+        draftKnowledgeBindings: release.knowledgeBindings ?? [],
         draftCapabilityPreset: release.capabilityPreset, sourceSessionId: request.authoringSessionId,
         sourceThroughSeq: this.sourceSeq(request.authoringSessionId) }
       authorize()
@@ -561,9 +567,15 @@ export class CloudAgentService extends TypertRemoteService {
   async validateCapabilities(releaseId: string, sessionId?: SessionId): Promise<void> {
     const release = this.releases.get(brandString<CloudAgentReleaseId>(releaseId))
     if (release === undefined) throw unavailableCapability(releaseId)
-    for (const id of release.definition.mcpServers ?? []) await this.ctx.companyMcpProvider.discoverTools(this.subject(sessionId), id)
+    if (!this.knowledgeAvailable(release.knowledgeBindings)) throw unavailableCapability('knowledge')
+    const mcp = this.ctx.get('companyMcpProvider')
+    if (mcp === undefined) {
+      if ((release.definition.mcpServers?.length ?? 0) > 0 || (release.mcpBindings?.length ?? 0) > 0) throw unavailableCapability('mcp')
+      return
+    }
+    for (const id of release.definition.mcpServers ?? []) await mcp.discoverTools(this.subject(sessionId), id)
     for (const binding of release.mcpBindings ?? []) {
-      const current = await this.ctx.companyMcpProvider.resolveTool(this.subject(sessionId), binding.name)
+      const current = await mcp.resolveTool(this.subject(sessionId), binding.name)
       if (current === undefined || toolFingerprint(current.schema) !== binding.fingerprint) throw unavailableCapability(binding.name)
     }
   }
@@ -577,25 +589,63 @@ export class CloudAgentService extends TypertRemoteService {
     const release = this.releases.get(brandString<CloudAgentReleaseId>(releaseId))
     if (release === undefined) throw unavailableCapability(releaseId)
     await this.validateCapabilities(releaseId, sessionId)
+    const mcp = this.ctx.get('companyMcpProvider')
+    if (mcp === undefined) return []
     return Promise.all((release.mcpBindings ?? []).map(async (binding) => {
-      const current = await this.ctx.companyMcpProvider.resolveTool(this.subject(sessionId), binding.name)
+      const current = await mcp.resolveTool(this.subject(sessionId), binding.name)
       if (current === undefined || toolFingerprint(current.schema) !== binding.fingerprint) throw unavailableCapability(binding.name)
       return { ...current.tool, execute: (args: unknown, execution: ToolRunContext): Promise<unknown> => {
         const run = async (): Promise<unknown> => {
           this.requireReleaseAgent(execution.agent, releaseId)
           await this.validateCapabilities(releaseId, execution.agent.id)
-          const tool = await this.ctx.companyMcpProvider.resolveTool(this.subject(execution.agent.id), binding.name)
+          const tool = await mcp.resolveTool(this.subject(execution.agent.id), binding.name)
           if (tool === undefined || toolFingerprint(tool.schema) !== binding.fingerprint) throw unavailableCapability(binding.name)
           this.requireReleaseAgent(execution.agent, releaseId)
           execution.signal.throwIfAborted()
           return tool.tool.execute(args, execution)
         }
         const pending = run()
-        this.mcpCalls.add(pending)
-        void pending.then(() => { this.mcpCalls.delete(pending) }, () => { this.mcpCalls.delete(pending) })
+        this.capabilityCalls.add(pending)
+        void pending.then(() => { this.capabilityCalls.delete(pending) }, () => { this.capabilityCalls.delete(pending) })
         return pending
       } }
     }))
+  }
+
+  /** Retrieve evidence through a source pinned to the invoking release, without MCP dispatch.
+   * @param agent - live invoking release Agent.
+   * @param releaseId - immutable release selected by its runtime.
+   * @param sourceId - logical source selected from that release.
+   * @param query - current user question.
+   * @param signal - tool cancellation and deadline.
+   * @param options - conversation history and direct retrieval controls; omission uses one user message.
+   * @returns verified evidence, references and method/sufficiency signals.
+   */
+  searchKnowledge(agent: Agent | undefined, releaseId: string, sourceId: string, query: string, signal: AbortSignal,
+    options?: CompanyKnowledgeRetrieveOptions): Promise<CompanyKnowledgeDetailedSearchResult> {
+    const run = async (): Promise<CompanyKnowledgeDetailedSearchResult> => {
+      this.requireReleaseAgent(agent, releaseId)
+      await this.validateCapabilities(releaseId, agent.id)
+      this.requireReleaseAgent(agent, releaseId)
+      const binding = this.releases.get(brandString<CloudAgentReleaseId>(releaseId))?.knowledgeBindings?.find(item => item.id === sourceId)
+      const knowledge = this.ctx.get('companyKnowledge')
+      if (binding === undefined || knowledge === undefined) throw unavailableCapability(sourceId)
+      signal.throwIfAborted()
+      const result = await knowledge.search(binding, query, signal, options)
+      this.requireReleaseAgent(agent, releaseId)
+      if (!this.knowledgeAvailable([binding])) throw unavailableCapability(sourceId)
+      return result
+    }
+    const pending = run()
+    this.capabilityCalls.add(pending)
+    void pending.then(() => { this.capabilityCalls.delete(pending) }, () => { this.capabilityCalls.delete(pending) })
+    return pending
+  }
+
+  private knowledgeAvailable(bindings: readonly CloudAgentKnowledgeBinding[] = []): boolean {
+    const knowledge = this.ctx.get('companyKnowledge')
+    return bindings.every(binding => knowledge !== undefined && knowledge.sources().some(source => source.id === binding.id)
+      && knowledge.binding(binding.id).fingerprint === binding.fingerprint)
   }
 
   /** List only attachments retained by the invoking live release Session.
@@ -680,7 +730,8 @@ export class CloudAgentService extends TypertRemoteService {
     const parsed = draftSchema.safeParse(input)
     if (!parsed.success) throw new RemoteError('cloud-agent/invalid-input', 'Check the reusable Agent fields', { reason: parsed.error.message })
     return { ...parsed.data, mcpTools: [...new Set(parsed.data.mcpTools ?? [])].sort(),
-      mcpServers: [...new Set(parsed.data.mcpServers ?? [])].sort(), skills: [...new Set(parsed.data.skills ?? [])].sort() }
+      mcpServers: [...new Set(parsed.data.mcpServers ?? [])].sort(), skills: [...new Set(parsed.data.skills ?? [])].sort(),
+      ...parsed.data.knowledgeSources === undefined ? {} : { knowledgeSources: [...new Set(parsed.data.knowledgeSources)].sort() } }
   }
   private async requireRecord(request: CloudAgentRevisionRequest, ownerId: CloudAgentOwnerId): Promise<CloudAgentRecord> {
     const record = (await this.ready).table('agents').get(request.id)
@@ -769,6 +820,7 @@ export class CloudAgentService extends TypertRemoteService {
         description: release.definition.description, availability: 'retained', plugins: [{
           name: '@deepseek-ai/dsh-company-cloud-agent-runtime', config: { mode: 'release', releaseId: release.id,
             instructions: release.definition.instructions, mcpTools: release.definition.mcpTools ?? [],
+            knowledgeSources: release.knowledgeBindings?.map(binding => binding.id) ?? [],
             skills: release.skillSnapshots ?? [] },
         }, cloudAgentCompaction()] })
       this.unregister.set(release.id, stop)
@@ -781,16 +833,24 @@ export class CloudAgentService extends TypertRemoteService {
     return Math.max(0, agent.session.seq - 1)
   }
   private async captureDraft(draft: CloudAgentDraft): Promise<Pick<CloudAgentRecord,
-    'draft' | 'draftMcpBindings' | 'draftSkillSnapshots' | 'draftCapabilityPreset'>> {
-    const servers = await Promise.all((draft.mcpServers ?? []).map(id => this.ctx.companyMcpProvider.discoverTools(this.subject(), id)))
+    'draft' | 'draftMcpBindings' | 'draftSkillSnapshots' | 'draftCapabilityPreset' | 'draftKnowledgeBindings'>> {
+    const mcp = this.ctx.get('companyMcpProvider')
+    if (mcp === undefined && ((draft.mcpServers?.length ?? 0) > 0 || (draft.mcpTools?.length ?? 0) > 0)) throw unavailableCapability('mcp')
+    const servers = mcp === undefined ? [] : await Promise.all((draft.mcpServers ?? []).map(id => mcp.discoverTools(this.subject(), id)))
     const names = [...new Set([...(draft.mcpTools ?? []), ...servers.flat().map(tool => tool.name)])].sort()
     const definition = this.parseDraft({ ...draft, mcpTools: names })
+    const knowledge = this.ctx.get('companyKnowledge')
+    const draftKnowledgeBindings = (definition.knowledgeSources ?? []).map((id) => {
+      if (knowledge === undefined || !knowledge.sources().some(source => source.id === id)) throw unavailableCapability(id)
+      return knowledge.binding(id)
+    })
     const draftMcpBindings = await Promise.all(names.map(async (name) => {
-      const tool = await this.ctx.companyMcpProvider.resolveTool(this.subject(), name)
+      if (mcp === undefined) throw unavailableCapability('mcp')
+      const tool = await mcp.resolveTool(this.subject(), name)
       if (tool === undefined) throw unavailableCapability(name)
       return { name, fingerprint: toolFingerprint(tool.schema) }
     }))
-    return { draft: definition, draftMcpBindings,
+    return { draft: definition, draftMcpBindings, draftKnowledgeBindings,
       draftSkillSnapshots: await snapshotSkills(this.owner, draft.skills ?? [], this.config),
       draftCapabilityPreset: this.config.capabilityPreset }
   }
@@ -801,10 +861,19 @@ export class CloudAgentService extends TypertRemoteService {
     if (record.draftMcpBindings === undefined || record.draftSkillSnapshots === undefined) {
       throw new RemoteError('cloud-agent/invalid-input', 'Save this draft to capture its capabilities before confirming publication', { reason: 'draft-snapshot-required' })
     }
-    for (const id of definition.mcpServers ?? []) await this.ctx.companyMcpProvider.discoverTools(this.subject(), id)
+    if ((definition.knowledgeSources?.length ?? 0) > 0 && record.draftKnowledgeBindings === undefined) {
+      throw new RemoteError('cloud-agent/invalid-input', 'Save this draft to capture knowledge source permissions before publication', { reason: 'draft-snapshot-required' })
+    }
+    const knowledgeBindings = record.draftKnowledgeBindings ?? []
+    if (!this.knowledgeAvailable(knowledgeBindings)) throw unavailableCapability('knowledge')
+    const mcp = this.ctx.get('companyMcpProvider')
     const mcpBindings = record.draftMcpBindings
+    if (mcp === undefined) {
+      if ((definition.mcpServers?.length ?? 0) > 0 || mcpBindings.length > 0) throw unavailableCapability('mcp')
+    } else for (const id of definition.mcpServers ?? []) await mcp.discoverTools(this.subject(), id)
     for (const binding of mcpBindings) {
-      const tool = await this.ctx.companyMcpProvider.resolveTool(this.subject(), binding.name)
+      if (mcp === undefined) throw unavailableCapability('mcp')
+      const tool = await mcp.resolveTool(this.subject(), binding.name)
       if (tool === undefined || toolFingerprint(tool.schema) !== binding.fingerprint) throw unavailableCapability(binding.name)
     }
     const skillSnapshots = record.draftSkillSnapshots
@@ -812,7 +881,7 @@ export class CloudAgentService extends TypertRemoteService {
     if (agent === undefined) throw new RemoteError('cloud-agent/authoring-required', 'The source editor is unavailable', {})
     const source = { sessionId: agent.id, throughSeq: Math.max(0, agent.session.seq - 1),
       preset: this.owner.agentPresets.composedPreset(agent.ctx), permission: this.owner.permissionPresets.current(agent.session) }
-    const captured = { definition, mcpBindings, skillSnapshots, capabilityPreset: record.draftCapabilityPreset }
+    const captured = { definition, mcpBindings, skillSnapshots, knowledgeBindings, capabilityPreset: record.draftCapabilityPreset }
     const release: CloudAgentRelease = { ...captured, id: brandString<CloudAgentReleaseId>(randomUUID()), kind,
       version: kind === 'published' ? record.releases.filter(item => item.kind === 'published').length + 1 : 0,
       draftRevision: record.revision, createdAt: Date.now(), visibility, source, digest: digest(captured) }

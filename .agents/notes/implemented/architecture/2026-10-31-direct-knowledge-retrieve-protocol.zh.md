@@ -12,7 +12,7 @@ Status: implemented
 
 企业知识库使用每个逻辑来源配置的直连 retrieve 地址。Host 注入批准的 `space_ids`，发送完整的 user/assistant `messages` 历史，并在有值时携带 `emotion`、`prev_method_id`、`verify`、图片、来源和过滤控制。直连接口是内部免鉴权服务；本包不配置或转发 bearer token。
 
-Host 校验 retrieve 外壳和批准的文档空间，保留 `chunks`、`images`、`im`、`graph` 分组结果及检索信号供 Cloud Agent 执行，同时只通过管理 Remote 暴露有界的证据字段。Cloud Agent 在检索前从当前 Session 推导对话消息和上一轮方法 id。
+Host 校验 retrieve 外壳和批准的文档空间，保留 `chunks`、`images`、`im`、`graph` 分组结果及检索信号供 Cloud Agent 执行，同时只通过管理 Remote 暴露有界的证据字段。Cloud Agent 运行时在检索前从当前 Session 推导 user/assistant 文本消息；继续服务端方法时由调用方传入 `prev_method_id`。
 
 ## 考虑过的替代方案
 

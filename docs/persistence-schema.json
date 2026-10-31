@@ -436,7 +436,7 @@
     {"digest":"930c1cd289def119d443e19dd90008916bf035f0a4d23e07241e7f050f2b89b7","names":["packages/interaction/user-approval/src/types.ts#ApprovalOutcome"],"sources":["packages/interaction/user-approval/src/types.ts:32"]},
     {"digest":"935c8d486292b13c87b57ca280eb8c58b5b2f5239be86fcd4334c33fdeb87682","names":[],"sources":[]},
     {"digest":"938f7c7357bc403ea3b281a9dd016939df7a0880fc8db12612585be574d0d615","names":[],"sources":[]},
-    {"digest":"93932f22fd2a7bd0f7800c51d4d5727cfe4029b87682486c83f62adb89c16919","names":["packages/company/cloud-agent/src/types.ts#CloudAgentConversation"],"sources":["packages/company/cloud-agent/src/types.ts:165"]},
+    {"digest":"93932f22fd2a7bd0f7800c51d4d5727cfe4029b87682486c83f62adb89c16919","names":["packages/company/cloud-agent/src/types.ts#CloudAgentConversation"],"sources":["packages/company/cloud-agent/src/types.ts:177"]},
     {"digest":"93acc62c623436a3c4143c60d8838fbd908ab2c7d1141300f72bdeb9322d1d89","names":[],"sources":[]},
     {"digest":"93c33d9687613293f8c95d46c4d922fe9ceae83b84c384beff5c3315abe005f2","names":[],"sources":[]},
     {"digest":"93cbbc5a7fd0b1aa1ff1b9a6bb5ec52b073f48e5a5200365c45c0cd54059e1b9","names":[],"sources":["packages/interaction/user-approval/src/types.ts:55"]},

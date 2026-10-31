@@ -3,23 +3,23 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/company/cloud-agent/README.md
 /:
-  en: f990920132baf5e7
-  zh: ed7b3dcb8f8a630f
+  en: 7ae51c4fa325815f
+  zh: 4235efc027d20a99
 /deepseek-ai-dsh-company-cloud-agent:
   en: 95e2a615687fa08e
   zh: 117157f934e22b18
 /deepseek-ai-dsh-company-cloud-agent/summary:
-  en: 3938699d3fdc770b
-  zh: 32e7c74895c6d5d0
+  en: 5436b0bbab0ea9d1
+  zh: b6a6a35bb71fa262
 /deepseek-ai-dsh-company-cloud-agent/table-of-contents:
   en: 4ae025c94ad3935a
   zh: 88607eff9df7fe2e
 /deepseek-ai-dsh-company-cloud-agent/use-this-package:
-  en: ba40d8fb053b50b5
-  zh: 8c1e222b3a5c27f1
+  en: bf19caba00203338
+  zh: 7d3504e412a47b19
 /deepseek-ai-dsh-company-cloud-agent/ownership-and-execution:
-  en: 5370de67658856b2
-  zh: a838d8997676c480
+  en: db4bc9f7609794dd
+  zh: 016c3a713566a23e
 /deepseek-ai-dsh-company-cloud-agent/persistence-and-lifecycle:
   en: efd9997fb693fbad
   zh: 41496e4d2925df7c
@@ -54,8 +54,8 @@
   en: 754897ede4136df8
   zh: 6c3a518c9f3c78c8
 /deepseek-ai-dsh-company-cloud-agent/known-limitations-and-deferred-work:
-  en: 501b6f1c23e6b508
-  zh: f8f511c0c03d40a2
+  en: c1676759f0f8be91
+  zh: 8de78afa2bf4fd35
 /deepseek-ai-dsh-company-cloud-agent/known-limitations-and-deferred-work/dev-note:
   en: 7d529c8379bc20b0
   zh: 57f079960ea495c1

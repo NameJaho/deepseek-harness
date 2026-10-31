@@ -1001,6 +1001,17 @@ async validateCapabilities(releaseId: string, sessionId?: SessionId): Promise<vo
  */
 async releaseMcpTools(releaseId: string, sessionId?: SessionId): Promise<readonly ToolDefinition[]>
 
+/** Retrieve evidence through a source pinned to the invoking release, without MCP dispatch.
+ * @param agent - live invoking release Agent.
+ * @param releaseId - immutable release selected by its runtime.
+ * @param sourceId - logical source selected from that release.
+ * @param query - current user question.
+ * @param signal - tool cancellation and deadline.
+ * @param options - conversation history and direct retrieval controls; omission uses one user message.
+ * @returns verified evidence, references and method/sufficiency signals.
+ */
+searchKnowledge(agent: Agent | undefined, releaseId: string, sourceId: string, query: string, signal: AbortSignal, options?: CompanyKnowledgeRetrieveOptions): Promise<CompanyKnowledgeDetailedSearchResult>
+
 /** List only attachments retained by the invoking live release Session.
  * @param agent - trusted executor initiator.
  * @returns recorded references, including compacted history.

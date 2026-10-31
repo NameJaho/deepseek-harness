@@ -39,7 +39,7 @@ const sessionId = 'usage' as SessionId
 const catalog: CloudAgentCatalog = { mine: [{ ...record, releases: [release], publishedReleaseId: release.id }], published: [],
   conversations: [{ agentId: record.id, role: 'usage', sessionId, releaseId: release.id, creationPreset: 'creation-mode', runPreset: 'run-mode', effectiveDigest: 'effective-digest' }],
   usage: [{ agentId: record.id, ownerId: record.ownerId, name: 'Stable Agent', status: 'disabled', release }],
-  models: { groups: [], default: { provider: 'p', model: 'm' }, routableProviders: [], failures: [] }, capabilities: { mcpTools: [{ name: 'unselected.global', description: 'Global tool' }], skills: [{ name: 'global.skill', description: 'Global skill' }], mcpServers: [] } }
+  models: { groups: [], default: { provider: 'p', model: 'm' }, routableProviders: [], failures: [] }, capabilities: { mcpTools: [{ name: 'unselected.global', description: 'Global tool' }], skills: [{ name: 'global.skill', description: 'Global skill' }], mcpServers: [], knowledgeSources: [] } }
 type ProjectionKey = Extract<keyof SessionProjectionMap, string>
 function useProjection<K extends ProjectionKey>(key: K): SessionProjectionMap[K] | undefined
 function useProjection<K extends ProjectionKey, S>(key: K, selector: (value: SessionProjectionMap[K] | undefined) => S): S

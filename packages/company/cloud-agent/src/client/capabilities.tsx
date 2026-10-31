@@ -16,7 +16,7 @@ type CapabilityProps = PropsRuntime<'sidebar.right.pane.tab'> & PropsLocale<'com
 type NavigationProps = PropsRuntime<'conversation.input.right'> & PropsLocale<'company.cloudAgent'>
   & InjectFace<Pick<CloudAgentInjected, 'hooks' | 'refresh'>> & { readonly revealCapabilities: (sessionId: SessionId) => void }
 /** Editable capability fields, excluding executable plugins and connection settings. */
-export type CapabilitySelection = Pick<CloudAgentDraft, 'mcpTools' | 'mcpServers' | 'skills'>
+export type CapabilitySelection = Pick<CloudAgentDraft, 'mcpTools' | 'mcpServers' | 'skills' | 'knowledgeSources'>
 function toggle<T extends string>(values: readonly T[] | undefined, value: T, checked: boolean): T[] {
   return checked ? [...new Set([...(values ?? []), value])] : (values ?? []).filter(item => item !== value)
 }
@@ -76,6 +76,17 @@ export function CapabilityChoices({ catalog, selection, busy, t, onChange }: {
             onChange={(checked) => { onChange({ ...selection, skills: toggle(selection.skills, name, checked) }) }} />
           <p>{catalog.skills.find(skill => skill.name === name)?.description ?? t('mcpListMissingDescription')}</p>
         </div>)}
+    </fieldset>
+    <fieldset className={css.capabilityPicker}><legend>{t('knowledgeSources')}</legend>
+      {catalog.knowledgeSources.length === 0 && <p>{t('noKnowledgeSources')}</p>}
+      {[...new Set([...catalog.knowledgeSources.map(source => source.id), ...(selection.knowledgeSources ?? [])])].map((id) => {
+        const source = catalog.knowledgeSources.find(item => item.id === id)
+        return <div key={id} className={css.capabilityOption}>
+          <Checkbox label={source?.name ?? id} checked={selection.knowledgeSources?.includes(id) === true} disabled={busy}
+            onChange={(checked) => { onChange({ ...selection, knowledgeSources: toggle(selection.knowledgeSources, id, checked) }) }} />
+          <p>{source?.description ?? t('knowledgeSourceMissing')}</p>
+        </div>
+      })}
     </fieldset>
   </>
 }
@@ -145,6 +156,9 @@ export function CloudAgentCapabilitiesPanel(props: CapabilityProps) {
             {selection.tools.length === 0 ? <p>{props.t('infoNoMcp')}</p> : <ul className={css.infoList}>{selection.tools.map(tool =>
               <li key={tool.name}><code>{tool.name}</code><p>{tool.description ?? props.t('mcpListMissingDescription')}</p></li>)}</ul>}
           </section>
+          <section className={css.capabilitySection}><h3>{props.t('knowledgeSources')}</h3><ul className={css.infoList}>
+            {(selection.release.definition.knowledgeSources ?? []).map(id => <li key={id}><code>{id}</code></li>)}
+          </ul></section>
           <section className={css.capabilitySection}><h3>{props.t('skills')}</h3><ul className={css.infoList}>
             {(selection.release.skillSnapshots?.map(skill => ({ name: skill.name, description: skill.description }))
               ?? selection.release.definition.skills?.map(name => ({ name, description: '' })) ?? []).map(skill =>

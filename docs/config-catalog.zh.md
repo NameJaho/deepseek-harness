@@ -804,7 +804,7 @@ export interface ToolResultPruneConfig {
 
 ## `@deepseek-ai/dsh-company-cloud-agent`
 
-- `inject`: `storageDomain` · `agentPresets` · `agents` · `llm` · `sessionController` · `tools` · `workspaceRegistry` · `companyMcpProvider` · `sessionProjections` · `permissionPresets` · `sessionPersistence`
+- `inject`: `storageDomain` · `agentPresets` · `agents` · `llm` · `sessionController` · `tools` · `workspaceRegistry` · `companyWecomAuth` · `sessionProjections` · `permissionPresets` · `sessionPersistence`
 - `source`: [`packages/company/cloud-agent/src/config.ts:5`](../packages/company/cloud-agent/src/config.ts)
 
 ```ts config-catalog
@@ -847,6 +847,8 @@ export interface Config {
   mcpTools?: string[]
   /** Published skill instructions and resources. */
   skills?: CloudAgentRuntimeSkill[]
+  /** Logical direct-retrieval source ids approved by the release. */
+  knowledgeSources?: string[]
   /** Authoring or ordinary retained release behavior. */
   mode?: 'authoring' | 'release'
 }

@@ -37,7 +37,7 @@ kind: "package-bundle"
 | `sources` | `[]` | Host 持有的逻辑来源，含直连地址和空间白名单 |
 | `topK` | `5` | 请求的段落数，范围 1 到 50 |
 | `minimumScore` | `0.5` | 接受的最低重排相关度 |
-| `timeoutMs` | `30000` | 单次检索的截止时间 |
+| `timeoutMs` | `60000` | 单次检索的截止时间 |
 | `maxQueryChars` | `16000` | 去除首尾空白后问题的最大字符数 |
 | `maxResponseBytes` | `8388608` | 上游完整响应的字节上限 |
 

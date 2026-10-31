@@ -12,7 +12,7 @@ The company knowledge provider was sending an older single-question response con
 
 Company knowledge uses the direct retrieve endpoint configured by each logical source. The Host injects the approved `space_ids`, sends the complete user/assistant `messages` history, and carries `emotion`, `prev_method_id`, `verify`, image, source and filtering controls when provided. The direct endpoint is an internal unauthenticated service; no bearer token is configured or forwarded by this package.
 
-The Host validates the retrieve envelope and approved document spaces, retains grouped `chunks`, `images`, `im` and `graph` results plus retrieve signals for Cloud Agent execution, and projects only bounded evidence fields to the management Remote. Cloud Agent derives prior conversation messages and the previous method id from the current Session before invoking retrieval.
+The Host validates the retrieve envelope and approved document spaces, retains grouped `chunks`, `images`, `im` and `graph` results plus retrieve signals for Cloud Agent execution, and projects only bounded evidence fields to the management Remote. Cloud Agent runtime derives prior user/assistant text messages from the current Session before invoking retrieval; callers pass `prev_method_id` when continuing a server-side method.
 
 ## Alternatives considered
 

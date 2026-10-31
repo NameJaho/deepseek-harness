@@ -186,6 +186,19 @@ it('keeps an explicitly configured full-access default for authoring Sessions', 
   expect(published.releases[0]?.source?.permission).toBe('danger-full-access')
 })
 
+it('executes the authoring tool through the injected company identity context', async (test) => {
+  const f = await fixture(test)
+  const sessionId = await f.editor()
+  const agent = f.agents.get(sessionId)!
+  const authoring = f.ctx.tools.executable('cloud_agent', agent)
+  expect(authoring).toBeDefined()
+  const result = await authoring!.execute({ action: 'save', name: f.draft.name, description: f.draft.description,
+    instructions: f.draft.instructions, provider: f.draft.provider, model: f.draft.model, mcpTools: [] }, {
+    agent, callId: brandString<ToolRunContext['callId']>('authoring-tool-call'), signal: new AbortController().signal,
+  } as ToolRunContext)
+  expect(JSON.parse(String(result))).toMatchObject({ action: 'saved', revision: 1, draft: { name: f.draft.name } })
+})
+
 it('pins the saved revision, rejects changed schemas, and deduplicates explicit publication replays', async (test) => {
   const f = await fixture(test)
   const sessionId = await f.editor()

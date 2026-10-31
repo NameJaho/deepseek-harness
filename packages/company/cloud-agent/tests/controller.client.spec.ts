@@ -12,7 +12,7 @@ const record: CloudAgentRecord = { id: 'agent-1' as CloudAgentRecord['id'], owne
   draft: release.definition, releases: [release], publishedReleaseId: release.id, createdAt: 1, updatedAt: 2 }
 const catalog: CloudAgentCatalog = { mine: [record], published: [{ id: record.id, ownerId: record.ownerId, release }],
   usage: [], conversations: [],
-  capabilities: { mcpTools: [], mcpServers: [], skills: [] }, models: { groups: [], default: { provider: 'provider', model: 'model' }, routableProviders: [], failures: [] } }
+  capabilities: { mcpTools: [], mcpServers: [], skills: [], knowledgeSources: [] }, models: { groups: [], default: { provider: 'provider', model: 'model' }, routableProviders: [], failures: [] } }
 const ok = <T>(value: T) => ({ ok: true as const, value })
 function deferred<T>() {
   let resolve!: (value: T) => void

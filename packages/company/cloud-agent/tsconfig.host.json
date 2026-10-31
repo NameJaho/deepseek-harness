@@ -8,6 +8,7 @@
   "include": ["src/*.ts"],
   "references": [
     { "path": "../wecom-auth" },
+    { "path": "../knowledge/tsconfig.host.json" },
     { "path": "../mcp-provider" },
     { "path": "../../../vendor/cordis" },
     { "path": "../../../vendor/schemastery" },

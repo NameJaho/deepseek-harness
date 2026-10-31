@@ -336,7 +336,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 'cloud-agent/binding': CloudAgentConversation
 ```
 
-来源：[`packages/company/cloud-agent/src/types.ts:263`](../packages/company/cloud-agent/src/types.ts)
+来源：[`packages/company/cloud-agent/src/types.ts:275`](../packages/company/cloud-agent/src/types.ts)
 
 ### `command/*`
 
@@ -3296,7 +3296,7 @@ SHA-256: `84bbfdce7d2eab5b0c53e72ff7406db856c8bfd621b965b72fd86598ba493bf7`
 
 SHA-256: `93932f22fd2a7bd0f7800c51d4d5727cfe4029b87682486c83f62adb89c16919`
 
-来源：[`packages/company/cloud-agent/src/types.ts:165`](../packages/company/cloud-agent/src/types.ts)
+来源：[`packages/company/cloud-agent/src/types.ts:177`](../packages/company/cloud-agent/src/types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|

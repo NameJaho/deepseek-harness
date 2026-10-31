@@ -6,7 +6,7 @@ import { Context } from '@deepseek-ai/cordis'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
 import { expect, it } from 'vitest'
 import { Config } from '../src/config.ts'
-import { snapshotSkills, toolFingerprint } from '../src/capabilities.ts'
+import { capabilityCatalog, snapshotSkills, toolFingerprint } from '../src/capabilities.ts'
 import { cloudAgentDomain } from '../src/storage.ts'
 
 it('captures regular resources and rejects missing skills, links and exceeded resource limits', async (test) => {
@@ -58,4 +58,13 @@ it('fingerprints the exact provider schema including tool descriptions and param
   expect(toolFingerprint(a)).toBe(toolFingerprint(structuredClone(a)))
   expect(toolFingerprint(a)).not.toBe(toolFingerprint({ ...a, description: 'Changed' }))
   expect(toolFingerprint(a)).not.toBe(toolFingerprint({ ...a, parameters: { type: 'object' } }))
+})
+
+it('lists direct knowledge sources when no MCP provider is mounted', async () => {
+  const ctx = new Context()
+  ctx.provide('agentPresets', { acquireScope: async () => ({ key: {}, [Symbol.asyncDispose]: async () => undefined }) } as never)
+  ctx.provide('companyKnowledge', { sources: () => [{ id: 'operations', name: 'Operations', description: 'Approved' }] } as never)
+  const catalog = await capabilityCatalog(ctx, { scope: 'scope', corpId: 'corp', sub: 'member' } as never)
+  expect(catalog.mcpServers).toEqual([])
+  expect(catalog.knowledgeSources).toEqual([{ id: 'operations', name: 'Operations', description: 'Approved' }])
 })

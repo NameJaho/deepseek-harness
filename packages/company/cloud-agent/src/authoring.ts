@@ -16,6 +16,7 @@ export function registerAuthoringTool(ctx: Context, service: CloudAgentService):
     description: 'Save reusable Agent requirements from the confirmed conversation. Read catalog first. '
       + 'Preserve confirmed rules and omit credentials, endpoints, temporary paths and one-off results. '
       + 'Use discover for a selected MCP server; select exact catalog or discovered tool and skill names. '
+      + 'Knowledge uses a separate direct retrieval service: select knowledgeSources from catalog even when no MCP servers exist. '
       + 'Saving does not publish. Show the saved name, description and revision; the user publishes with '
       + '/publish-agent confirm <revision> <public|private>. Preview opens a separate private test conversation.',
     parameters: {
@@ -32,6 +33,7 @@ export function registerAuthoringTool(ctx: Context, service: CloudAgentService):
       mcpTools: { type: 'array', items: { type: 'string' }, description: 'Exact MCP tools; omission retains current choices, [] removes them.' },
       mcpServers: { type: 'array', items: { type: 'string' }, description: 'Selected server ids; their current tools are pinned when saving the draft. Omission retains choices.' },
       skills: { type: 'array', items: { type: 'string' }, description: 'Installed skill names to snapshot; omission retains choices, [] removes them.' },
+      knowledgeSources: { type: 'array', items: { type: 'string' }, description: 'Direct retrieval source ids from capabilities.knowledgeSources, independent of MCP; omission retains choices, [] removes them.' },
     },
     output: {
       schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }],
@@ -57,8 +59,10 @@ export function registerAuthoringTool(ctx: Context, service: CloudAgentService):
       })
       if (args.action === 'discover') {
         if (args.serverId === undefined) throw new Error('discover requires serverId from catalog')
+        const mcp = ctx.get('companyMcpProvider')
+        if (mcp === undefined) throw new Error('No MCP provider is configured; direct knowledge sources are independent of MCP')
         const subject = ctx.companyWecomAuth.marketSubject(agent.id)
-        return JSON.stringify(await ctx.companyMcpProvider.discover(subject, brandString<CompanyMcpId>(args.serverId), execution.signal))
+        return JSON.stringify(await mcp.discover(subject, brandString<CompanyMcpId>(args.serverId), execution.signal))
       }
       if (args.action === 'save') {
         if (args.name === undefined || args.instructions === undefined) throw new Error('save requires name and complete instructions')
@@ -69,13 +73,17 @@ export function registerAuthoringTool(ctx: Context, service: CloudAgentService):
           model: args.model ?? base?.model ?? selection?.model ?? catalog.models.default.model,
           mcpTools: args.mcpTools ?? base?.mcpTools ?? [],
           mcpServers: args.mcpServers?.map(id => brandString<CompanyMcpId>(id)) ?? base?.mcpServers ?? [],
-          skills: args.skills ?? base?.skills ?? [] }
+          skills: args.skills ?? base?.skills ?? [], knowledgeSources: args.knowledgeSources ?? base?.knowledgeSources ?? [] }
         const subject = ctx.companyWecomAuth.marketSubject(agent.id)
-        for (const name of draft.mcpTools ?? []) if (await ctx.companyMcpProvider.resolveTool(subject, name) === undefined) {
+        const mcp = ctx.get('companyMcpProvider')
+        if (mcp === undefined && ((draft.mcpServers?.length ?? 0) > 0 || (draft.mcpTools?.length ?? 0) > 0)) {
+          throw new Error('No MCP provider is configured; select direct knowledge sources instead')
+        }
+        if (mcp !== undefined) for (const name of draft.mcpTools ?? []) if (await mcp.resolveTool(subject, name) === undefined) {
           throw new Error('Select an available MCP tool from catalog or discovery')
         }
         if (draft.skills?.some(name => !catalog.capabilities.skills.some(skill => skill.name === name))) throw new Error('Select installed skills from catalog')
-        for (const id of draft.mcpServers ?? []) await ctx.companyMcpProvider.discoverTools(subject, id)
+        if (mcp !== undefined) for (const id of draft.mcpServers ?? []) await mcp.discoverTools(subject, id)
         const saved = await service.saveFromConversation(agent, String(execution.callId), draft,
           args.agentId === undefined ? undefined : brandString<CloudAgentId>(args.agentId), args.expectedRevision)
         return JSON.stringify({ action: 'saved', id: saved.id, revision: saved.revision, draft: saved.draft,

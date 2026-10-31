@@ -8,6 +8,7 @@ import type { ToolSchema } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import type {} from '@deepseek-ai/dsh-company-mcp-provider'
+import type {} from '@deepseek-ai/dsh-company-knowledge'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import type { Config } from './config.ts'
 import type { CloudAgentCapabilities, CloudAgentSkillSnapshot } from './types.ts'
@@ -29,12 +30,14 @@ export function toolFingerprint(schema: ToolSchema): string {
 export async function capabilityCatalog(ctx: Context, subject: CompanyMarketSubject, preset?: string): Promise<CloudAgentCapabilities> {
   await using lease = await ctx.agentPresets.acquireScope(preset)
   const skills = ctx.get('skills')
-  const mcpServers = await ctx.companyMcpProvider.capabilityCatalog(subject)
-  const catalog = await ctx.companyMcpProvider.catalog(subject)
+  const mcp = ctx.get('companyMcpProvider')
+  const mcpServers = mcp === undefined ? [] : await mcp.capabilityCatalog(subject)
+  const catalog = mcp === undefined ? { servers: [] } : await mcp.catalog(subject)
   return {
     mcpTools: catalog.servers.filter(server => server.enabled && server.status === 'available')
       .flatMap(server => server.tools.map(tool => ({ name: tool.name, description: tool.description }))),
     mcpServers,
+    knowledgeSources: ctx.get('companyKnowledge')?.sources() ?? [],
     skills: skills === undefined ? [] : (await skills.list({ cwd: process.cwd(), scope: lease.key }))
       .filter(skill => skill.invocation.modelInvocable).map(skill => ({ name: skill.name, description: skill.description })),
   }

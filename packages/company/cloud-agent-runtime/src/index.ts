@@ -23,6 +23,8 @@ export interface Config {
   mcpTools?: string[]
   /** Published skill instructions and resources. */
   skills?: CloudAgentRuntimeSkill[]
+  /** Logical direct-retrieval source ids approved by the release. */
+  knowledgeSources?: string[]
   /** Authoring or ordinary retained release behavior. */
   mode?: 'authoring' | 'release'
 }
@@ -56,6 +58,7 @@ export const Config: z<Config> = z.object({
     name: z.string().required(), description: z.string().required(), content: z.string().required(),
     resources: z.array(z.object({ path: z.string().required(), base64: z.string().required() })).required(),
   })).default([]),
+  knowledgeSources: z.array(z.string()).default([]),
   mode: z.union(['authoring', 'release']).default('release'),
 })
 
@@ -67,12 +70,14 @@ export const Config: z<Config> = z.object({
 export function apply(ctx: Context, config: Config): void {
   const authoring = config.mode === 'authoring'
   const skills = config.skills ?? []
+  const knowledgeSources = authoring ? [] : config.knowledgeSources ?? []
   const denial = authoring ? 'This conversation creates and edits agent drafts.'
     : 'Only tools explicitly enabled for this Cloud Agent can be used.'
   // Tool policies survive runtime unloading until their owning Agent is disposed.
   ctx.on('agent/created', async ({ agent }) => {
     const allowed = new Set(authoring ? ['cloud_agent'] : [
       ...config.mcpTools ?? [], ...skills.length > 0 ? ['cloud_skill'] : [], 'cloud_report',
+      ...knowledgeSources.length > 0 ? ['cloud_knowledge'] : [],
     ])
     const mask = createScope(agent.ctx, agent)
     agent.ctx.effect(() => mask.rawDispose, 'cloud-agent: Agent tool policy')
@@ -158,11 +163,53 @@ export function apply(ctx: Context, config: Config): void {
     order: ctx.systemPrompt.getSectionOrder('DEPLOYMENT_PERSONA_PREFIX'),
     text: [config.instructions,
       ...skills.length === 0 ? [] : [`Available skills (load instructions with cloud_skill before using them):\n${skills.map(skill => `- ${skill.name}: ${skill.description}`).join('\n')}`],
+      ...knowledgeSources.length === 0 ? [] : [`Approved knowledge sources: ${knowledgeSources.join(', ')}. Use cloud_knowledge before answering questions that need company knowledge. Cite document titles and sections. If no reliable evidence is returned, state what is missing rather than inventing an answer.`],
     ].join('\n\n'),
     interpolate: false,
     complete: true,
   }), 'cloud-agent: literal instructions')
   ctx.systemPrompt.suppressRuntimeContext()
+  if (knowledgeSources.length > 0) ctx.tools.register(defineTool({
+    name: 'cloud_knowledge',
+    description: 'Search an approved company knowledge source. Use returned evidence and cite document titles and sections. An empty hit list is not evidence for an invented answer.',
+    parameters: {
+      sourceId: { type: 'string', required: true, enum: knowledgeSources, description: 'Exact approved knowledge source id.' },
+      query: { type: 'string', required: true, description: 'Current user question in natural language.' },
+      messages: { type: 'array', items: { type: 'object', additionalProperties: false, properties: {
+        role: { type: 'string', required: true, enum: ['user', 'assistant'] },
+        content: { type: 'string', required: true },
+      } }, description: 'Optional complete conversation history ending with the current user question.' },
+      emotion: { type: 'string', description: 'Optional current-user emotion: 平和, 疑惑, 着急, 不满 or 愤怒.' },
+      prevMethodId: { type: 'string', description: 'Method id from the previous retrieval response for a continuing issue.' },
+      verify: { type: 'boolean', description: 'Whether the retrieval service verifies sufficiency and supplements evidence; defaults to true.' },
+      image: { type: 'string', description: 'Optional image URL, data URI or base64 for image retrieval.' },
+      kbIds: { type: 'array', items: { type: 'string' }, description: 'Optional knowledge base ids within the approved source spaces.' },
+      sources: { type: 'array', items: { type: 'string', enum: ['chunks', 'images', 'im', 'graph'] }, description: 'Optional retrieval source restriction.' },
+      topK: { type: 'number', description: 'Optional result count per source, from 1 to 50.' },
+      filterDocType: { type: 'string', description: 'Optional document type filter.' },
+      excludeNeedsReview: { type: 'boolean', description: 'Exclude document chunks awaiting review.' },
+    },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+    async execute(args, execution) {
+      if (execution.agent === undefined) throw new Error('Knowledge search requires a live Agent')
+      const messages = args.messages ?? execution.agent.session.deriveMessages()
+        .filter(message => message.role === 'user' || message.role === 'assistant')
+        .map(message => ({ role: message.role, content: message.content.filter(block => block.type === 'text').map(block => block.text).join('\n') }))
+      return JSON.stringify(await ctx.cloudAgents.searchKnowledge(execution.agent, config.releaseId,
+        args.sourceId, args.query, execution.signal, {
+          messages,
+          ...args.emotion === undefined ? {} : { emotion: args.emotion },
+          ...args.prevMethodId === undefined ? {} : { prevMethodId: args.prevMethodId },
+          ...args.verify === undefined ? {} : { verify: args.verify },
+          ...args.image === undefined ? {} : { image: args.image },
+          ...args.kbIds === undefined ? {} : { kbIds: args.kbIds },
+          ...args.sources === undefined ? {} : { sources: args.sources },
+          ...args.topK === undefined ? {} : { topK: args.topK },
+          ...args.filterDocType === undefined ? {} : { filterDocType: args.filterDocType },
+          ...args.excludeNeedsReview === undefined ? {} : { excludeNeedsReview: args.excludeNeedsReview },
+        }))
+    },
+  }))
   if (skills.length > 0) ctx.tools.register(defineTool({
     name: 'cloud_skill',
     description: 'Load a selected skill\'s published instructions or one of its pinned resources. '

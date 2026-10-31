@@ -54,8 +54,8 @@
   en: 3abfd29330bf7924
   zh: 3abfd29330bf7924
 /session-persistence-event-catalog/events/cloud-agent/cloud-agent-binding-log-only:
-  en: 7410e7fbd64befea
-  zh: bd5181bdbb6e7450
+  en: 6d06233fd8a40c47
+  zh: 419b36e1770bb466
 /session-persistence-event-catalog/events/command:
   en: 2cecb5b0ee955732
   zh: 2cecb5b0ee955732
@@ -1008,8 +1008,8 @@
   en: ca03de888e0b04ca
   zh: bc192db2e83eb7c1
 /session-persistence-event-catalog/resolved-persistence-types/cloudagentconversation:
-  en: 8724f593b0348025
-  zh: 2f1322e4f7554861
+  en: 054a24a2560a3986
+  zh: 814e1ef7e69fb20a
 /session-persistence-event-catalog/resolved-persistence-types/commandsource:
   en: 459a6f8c8800d3e5
   zh: f1b2626c08c62b4d
