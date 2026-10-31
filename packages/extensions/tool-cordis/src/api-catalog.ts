@@ -4843,8 +4843,8 @@ export const EVENT_API: readonly EventApiEntry[] = [
     name: 'company-mcp/changed',
     mode: 'emit',
     signature: '\'company-mcp/changed\'(): void',
-    summary: 'Catalog, enablement or reported server state changed.',
-    description: 'Catalog, enablement or reported server state changed.',
+    summary: 'Authorized catalog or reported server state changed.',
+    description: 'Authorized catalog or reported server state changed.',
     parameters: [],
   },
   {

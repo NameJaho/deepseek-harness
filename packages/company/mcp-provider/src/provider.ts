@@ -12,7 +12,7 @@ declare module '@deepseek-ai/cordis' {
     companyMcpProvider: CompanyMcpProvider
   }
   interface Events {
-    /** Catalog, enablement or reported server state changed.
+    /** Authorized catalog or reported server state changed.
      * @mode emit
      */
     'company-mcp/changed'(): void
@@ -78,7 +78,7 @@ export abstract class CompanyMcpProvider extends Service {
 
   /** Read a freshly authorized catalog for one verified member.
    * @param subject - verified request or Session owner, never browser input.
-   * @returns servers with enablement, state and tools; `loaded` is false before the first successful refresh.
+   * @returns authorized servers with state and tools; `loaded` is false before the first successful refresh.
    */
   abstract catalog(subject: WecomMarketSubject): Promise<CompanyMcpCatalog>
 
@@ -88,17 +88,6 @@ export abstract class CompanyMcpProvider extends Service {
    * @returns the new catalog, or an empty catalog with `failure` when the refresh failed.
    */
   abstract refresh(subject: WecomMarketSubject, signal?: AbortSignal): Promise<CompanyMcpCatalog>
-
-  /** Persist one member’s preference; credentials are deployment configuration, not preferences.
-   * @param subject - verified request or Session owner, never browser input.
-   * @param request - server identity and enablement.
-   * @returns the updated catalog.
-   * @throws RemoteError `company-mcp/not-found` for an unknown server.
-   */
-  abstract configure(
-    subject: WecomMarketSubject,
-    request: { readonly id: CompanyMcpId; readonly enabled: boolean },
-  ): Promise<CompanyMcpCatalog>
 
   /** Refresh and read one server's current tools for display.
    * @param subject - verified request or Session owner, never browser input.

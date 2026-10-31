@@ -563,7 +563,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-client-ui-plugin-manager`
 
-- `source`: [`packages/client/ui-plugin-manager/src/index.ts:15`](../packages/client/ui-plugin-manager/src/index.ts)
+- `source`: [`packages/client/ui-plugin-manager/src/index.ts:16`](../packages/client/ui-plugin-manager/src/index.ts)
 
 ```ts config-catalog
 /** Registry-probe deadline and process-local cache policy. */
@@ -574,6 +574,8 @@ export interface Config {
   registryProbeTimeoutMs: number
   /** Lifetime of a winning registry or unavailable result. */
   registryProbeCacheTtlMs: number
+  /** When present, the Plugins page shows only these `plugins.item` ids; absent keeps the full manager. */
+  visibleItems?: string[] | undefined
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-client-ui-plugin-manager -->
@@ -870,6 +872,98 @@ export interface CloudAgentRuntimeSkillResource {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-company-cloud-agent-runtime -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-company-external-agent-subagent -->
+<a id="deepseek-aidsh-company-external-agent-subagent"></a>
+
+## `@deepseek-ai/dsh-company-external-agent-subagent`
+
+- `inject`: `subagents` · `credentials` · `agents`
+- `refs`: [`JsonValue`](../packages/util/values/src/index.ts)
+- `source`: [`packages/company/external-agent-subagent/src/index.ts:53`](../packages/company/external-agent-subagent/src/index.ts)
+
+```ts config-catalog
+/** All agents are explicitly configured on the Host; an empty list enables no providers. */
+export interface Config {
+  /** Logical external agents; each registers one subagent provider. */
+  readonly agents: ExternalAgentConfig[]
+  /** Mount one ordinary delegation tool per logical agent; explicit scoped mounts may leave this disabled. */
+  readonly registerTools?: boolean
+}
+
+/** Private deployment configuration for one separately registered logical agent. */
+export interface ExternalAgentConfig {
+  /** Deployment platform adapter; only `dify` is supported. */
+  readonly platform: 'dify'
+  /** Unique logical agent id; lowercase identifier starting with a letter. */
+  readonly id: string
+  /** Display name, at most 128 UTF-16 code units. */
+  readonly name: string
+  /** Deployment version descriptor; it does not select a remote app. */
+  readonly version: string
+  /** Deployment environment descriptor; it does not select a remote app. */
+  readonly environment: string
+  /** Unique subagent provider registry name the delegation tool selects. */
+  readonly providerName: string
+  /** Complete private POST URL ending in /chat-messages; HTTPS except loopback fixtures. */
+  readonly endpoint: string
+  /** Credential service reference, not a bearer token. */
+  readonly credentialRef: string
+  /** App input variables declared by its user_input_form; only explicit deployment values are sent. */
+  readonly inputs: Readonly<Record<string, JsonValue>>
+  /** Whole-call deadline, including credential resolution and response body consumption. */
+  readonly timeoutMs: number
+  /** Complete encoded request-body limit, including fixed protocol fields and configured inputs. */
+  readonly maxInputBytes: number
+  /** Decompressed HTTP response and serialized success result limit; failure diagnostics use the seam's 4096-byte limit. */
+  readonly maxOutputBytes: number
+  /** Permit explicit Host-only continuation of the latest successful owned child. */
+  readonly allowContinuation: boolean
+  /** Retention capacity per logical agent; admission fails instead of silently dropping descriptors. */
+  readonly maxRetainedRuns: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-company-external-agent-subagent -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-company-knowledge -->
+<a id="deepseek-aidsh-company-knowledge"></a>
+
+## `@deepseek-ai/dsh-company-knowledge`
+
+- `source`: [`packages/company/knowledge/src/config.ts:19`](../packages/company/knowledge/src/config.ts)
+
+```ts config-catalog
+/** Retrieval policy and deployment source list. */
+export interface Config {
+  /** Configured knowledge sources; an empty list leaves the page in its unconfigured state. */
+  sources: KnowledgeSourceConfig[]
+  /** Largest requested hit count; upstream accepts at most 50. */
+  topK: number
+  /** Minimum rerank score accepted as evidence. Every request enables rerank. */
+  minimumScore: number
+  /** Deadline for one read-only upstream request. The direct service may verify and supplement for up to 30 seconds. */
+  timeoutMs: number
+  /** Maximum characters in one natural-language query. */
+  maxQueryChars: number
+  /** Maximum complete upstream response bytes. */
+  maxResponseBytes: number
+}
+
+/** Deployment-owned knowledge source. Models and browsers cannot submit or read these endpoint or space fields. */
+export interface KnowledgeSourceConfig {
+  /** Logical identifier selected by Agent authors. */
+  id: string
+  /** Display name in capability lists. */
+  name: string
+  /** Public-safe description of this source. */
+  description: string
+  /** HTTP search endpoint used only by the Host. */
+  searchUrl: string
+  /** Exact nonempty upstream space allowlist injected into every request. */
+  spaceIds: string[]
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-company-knowledge -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-company-wecom-auth -->
 <a id="deepseek-aidsh-company-wecom-auth"></a>

@@ -49,12 +49,12 @@ Host 通过 `companyWecomAuth.marketSubject()` 从已启用的官方企微 Princ
 
 DSH 对模型可见的 `{name, description, parameters}` 生成 SHA-256 fingerprint，输入为对象键按字典序排序、数组保持顺序且无额外空白的规范 JSON。`parameters` 是详情工具的 `inputSchema`。公开工具名由稳定服务 id 和原始工具名生成；命名与 fingerprint 的权威实现为 [companyMcpToolName 和 companyMcpFingerprint](../../packages/company/mcp-provider/src/provider.ts)。后端校验 `schemaFingerprint` 时必须使用相同表示。
 
-启用偏好按成员所有者范围与服务 id 保存。目录请求读取当前授权，不使用共享用户缓存，失败返回空目录。Cloud Agent 保存和发布会固定工具 fingerprint，启动、模型步骤与执行均重新校验实际运行者权限。成员使用其他作者发布的公开 Agent 时使用自己的 MCP 授权，发布不会转移作者权限。
+DSH 读取既有 MCP 权限，成员可为 Cloud Agent 选择有权限的工具。DSH 不提交申请，也不授予、撤销或启用权限。目录请求读取当前授权，不使用共享用户缓存，失败返回空目录。Cloud Agent 保存和发布会固定工具 fingerprint，启动、模型步骤与执行均重新校验实际运行者权限。成员使用其他作者发布的公开 Agent 时使用自己的 MCP 授权，发布不会转移作者权限。
 
 <a id="deployment-and-verification"></a>
 ## 部署与验证
 
-可选的[市场 patch](../../packages/company/mcp-provider/cordis.patch.yml)依赖企微认证、凭据提供方和 storage-domain 服务。部署提供 `DSH_MCP_MARKET_URL`、`DSH_WECOM_CORP_ID` 和 `DSH_MCP_MARKET_TOKEN` 服务凭据引用。[Cloud Agent patch](../../packages/company/cloud-agent/cordis.patch.yml)消费该 Provider。这两个 patch 均不负责部署市场后端。
+可选的[市场 patch](../../packages/company/mcp-provider/cordis.patch.yml)依赖企微认证和凭据提供方。部署提供 `DSH_MCP_MARKET_URL`、`DSH_WECOM_CORP_ID` 和 `DSH_MCP_MARKET_TOKEN` 服务凭据引用。[Cloud Agent patch](../../packages/company/cloud-agent/cordis.patch.yml)消费该 Provider。这两个 patch 均不负责部署市场后端。
 
 仓库测试覆盖双成员隔离、执行身份、撤权、未上架 MCP、schema 变更、失败响应及执行结果未知。真实 Loader fixture 组合 HTTP Provider 和浏览器 Remote。`company-mcp-member` 无密钥录制 Session 启动正式 headless profile，记录 HTTP 成功及随后撤权。真实市场联调需要后端接口和部署凭据；仓库 fixture 未完成真实市场联调。
 

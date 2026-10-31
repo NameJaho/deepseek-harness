@@ -12,7 +12,7 @@ MCP 市场目录和执行接口必须对应已认证企微成员。浏览器传�
 
 Host 从已验证的企微 Principal 或发起 Session 的持久所有者解析 `WecomMarketSubject`。浏览器 Remote 不接收 subject 字段。MCP Provider 使用部署服务凭据，将该身份发送给市场的内部分页、详情和执行接口。可见范围、上架状态和使用授权由市场负责。
 
-成员偏好使用所有者范围和服务器 id 作为键。授权或刷新失败会清空目录。Cloud Agent 发布时保存 schema fingerprint；启动 release 和每次执行都会重新校验当前授权、上架状态及 fingerprint，因此公开 release 按实际运行成员的权限执行。
+DSH 读取成员在市场中的既有权限，不保存本地启用偏好，也不提供申请或授权操作。授权或刷新失败会清空目录。Cloud Agent 发布时保存 schema fingerprint；启动 release 和每次执行都会重新校验当前授权、上架状态及 fingerprint，因此公开 release 按实际运行成员的权限执行。
 
 ## Alternatives considered
 

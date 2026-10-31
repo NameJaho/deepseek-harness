@@ -3,12 +3,9 @@ import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
-import Storage, { storageBackendServiceKey } from '@deepseek-ai/dsh-storage'
-import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import { afterEach, expect, it, onTestFinished, vi } from 'vitest'
-import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 import HttpCompanyMcpProvider, { Config } from '../src/http.ts'
 import CompanyMcpRemote from '../src/index.ts'
 import { companyMcpToolName } from '../src/provider.ts'
@@ -45,11 +42,6 @@ async function fixture(options: { authorized?: boolean; changed?: boolean; loade
   const ctx = new Context()
   onTestFinished(() => ctx.fiber.dispose())
   ctx.provide('credentials', { resolve: vi.fn((_ref: CredentialRef) => Promise.resolve({ value: TOKEN, source: 'fixture' })) })
-  await ctx.plugin(Storage)
-  const backend = new MemoryStorageBackend(new MemoryMediaPool())
-  ctx.storage.backend.register('test', backend)
-  ctx.provide(storageBackendServiceKey('test'), backend)
-  await ctx.plugin(StorageDomain, { backend: 'test' })
   ctx.provide('companyWecomAuth', { marketSubject: () => state.actor, registerResourceProvider: () => async () => {} })
   if (options.loader === true) {
     await ctx.plugin(Loader)
@@ -106,14 +98,6 @@ it('clears the catalog when authorization is revoked', async () => {
   expect(result).toMatchObject({ loaded: false, servers: [], failure: { code: 'company-mcp/forbidden' } })
 })
 
-it('keeps preferences isolated by verified member scope', async () => {
-  const { provider } = await fixture()
-  await provider.configure(subject, { id: crm, enabled: false })
-  expect((await provider.catalog(subject)).servers[0]?.enabled).toBe(false)
-  const bob: WecomMarketSubject = { scope: brandString<CompanyOwnerScope>('wecom:corp:bob'), corpId: brandString<WecomCorpId>('corp'), sub: brandString<WecomUserId>('bob') }
-  expect((await provider.catalog(bob)).servers[0]?.enabled).toBe(true)
-})
-
 it('rechecks the schema and dispatches the authorized tool with the raw Market path', async () => {
   const { provider, requests, state } = await fixture()
   const resolved = await provider.resolveTool(subject, lookup)
@@ -144,8 +128,7 @@ it('composes the HTTP provider and browser Remote through the real Loader', asyn
   const { ctx } = await fixture({ loader: true })
   expect([...ctx.loader.entries()].filter(entry => entry.fiber === undefined && !entry.disabled)).toEqual([])
   expect((await ctx.companyMcp.catalog()).servers.map(item => item.id)).toEqual(['crm'])
-  await ctx.companyMcp.configure({ id: crm, enabled: false })
-  expect((await ctx.companyMcp.catalog()).servers[0]?.enabled).toBe(false)
+  expect((await ctx.companyMcp.catalog()).servers[0]?.enabled).toBe(true)
 })
 
 it('denies a second member and a cross-member execution without dispatching an invocation', async () => {

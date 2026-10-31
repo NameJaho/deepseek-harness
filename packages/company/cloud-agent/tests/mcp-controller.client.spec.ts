@@ -21,7 +21,7 @@ function stream(value: CompanyMcpCatalog, fail = false): McpCatalogStream {
   } }
 }
 function setup() {
-  const api = { refresh: vi.fn(async () => ok(catalog)), configure: vi.fn(async () => ok(catalog)),
+  const api = { refresh: vi.fn(async () => ok(catalog)),
     discover: vi.fn(async () => ok(catalog.servers[0]!.tools)) }
   const notify = vi.fn()
   const makeStream = vi.fn(() => stream(catalog))
@@ -44,12 +44,12 @@ describe('sanitized MCP controller', () => {
     await controller.dispose()
   })
 
-  it.each([false, true])('retains previous data when the provider returns a failed catalog with loaded=%s', async (loaded) => {
+  it.each([false, true])('clears the directory when the provider returns a failed catalog with loaded=%s', async (loaded) => {
     const { api, controller } = setup()
     await vi.waitFor(() => { expect(controller.getSnapshot().catalog).toBe(catalog) })
-    api.refresh.mockResolvedValueOnce({ ok: true, value: { loaded, servers: [], failure: 'directory unavailable' } } as never)
+    api.refresh.mockResolvedValueOnce(ok({ loaded, servers: [], failure: { code: 'company-mcp/forbidden', message: 'Access denied' } }))
     await controller.face().refreshMcp()
-    expect(controller.getSnapshot().catalog).toBe(catalog)
+    expect(controller.getSnapshot().catalog?.servers).toEqual([])
     expect(controller.getSnapshot().error).toBe(true)
     await controller.dispose()
   })
@@ -65,21 +65,7 @@ describe('sanitized MCP controller', () => {
     pending.resolve({ ok: true, value: [] })
     await first
     expect(controller.getSnapshot().catalog?.servers[0]?.tools).toEqual([])
-    api.configure.mockRejectedValueOnce(new Error('Cannot save'))
-    await controller.face().configureMcp(id, false)
-    await controller.face().retryMcp()
-    expect(api.configure).toHaveBeenCalledTimes(2)
-    expect(api.configure).toHaveBeenLastCalledWith({ id, enabled: false })
     await controller.dispose()
-  })
-
-  it('does not submit a deferred configuration after its authentication lifecycle ends', async () => {
-    const { controller, api, notify } = setup()
-    const configuring = controller.face().configureMcp(id, false)
-    const disposed = controller.dispose()
-    await Promise.all([configuring, disposed])
-    expect(api.configure).not.toHaveBeenCalled()
-    expect(notify).not.toHaveBeenCalled()
   })
 
   it('replaces a failed stream on retry and drains pending work on disposal', async () => {

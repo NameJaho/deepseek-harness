@@ -1,6 +1,6 @@
 /** Sanitized company MCP management; tool details are collapsed until explicitly opened. */
 import { useState } from 'react'
-import { Button, Checkbox, CodeBlock, Input, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, CodeBlock, Input, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TagTone } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
@@ -10,7 +10,7 @@ import type { CloudAgentLocaleKey } from './locales.ts'
 import css from './page.module.css'
 
 type PageProps = PropsRuntime<'plugins.item'> & PropsLocale<'company.cloudAgent'> & InjectFace<McpInjected>
-type EntryProps = Pick<PageProps, 't' | 'configureMcp' | 'discoverMcp'> & { readonly entry: CompanyMcpServer; readonly busy: boolean }
+type EntryProps = Pick<PageProps, 't' | 'discoverMcp'> & { readonly entry: CompanyMcpServer; readonly busy: boolean }
 
 /** Every provider state is expressed through text and a semantic color. */
 export const mcpStatuses: Record<CompanyMcpStatus, CloudAgentLocaleKey> = {
@@ -76,16 +76,14 @@ export function ToolDisclosure({ tool, t }: { readonly tool: CompanyMcpTool; rea
   </details>
 }
 
-function McpEntry({ entry, busy, configureMcp, discoverMcp, t }: EntryProps) {
+function McpEntry({ entry, busy, discoverMcp, t }: EntryProps) {
   return <article className={`${css.card} ${css.mcpCard}`} data-company-mcp={entry.id}>
     <div className={css.cardHeading}><h2>{entry.name}</h2><Tag tone={mcpStatusTones[entry.status]}>{t(mcpStatuses[entry.status])}</Tag>
-      {!entry.enabled && <Tag>{t('mcpDisabled')}</Tag>}</div>
+    </div>
     <p className={css.description}>{entry.description || t('mcpListNoDescription')}</p>
     <p className={css.metadata}>{t('mcpToolsCount', { count: String(entry.tools.length) })}</p>
     {entry.updatedAt !== undefined && <p className={css.metadata}>{t('mcpUpdated', { time: new Date(entry.updatedAt).toISOString() })}</p>}
-    <Checkbox label={t('mcpEnabled')} checked={entry.enabled} disabled={busy}
-      onChange={(enabled) => { void configureMcp(entry.id, enabled) }} />
-    <Button variant="outline" disabled={busy || !entry.enabled || entry.status === 'maintenance'}
+    <Button variant="outline" disabled={busy || entry.status === 'maintenance'}
       onClick={() => { void discoverMcp(entry.id) }}>{t('mcpInspect')}</Button>
     <details className={css.mcpTools}><summary>{t('mcpToolsCount', { count: String(entry.tools.length) })}</summary>
       <div className={css.mcpToolList}>{entry.tools.map(tool => <ToolDisclosure key={tool.name} tool={tool} t={t} />)}</div>
@@ -100,10 +98,10 @@ function McpEntry({ entry, busy, configureMcp, discoverMcp, t }: EntryProps) {
 export function CompanyMcpPage(props: PageProps) {
   const view = props.useCompanyMcp(state => state)
   const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<'all' | 'enabled' | CompanyMcpStatus>('all')
+  const [filter, setFilter] = useState<'all' | CompanyMcpStatus>('all')
   if (props.view === 'summary') return props.t('mcpSummary')
   const terms = query.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean)
-  const entries = view.catalog?.servers.filter(entry => (filter === 'all' || (filter === 'enabled' ? entry.enabled : entry.status === filter))
+  const entries = view.catalog?.servers.filter(entry => (filter === 'all' || entry.status === filter)
     && terms.every(term => `${entry.name} ${entry.description} ${entry.tools.map(tool => `${tool.name} ${tool.rawName} ${tool.description}`).join(' ')}`
       .toLocaleLowerCase().includes(term))) ?? []
   return <section className={css.mcpPage} aria-busy={view.busy}>
@@ -113,9 +111,9 @@ export function CompanyMcpPage(props: PageProps) {
       <Input aria-label={props.t('mcpSearch')} placeholder={props.t('mcpSearch')} value={query} onChange={(event) => { setQuery(event.target.value) }} />
       <label className={css.field}>{props.t('mcpFilter')}<select value={filter} disabled={view.busy} onChange={(event) => {
         const value = event.target.value
-        if (value === 'all' || value === 'enabled' || value in mcpStatuses) setFilter(value as typeof filter)
+        if (value === 'all' || value in mcpStatuses) setFilter(value as typeof filter)
       }}>
-        <option value="all">{props.t('mcpAll')}</option><option value="enabled">{props.t('mcpEnabled')}</option>
+        <option value="all">{props.t('mcpAll')}</option>
         {Object.entries(mcpStatuses).map(([value, key]) => <option key={value} value={value}>{props.t(key)}</option>)}
       </select></label>
     </div>
@@ -125,6 +123,6 @@ export function CompanyMcpPage(props: PageProps) {
       {['a', 'b', 'c'].map(key => <div key={key} className={css.skeleton} />)}</div>
       : entries.length === 0 ? <p className={css.empty}>{props.t('mcpEmpty')}</p>
         : <div className={`${css.grid} ${css.mcpGrid}`}>{entries.map(entry => <McpEntry key={entry.id} entry={entry}
-          busy={view.busy} configureMcp={props.configureMcp} discoverMcp={props.discoverMcp} t={props.t} />)}</div>}
+          busy={view.busy} discoverMcp={props.discoverMcp} t={props.t} />)}</div>}
   </section>
 }

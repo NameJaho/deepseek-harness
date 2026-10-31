@@ -20,12 +20,12 @@ export interface CompanyMcpTool {
   readonly fingerprint: string
 }
 
-/** One server summary with its member enablement and last reported state. */
+/** One server summary with the member's current Market authorization and state. */
 export interface CompanyMcpServer {
   readonly id: CompanyMcpId
   readonly name: string
   readonly description: string
-  /** Member preference saved by `configure`; disabled servers never resolve tools. */
+  /** Market authorization has already filtered this server for the member. */
   readonly enabled: boolean
   readonly status: CompanyMcpStatus
   /** Upstream update time in epoch milliseconds, when reported. */

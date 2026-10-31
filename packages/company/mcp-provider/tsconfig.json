@@ -27,9 +27,6 @@
       "path": "../../core/tools"
     },
     {
-      "path": "../../storage/storage-domain"
-    },
-    {
       "path": "../../credentials/credentials"
     },
     {

@@ -16,7 +16,7 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-/** Browser-safe catalog reads, refresh, enablement and discovery. */
+/** Browser-safe catalog reads, refresh and tool discovery. */
 export class CompanyMcpRemote extends TypertRemoteService {
   static inject = ['companyMcpProvider', 'companyWecomAuth']
   /** @param ctx - Host with a company MCP provider. */
@@ -44,15 +44,6 @@ export class CompanyMcpRemote extends TypertRemoteService {
   @Remote
   refresh(signal: AbortSignal): Promise<CompanyMcpCatalog> {
     return this.ctx.companyMcpProvider.refresh(this.ctx.companyWecomAuth.marketSubject(), signal)
-  }
-
-  /** Enable or disable one server for this member.
-   * @param request - server identity and enablement.
-   * @returns updated catalog.
-   */
-  @Remote
-  configure(request: { readonly id: CompanyMcpId; readonly enabled: boolean }): Promise<CompanyMcpCatalog> {
-    return this.ctx.companyMcpProvider.configure(this.ctx.companyWecomAuth.marketSubject(), { id: request.id, enabled: request.enabled })
   }
 
   /** Refresh and read one server's tools.

@@ -16,7 +16,7 @@ export interface McpView {
 }
 
 /** Generated MCP management methods the controller calls. */
-export type McpControllerApi = Pick<ClientRemote['companyMcp'], 'refresh' | 'discover' | 'configure'>
+export type McpControllerApi = Pick<ClientRemote['companyMcp'], 'refresh' | 'discover'>
 /** Directory stream members the controller consumes. */
 export type McpCatalogStream = Pick<RemoteStream<CompanyMcpCatalog>, 'dispose' | typeof Symbol.asyncIterator>
 
@@ -26,7 +26,6 @@ export interface McpInjected {
   readonly refreshMcp: () => Promise<void>
   readonly retryMcp: () => Promise<void>
   readonly discoverMcp: (id: CompanyMcpId) => Promise<void>
-  readonly configureMcp: (id: CompanyMcpId, enabled: boolean) => Promise<void>
 }
 
 /** Owns the stream and prevents duplicate operations and late publications after disposal. */
@@ -94,13 +93,7 @@ export class McpController {
       if (catalog !== null) this.set({ catalog: { ...catalog, servers: catalog.servers.map(server =>
         server.id === id ? { ...server, tools: result.value } : server) } })
     }, 'mcpConnected', () => discoverMcp(id))
-    const configureMcp = (id: CompanyMcpId, enabled: boolean): Promise<void> => this.run(async () => {
-      const result = await this.api.configure({ id, enabled })
-      if (!result.ok) throw result.error
-      this.acceptCatalog(result.value)
-      if (result.value.failure !== undefined) throw new Error('MCP configuration failed')
-    }, 'mcpConfigured', () => configureMcp(id, enabled))
-    return { hooks: { companyMcp: this }, refreshMcp, discoverMcp, configureMcp,
+    return { hooks: { companyMcp: this }, refreshMcp, discoverMcp,
       retryMcp: () => (this.retry ?? refreshMcp)() }
   }
 
@@ -128,8 +121,7 @@ export class McpController {
 
   private acceptCatalog(catalog: CompanyMcpCatalog): void {
     const failed = catalog.failure !== undefined || !catalog.loaded
-    const retained = failed && this.snapshot.catalog?.loaded ? this.snapshot.catalog : catalog
-    this.set({ catalog: retained, error: failed, loading: false })
+    this.set({ catalog, error: failed, loading: false })
   }
 
   private set(patch: Partial<McpView>): void {

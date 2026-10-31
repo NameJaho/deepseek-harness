@@ -20,7 +20,7 @@ The provider reads the MCP Market through authenticated server-to-server endpoin
 
 ## Use this package
 
-`baseUrl`, `corpId`, `tokenRef`, request limits, and timeouts are deployment configuration. Member enablement preferences are persisted under a key containing the verified owner scope. The service expects `POST /api/internal/mcp/authorized/page`, `detail`, and `invoke`; each response must have `success: true` and `code: "200"`. It never consumes public endpoint configuration or upstream credentials.
+`baseUrl`, `corpId`, `tokenRef`, request limits, and timeouts are deployment configuration. The service expects `POST /api/internal/mcp/authorized/page`, `detail`, and `invoke`; each response must have `success: true` and `code: "200"`. MCP access permissions are read-only in DSH: it does not apply for, grant, revoke or enable access. The Market returns only the logged-in member's authorized, published MCPs for selection and invocation in Cloud Agents.
 
 Each tool invocation rechecks the member grant, publication, and schema fingerprint before forwarding `path`, raw tool name, arguments, and the fingerprint to the Market. A catalog failure clears the member catalog, so stale MCPs cannot remain executable.
 

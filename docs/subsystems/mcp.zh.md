@@ -123,7 +123,7 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 
 ### `ctx.companyMcp` — `CompanyMcpRemote`
 
-Browser-safe catalog reads, refresh, enablement and discovery.
+Browser-safe catalog reads, refresh and tool discovery.
 
 ```ts cordis-catalog
 /** Read the current catalog.
@@ -142,12 +142,6 @@ Browser-safe catalog reads, refresh, enablement and discovery.
  * @returns refreshed catalog or empty catalog with `failure`.
  */
 @Remote refresh(signal: AbortSignal): Promise<CompanyMcpCatalog>
-
-/** Enable or disable one server for this member.
- * @param request - server identity and enablement.
- * @returns updated catalog.
- */
-@Remote configure(request: { readonly id: CompanyMcpId; readonly enabled: boolean }): Promise<CompanyMcpCatalog>
 
 /** Refresh and read one server's tools.
  * @param request - server identity.
@@ -170,7 +164,7 @@ Implementations keep endpoints, headers and tokens private, discard inaccessible
 ```ts cordis-catalog
 /** Read a freshly authorized catalog for one verified member.
  * @param subject - verified request or Session owner, never browser input.
- * @returns servers with enablement, state and tools; `loaded` is false before the first successful refresh.
+ * @returns authorized servers with state and tools; `loaded` is false before the first successful refresh.
  */
 abstract catalog(subject: WecomMarketSubject): Promise<CompanyMcpCatalog>
 
@@ -180,14 +174,6 @@ abstract catalog(subject: WecomMarketSubject): Promise<CompanyMcpCatalog>
  * @returns the new catalog, or an empty catalog with `failure` when the refresh failed.
  */
 abstract refresh(subject: WecomMarketSubject, signal?: AbortSignal): Promise<CompanyMcpCatalog>
-
-/** Persist one member’s preference; credentials are deployment configuration, not preferences.
- * @param subject - verified request or Session owner, never browser input.
- * @param request - server identity and enablement.
- * @returns the updated catalog.
- * @throws RemoteError `company-mcp/not-found` for an unknown server.
- */
-abstract configure( subject: WecomMarketSubject, request: { readonly id: CompanyMcpId; readonly enabled: boolean }, ): Promise<CompanyMcpCatalog>
 
 /** Refresh and read one server's current tools for display.
  * @param subject - verified request or Session owner, never browser input.
@@ -263,10 +249,10 @@ Source: [`packages/mcp/mcp-resources/src/index.ts`](../../packages/mcp/mcp-resou
 
 #### `company-mcp/changed` — emit
 
-Catalog, enablement or reported server state changed.
+Authorized catalog or reported server state changed.
 
 ```ts cordis-catalog
-/** Catalog, enablement or reported server state changed.
+/** Authorized catalog or reported server state changed.
  * @mode emit
  */
 'company-mcp/changed'(): void

@@ -10,7 +10,7 @@ import type { CompanyMcpId } from '../../src/types.ts'
 import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
 import { MemoryCredentials } from '../../../../credentials/credentials/tests/memory.ts'
 
-export const inject = ['tools', 'storageDomain']
+export const inject = ['tools']
 type ToolSetup = { tool: ToolDefinition } | { error: unknown }
 
 /** Mount one member's real HTTP provider and expose its resolved tool to the model.

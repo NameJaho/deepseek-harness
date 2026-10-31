@@ -21,7 +21,7 @@ Provider 通过服务端凭据访问 MCP 市场。企微 `sub` 由已验证的 R
 <a id="use-this-package"></a>
 ## 使用本包
 
-`baseUrl`、`corpId`、`tokenRef`、请求限制和超时属于部署配置。成员启用偏好使用已验证的所有者范围隔离保存。Provider 需要 `POST /api/internal/mcp/authorized/page`、`detail` 和 `invoke`，每个响应都必须满足 `success: true` 与 `code: "200"`，也不读取公开接口中的连接配置或上游凭据。
+`baseUrl`、`corpId`、`tokenRef`、请求限制和超时属于部署配置。Provider 需要 `POST /api/internal/mcp/authorized/page`、`detail` 和 `invoke`，每个响应都必须满足 `success: true` 与 `code: "200"`。DSH 只读取 MCP 权限，不提交申请，也不授予、撤销或启用权限。市场仅返回当前成员已授权且已上架的 MCP，供 Cloud Agent 选择和调用。
 
 每次工具调用都会重新检查成员授权、上架状态和 schema fingerprint，然后把 `path`、原始工具名、参数及 fingerprint 转发给市场。目录请求失败会清空当前成员目录，旧 MCP 不会继续执行。
 

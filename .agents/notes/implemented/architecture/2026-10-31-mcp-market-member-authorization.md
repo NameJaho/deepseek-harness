@@ -12,7 +12,7 @@ The MCP Market directory and execution routes must reflect the authenticated WeC
 
 The Host resolves a `WecomMarketSubject` from the verified WeCom Principal or the retained owner of the initiating Session. The browser Remote has no subject field. The MCP provider sends that subject together with a deployment service credential to Market-owned internal page, detail, and invoke routes. The Market performs visibility, publication, and usage authorization.
 
-Member preferences are keyed by the owner scope and server id. Failed authorization or refresh clears the catalog. Cloud Agent publication stores schema fingerprints; starting a release and each invocation recheck current authorization, publication and fingerprint. A public release therefore runs with the current member's rights.
+DSH reads the member's existing Market permissions without storing local enablement preferences or exposing application or authorization actions. Failed authorization or refresh clears the catalog. Cloud Agent publication stores schema fingerprints; starting a release and each invocation recheck current authorization, publication and fingerprint. A public release therefore runs with the current member's rights.
 
 ## Alternatives considered
 

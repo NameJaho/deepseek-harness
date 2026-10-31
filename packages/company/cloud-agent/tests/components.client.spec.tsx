@@ -25,7 +25,7 @@ const server: CompanyMcpServer = { id: 'search-service' as CompanyMcpId, name: '
 const maintenance: CompanyMcpServer = { ...server, id: 'maintenance' as CompanyMcpId, name: 'Maintenance service', description: 'Temporarily unavailable', status: 'maintenance', tools: [] }
 function mcpProps(view: McpView): ComponentProps<typeof CompanyMcpPage> {
   return { t, view: 'page', useCompanyMcp: <T,>(select: (value: McpView) => T): T => select(view),
-    refreshMcp: vi.fn(async () => {}), retryMcp: vi.fn(async () => {}), configureMcp: vi.fn(async () => {}),
+    refreshMcp: vi.fn(async () => {}), retryMcp: vi.fn(async () => {}),
     discoverMcp: vi.fn(async () => {}) } as ComponentProps<typeof CompanyMcpPage>
 }
 const record: CloudAgentRecord = { id: 'agent' as CloudAgentRecord['id'], ownerId: 'owner' as CloudAgentRecord['ownerId'], revision: 1,
@@ -65,6 +65,7 @@ describe.each([{ name: 'English', dict: en }, { name: 'Chinese', dict: zh }])('$
     }
     render(<CompanyMcpPage {...props} />)
     expect(screen.getByRole('heading', { name: server.name })).toBeTruthy()
+    expect(screen.queryByRole('checkbox')).toBe(null)
     const search = screen.getByRole('textbox', { name: dict.mcpSearch })
     for (const term of ['Research', 'company documents', 'research.search', 'payroll policies']) {
       fireEvent.change(search, { target: { value: term } })
@@ -109,7 +110,6 @@ describe('MCP failure and pending presentation', () => {
     rerender(<CompanyMcpPage {...mcpProps({ catalog: { loaded: true, servers: [server] }, busy: true, loading: false, error: false })} />)
     expect(screen.getByRole<HTMLButtonElement>('button', { name: en.mcpRefresh }).disabled).toBe(true)
     expect(screen.getByRole<HTMLButtonElement>('button', { name: en.mcpInspect }).disabled).toBe(true)
-    expect(screen.getByRole<HTMLInputElement>('checkbox', { name: en.mcpEnabled }).disabled).toBe(true)
   })
 
   it('distinguishes a loading catalog from empty results', () => {

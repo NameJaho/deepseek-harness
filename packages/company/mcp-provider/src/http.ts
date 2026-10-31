@@ -2,9 +2,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { z as schema } from 'zod'
-import { brandString, type Branded } from '@deepseek-ai/dsh-brand'
+import { brandString } from '@deepseek-ai/dsh-brand'
 import { credentialRef, type CredentialRef } from '@deepseek-ai/dsh-credentials'
-import { defineDomain, domainTable, type Domain } from '@deepseek-ai/dsh-storage-domain'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { assertSupportedJsonSchema } from '@deepseek-ai/dsh-tools'
 import type { ToolSchema } from '@deepseek-ai/dsh-llm'
@@ -47,10 +46,6 @@ export const Config: z<Config> = z.object({
   pageSize: z.natural().min(1).max(100).default(100),
 })
 
-type PreferenceKey = Branded<'company-mcp-preference-key'>
-const preference = schema.object({ enabled: schema.boolean() }).strict()
-const preferences = defineDomain({ name: 'company_mcp_member_preferences', version: 1,
-  tables: { servers: domainTable<PreferenceKey, schema.infer<typeof preference>>(preference) } })
 const text = (max: number) => schema.string().min(1).max(max)
 const identity = { id: text(200), path: text(200), name: text(200), description: schema.string().max(4000),
   authorized: schema.literal(true), published: schema.literal(true), status: schema.enum(['available', 'connecting', 'failed', 'maintenance']) }
@@ -74,18 +69,17 @@ function forbidden(): RemoteError<'company-mcp/forbidden'> {
   return new RemoteError('company-mcp/forbidden', 'MCP access is unavailable for this account; check your Market permissions', {})
 }
 
-/** One Host-owned adapter; requests have no shared catalog cache or shared user enablement. */
+/** One Host-owned adapter; requests have no shared catalog cache or local permission state. */
 export class HttpCompanyMcpProvider extends CompanyMcpProvider {
-  static inject = ['storageDomain', 'credentials', 'companyWecomAuth']
+  static inject = ['credentials', 'companyWecomAuth']
   static Config = Config
   private readonly config: Config
   private readonly baseUrl: URL
   private readonly tokenRef: CredentialRef
   private readonly lifetime = new AbortController()
   private readonly operations = new Set<Promise<unknown>>()
-  private domain: Domain<typeof preferences> | undefined
 
-  /** @param ctx - Host identity, credentials and preferences services.
+  /** @param ctx - Host identity, credentials and WeCom authentication services.
    * @param config - Market origin, enterprise, credential reference and limits.
    */
   constructor(ctx: Context, config: Config) {
@@ -98,17 +92,13 @@ export class HttpCompanyMcpProvider extends CompanyMcpProvider {
     ctx.effect(() => async () => {
       this.lifetime.abort()
       await Promise.allSettled([...this.operations])
-      await this.domain?.close()
-    }, 'company-mcp: requests and member preferences')
+    }, 'company-mcp: requests')
     ctx.companyWecomAuth.registerResourceProvider({ sessionOwner: () => undefined,
       bindings: () => [{ resource: { kind: 'global' }, role: { name: 'company:mcp', resource: 'global', actions: [
-        'companyMcp/catalog', 'companyMcp/follow', 'companyMcp/refresh', 'companyMcp/configure', 'companyMcp/discover',
+        'companyMcp/catalog', 'companyMcp/follow', 'companyMcp/refresh', 'companyMcp/discover',
       ] } }],
     })
   }
-
-  /** Open member preferences; no user directory is loaded at startup. */
-  async [CompanyMcpProvider.init](): Promise<void> { this.domain = await this.ctx.storageDomain.open(preferences) }
 
   /** Read the current member-authorized catalog and persist no shared user state.
    * @param subject - verified member identity used for Market authorization.
@@ -133,15 +123,6 @@ export class HttpCompanyMcpProvider extends CompanyMcpProvider {
       const catalog = await this.catalog(subject, signal)
       this.ctx.emit('company-mcp/changed')
       return catalog
-    })
-  }
-
-  configure(subject: WecomMarketSubject, request: { readonly id: CompanyMcpId; readonly enabled: boolean }): Promise<CompanyMcpCatalog> {
-    return this.track(async () => {
-      await this.detail(subject, request.id, this.catalogSignal(), { remaining: this.config.maxCatalogBytes })
-      await this.requireDomain().table('servers').put(this.key(subject, request.id), { enabled: request.enabled })
-      this.ctx.emit('company-mcp/changed')
-      return this.catalog(subject)
     })
   }
 
@@ -178,13 +159,6 @@ export class HttpCompanyMcpProvider extends CompanyMcpProvider {
       description: tool.description, fingerprint: tool.fingerprint }
   }
 
-  private requireDomain(): Domain<typeof preferences> {
-    if (this.domain === undefined) throw new RemoteError('company-mcp/stopping', 'MCP provider is unavailable', {})
-    return this.domain
-  }
-  private key(subject: WecomMarketSubject, id: CompanyMcpId): PreferenceKey {
-    return brandString<PreferenceKey>(JSON.stringify([subject.scope, id]))
-  }
   private checkSubject(subject: WecomMarketSubject): void {
     if (subject.corpId !== this.config.corpId || subject.sub === '' || subject.scope !== `wecom:${subject.corpId}:${subject.sub}`) throw forbidden()
   }
@@ -253,7 +227,7 @@ export class HttpCompanyMcpProvider extends CompanyMcpProvider {
         parametersJson: JSON.stringify(tool.inputSchema), fingerprint: companyMcpFingerprint(toolSchema) }
     })
     return { path: parsed.data.path, server: { id, name: parsed.data.name, description: parsed.data.description,
-      enabled: this.requireDomain().table('servers').get(this.key(subject, id))?.enabled ?? true,
+      enabled: true,
       status: parsed.data.status, tools } }
   }
   private definition(subject: WecomMarketSubject, id: CompanyMcpId, tool: CompanyMcpTool, toolSchema: ToolSchema): ToolDefinition {
