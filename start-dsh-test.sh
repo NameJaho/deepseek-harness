@@ -37,11 +37,11 @@ export DSH_PUBLIC_URL
 export DSH_WECOM_WORKSPACE_ROOT
 export DSH_WECOM_CORP_ID="${DSH_WECOM_CORP_ID:-ww2ec793812513c257}"
 export DSH_WECOM_AGENT_ID="${DSH_WECOM_AGENT_ID:-1000239}"
-if [[ -z "${DSH_WECOM_APP_SECRET:-}" ]]; then
+if [[ -z "${DSH_WECOM_APP_SECRET:-}" && "${DSH_GATEWAY_IDENTITY_ENABLED:-0}" != "1" ]]; then
   printf '请先在服务端环境设置 DSH_WECOM_APP_SECRET（使用轮换后的自建应用 Secret）；拒绝无登录启动\n' >&2
   exit 1
 fi
-export DSH_WECOM_APP_SECRET
+export DSH_WECOM_APP_SECRET="${DSH_WECOM_APP_SECRET:-}"
 DSH_PID_FILE="${DSH_PID_FILE:-$DSH_BASE/dsh.pid}"
 DSH_STOP_TIMEOUT_SECONDS="${DSH_STOP_TIMEOUT_SECONDS:-90}"
 # 独立的 harness home，避免继承公司 profile 的插件与会话数据。
