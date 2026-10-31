@@ -40,6 +40,8 @@ export interface WecomSessionView {
   readonly userId: WecomUserId
   readonly role: WecomUserRole
   readonly displayName?: string
+  /** Optional logout destination for identities managed by an upstream gateway. */
+  readonly logoutUrl?: string
   readonly expiresAt: number
 }
 
@@ -62,5 +64,16 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
   interface PrincipalMap {
     /** Authenticated member; no browser cookie or app access token. */
     'wecom-user': WecomUserPrincipal
+    /** Identity asserted by a trusted upstream portal gateway. */
+    'gateway-user': GatewayUserPrincipal
   }
+}
+
+/** Credential-free identity asserted by a trusted upstream portal gateway. */
+export interface GatewayUserPrincipal {
+  readonly kind: 'gateway-user'
+  readonly identityId: WecomIdentityId
+  readonly userId: WecomUserId
+  readonly displayName: string
+  readonly role: WecomUserRole
 }

@@ -14,6 +14,7 @@ import { MemoryCredentials } from '../../../credentials/credentials/tests/memory
 import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 import Auth, { Config } from '../src/index.ts'
 import { WecomOfficial } from '../src/upstream.ts'
+import type {} from '../src/types.ts'
 import type { WecomLoginConfig } from '../src/types.ts'
 
 const publicOrigin = 'https://login.example'
@@ -43,7 +44,7 @@ function officialFixture() {
   return { calls, overrides }
 }
 
-async function fixture() {
+async function fixture(overrides: Partial<{ gatewayIdentityEnabled: boolean; gatewayLogoutUrl: string }> = {}) {
   vi.stubEnv('DSH_WECOM_APP_SECRET', 'PRIVATE_TEST_SECRET')
   const official = officialFixture()
   const ctx = new Context()
@@ -64,7 +65,7 @@ async function fixture() {
   await ctx.plugin(WebServer, { host: '127.0.0.1', port: 0 })
   new RemoteAccessService(ctx)
   await ctx.plugin(Connection, { trustedHosts: ['login.example'], requireBrowserLogin: true })
-  const fiber = ctx.plugin(Auth, config)
+  const fiber = ctx.plugin(Auth, Config({ ...config, ...overrides } as Config))
   await fiber
   ctx.effect(() => ctx.webServer.registerFallback((req, res) => {
     if (ctx.connection.authorizeIndex(req, res)) { res.writeHead(200); res.end('APPLICATION') }
@@ -102,6 +103,21 @@ async function fixture() {
     '/auth/wecom/callback?' + new URLSearchParams({ code: 'PRIVATE_CODE', state }), { headers: { cookie: binding } })
   return { ctx, fiber, request, begin, exchange, warnings, storedHeaders, ...official }
 }
+
+it('admits a trusted gateway identity and exposes its configured logout destination', async () => {
+  const f = await fixture({ gatewayIdentityEnabled: true, gatewayLogoutUrl: 'https://portal.example/logout' })
+  const gatewayHeaders = { host: 'login.example', 'x-user-info': encodeURIComponent(JSON.stringify({ userId: 'portal-user', userName: 'Portal User', department: 'ops' })) }
+  const admitted = f.ctx.connection.admit({ headers: gatewayHeaders })
+  if (!('peer' in admitted)) throw new Error('Expected gateway Peer')
+  expect(admitted.peer.principal.kind).toBe('gateway-user')
+  const me = await f.request('/auth/me', { headers: gatewayHeaders })
+  expect(me.status).toBe(200)
+  expect(await me.json()).toMatchObject({ session: { userId: 'portal-user', displayName: 'Portal User', logoutUrl: 'https://portal.example/logout' } })
+  await vi.waitFor(() => { expect(f.ctx.workspaceRegistry.list()).toHaveLength(1) })
+  expect(f.ctx.remoteAccess.decide({ principal: admitted.peer.principal, action: 'agentPresets/list', resources: [{ kind: 'global' }] })).toEqual({ kind: 'allow' })
+  const account = await f.request('/login?account=1', { headers: gatewayHeaders })
+  expect(await account.text()).toContain('https://portal.example/logout')
+})
 
 it('redirects protected root, offers desktop QR and automatically authorizes a WeCom browser', async () => {
   const f = await fixture()

@@ -32,6 +32,8 @@ Configure `test-hmwork.busyming.com` as the self-built application's trusted OAu
 
 `GET /login?redirect=/path` starts login. `GET /auth/me` returns the current member or 401. `POST /auth/wecom/logout` requires the public `Origin` and `X-DSH-Auth: 1`, revokes the local session and clears its cookie. External redirect values become `/`; permitted path and query values survive login except credential parameters.
 
+When `gatewayIdentityEnabled` is true, the deployment may sit behind a trusted portal gateway that strips incoming identity headers and injects URL-encoded `X-User-Info` JSON with `userId` and `userName`. DSH validates those fields, creates the same private Workspace policy, and exposes the name through `/auth/me` and the account page. Set `gatewayLogoutUrl` to the portal's logout destination when gateway sessions should leave through that portal. Never enable this mode on a listener reachable without the gateway: `X-User-Info` is an assertion from the trusted proxy, not a browser credential, and the application cannot distinguish a spoofed direct request.
+
 The layer sets Connection's `requireBrowserLogin: true`. Owner browser cookies, root launch tokens and `/connect` credentials cannot admit a public caller, even after the login provider unloads. Each member receives one durable `default` Workspace below `DSH_WECOM_WORKSPACE_ROOT`; Remote lists and commands are filtered to that Workspace and its Sessions, and `session/create` rejects another Workspace or a raw `cwd`. The member principal remains `wecom-user`, not Owner.
 
 -----

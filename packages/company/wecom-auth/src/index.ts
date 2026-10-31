@@ -1,5 +1,5 @@
 /** Official WeCom login and durable credential-free browser sessions. */
-import { randomBytes, randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { mkdir } from 'node:fs/promises'
@@ -17,7 +17,7 @@ import type { Domain } from '@deepseek-ai/dsh-storage-domain'
 import { z } from 'zod'
 import { Config } from './config.ts'
 import { wecomAuthDomain, type WecomSessionRecord } from './storage.ts'
-import type { WecomIdentityId, WecomLoginAttemptId, WecomLoginConfig, WecomLoginResult, WecomSessionId, WecomSessionView, WecomUserRole } from './types.ts'
+import type { GatewayUserPrincipal, WecomCorpId, WecomIdentityId, WecomLoginAttemptId, WecomLoginConfig, WecomLoginResult, WecomSessionId, WecomSessionView, WecomUserId, WecomUserRole } from './types.ts'
 import { BROWSER_COOKIE, SESSION_COOKIE, cookie, cookieHeader, hash, hashMatches, header, readCookie, safeRedirect, signCookie } from './browser.ts'
 import { WecomAuthError } from './errors.ts'
 import { WecomOfficial, type WecomMemberLogin } from './upstream.ts'
@@ -35,6 +35,7 @@ declare module '@deepseek-ai/cordis' {
 }
 
 interface State { readonly domain: Domain<typeof wecomAuthDomain>; readonly secret: Buffer }
+interface GatewayIdentity { readonly principal: GatewayUserPrincipal; readonly workspace?: Workspace }
 const SECRET = credentialKey('company-wecom-official-auth', 'cookie-secret')
 const DEFAULT_WECOM_ROLE: WecomUserRole = 'user'
 const exchangeSchema = z.object({
@@ -58,6 +59,8 @@ export class CompanyWecomAuthService extends Service {
   private readonly revoked = new Set<WecomSessionId>()
   private readonly workspaces = new Map<WecomIdentityId, Workspace>()
   private readonly workspaceRoots = new Map<WecomIdentityId, string>()
+  private readonly gatewayIdentities = new Map<WecomIdentityId, GatewayIdentity>()
+  private readonly gatewayProvisioning = new Map<WecomIdentityId, Promise<void>>()
   private timer: ReturnType<typeof setTimeout> | undefined
 
   /** @param owner - Host HTTP, cookie-key and domain providers.
@@ -75,6 +78,10 @@ export class CompanyWecomAuthService extends Service {
     if (origin.protocol !== 'https:' || origin.username !== '' || origin.password !== '' || origin.pathname !== '/'
       || origin.search !== '' || origin.hash !== '') throw new Error('wecom-auth: publicOrigin must be a bare HTTPS origin')
     this.config.publicOrigin = origin.origin
+    if (this.config.gatewayLogoutUrl !== '') {
+      const logout = new URL(this.config.gatewayLogoutUrl)
+      if (!['http:', 'https:'].includes(logout.protocol)) throw new Error('wecom-auth: gatewayLogoutUrl must use HTTP or HTTPS')
+    }
     const secret = process.env.DSH_WECOM_APP_SECRET
     if (secret === undefined || secret.trim() === '') throw new Error('wecom-auth: set DSH_WECOM_APP_SECRET in the server environment')
     this.upstream = new WecomOfficial(this.config, secret, this.lifetime.signal)
@@ -110,6 +117,7 @@ export class CompanyWecomAuthService extends Service {
         if (identity.enabled && identity.corpId === this.config.corpId) await this.ensureWorkspace(identity.id)
       }
       remoteAccess.registerPolicy('wecom-user', { bindings: principal => this.bindings(principal.identityId) })
+      remoteAccess.registerPolicy('gateway-user', { bindings: principal => this.bindings(principal.identityId) })
       this.owner.on('domain/changed', (change) => {
         if (change.domain === 'workspace') remoteAccess.invalidate()
       })
@@ -117,6 +125,8 @@ export class CompanyWecomAuthService extends Service {
     this.registration = this.owner.connection.registerBrowserPrincipalProvider({
       loginPath: '/login', requireLogin: true,
       authenticate: (request) => {
+        const gateway = this.gatewayPrincipal(request)
+        if (gateway !== undefined) return { sessionKey: brandString<BrowserSessionKey>(`gateway-${gateway.identityId}`), principal: gateway }
         const session = this.current(request)
         const identity = session === undefined ? undefined : this.state?.domain.table('identities').get(session.identityId)
         if (session === undefined || identity === undefined) return undefined
@@ -126,6 +136,13 @@ export class CompanyWecomAuthService extends Service {
       },
     })
     this.owner.on('webserver/index-inject', (table, peer) => {
+      if (peer.principal.kind === 'gateway-user') {
+        table.push({ kind: 'global', name: '__DSH_WECOM_SESSION__', value: {
+          identityId: peer.principal.identityId, corpId: 'gateway', userId: peer.principal.userId,
+          displayName: peer.principal.displayName, role: peer.principal.role,
+        } })
+        return
+      }
       if (peer.principal.kind !== 'wecom-user') return
       const identity = this.state?.domain.table('identities').get(peer.principal.identityId)
       if (identity !== undefined) table.push({ kind: 'global', name: '__DSH_WECOM_SESSION__', value: {
@@ -139,6 +156,41 @@ export class CompanyWecomAuthService extends Service {
       }), `wecom-auth: ${path}`)
     }
     this.scheduleExpiry()
+  }
+
+  /** Parse one trusted portal identity and start its Workspace provisioning.
+   * @param request - request headers supplied by the trusted reverse proxy.
+   * @returns gateway principal, or undefined when the feature is disabled or the header is invalid.
+   */
+  private gatewayPrincipal(request: ConnectionTrustRequest): GatewayUserPrincipal | undefined {
+    if (!this.config.gatewayIdentityEnabled) return undefined
+    const encoded = header(request, 'x-user-info')
+    if (encoded === undefined || encoded.length > 16_384) return undefined
+    let input: unknown
+    try { input = JSON.parse(decodeURIComponent(encoded)) }
+    catch (_invalidGatewayIdentity) { return undefined }
+    const parsed = z.object({ userId: z.string().trim().min(1).max(256), userName: z.string().trim().min(1).max(256) })
+      .passthrough().safeParse(input)
+    if (!parsed.success) return undefined
+    const identityId = brandString<WecomIdentityId>(`i-${createHash('sha256').update(`gateway:${parsed.data.userId}`).digest('hex')}`)
+    const principal: GatewayUserPrincipal = { kind: 'gateway-user', identityId,
+      userId: brandString<WecomUserId>(parsed.data.userId), displayName: parsed.data.userName, role: DEFAULT_WECOM_ROLE }
+    const current = this.gatewayIdentities.get(identityId)
+    this.gatewayIdentities.set(identityId, { principal, ...(current?.workspace === undefined ? {} : { workspace: current.workspace }) })
+    if (current === undefined) this.provisionGatewayIdentity(identityId)
+    return principal
+  }
+
+  private provisionGatewayIdentity(identityId: WecomIdentityId): void {
+    if (this.gatewayProvisioning.has(identityId)) return
+    const task = this.ensureWorkspace(identityId).then((workspace) => {
+      if (workspace === undefined) return
+      const identity = this.gatewayIdentities.get(identityId)
+      if (identity !== undefined) this.gatewayIdentities.set(identityId, { ...identity, workspace })
+      this.owner.get('remoteAccess')?.invalidate()
+    }).finally(() => { this.gatewayProvisioning.delete(identityId) })
+    this.gatewayProvisioning.set(identityId, task)
+    void task.catch((error: unknown) => { this.owner.logger.warn(`wecom-auth: gateway Workspace provisioning failed: ${String(error)}`) })
   }
 
   /** Begin a durable, browser-bound, single-use login attempt.
@@ -223,6 +275,10 @@ export class CompanyWecomAuthService extends Service {
    * @returns credential-free member view, or null when admission is denied.
    */
   getCurrentSession(request: ConnectionTrustRequest): WecomSessionView | null {
+    const gateway = this.gatewayPrincipal(request)
+    if (gateway !== undefined) return { identityId: gateway.identityId, corpId: brandString<WecomCorpId>('gateway'),
+      userId: gateway.userId, role: gateway.role, displayName: gateway.displayName, expiresAt: Date.now() + this.config.sessionTtlMs,
+      ...this.config.gatewayLogoutUrl === '' ? {} : { logoutUrl: this.config.gatewayLogoutUrl } }
     const session = this.current(request)
     const identity = session === undefined ? undefined : this.state?.domain.table('identities').get(session.identityId)
     return identity === undefined || session === undefined ? null : { identityId: identity.id, corpId: identity.corpId,
@@ -277,10 +333,12 @@ export class CompanyWecomAuthService extends Service {
     const identity = state?.domain.table('identities').get(identityId)
     const registry = this.owner.get('workspaceRegistry')
     if (state === undefined || registry === undefined) return []
-    if (identity?.enabled !== true || identity.corpId !== this.config.corpId
-      || ![...state.domain.table('sessions').entries()].some(([id, session]) => session.identityId === identityId
+    const gateway = this.gatewayIdentities.get(identityId)
+    const localActive = identity?.enabled === true && identity.corpId === this.config.corpId
+      && [...state.domain.table('sessions').entries()].some(([id, session]) => session.identityId === identityId
         && session.agentId === this.config.agentId && session.browserAuthority === this.config.publicOrigin
-        && !this.revoked.has(id) && session.revokedAt === undefined && session.expiresAt > Date.now())) return []
+        && !this.revoked.has(id) && session.revokedAt === undefined && session.expiresAt > Date.now())
+    if (gateway === undefined && !localActive) return []
     const root = this.workspaceRoots.get(identityId)
     if (root === undefined) return []
     const workspace = this.workspaces.get(identityId)
@@ -422,11 +480,16 @@ export class CompanyWecomAuthService extends Service {
       const headers = { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff' }
       if (path === '/login') {
         const nonce = randomBytes(32).toString('base64url')
-        const current = url.searchParams.get('account') === '1' ? this.getCurrentSession(req) : null
+        const gatewayCurrent = this.config.gatewayIdentityEnabled ? this.getCurrentSession(req) : null
+        const current = url.searchParams.get('account') === '1' ? gatewayCurrent ?? this.getCurrentSession(req) : null
         if (current !== null) {
           res.writeHead(200, { ...headers, 'content-type': 'text/html; charset=utf-8',
             'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'` })
           res.end(accountPage(current, nonce, /^zh\b/i.test(header(req, 'accept-language') ?? '') ? 'zh' : 'en')); return
+        }
+        if (gatewayCurrent !== null) {
+          const redirect = safeRedirect(url.searchParams.get('redirect'), ['/'])
+          res.writeHead(303, { ...headers, location: redirect }); res.end(); return
         }
         const existing = cookie(req, BROWSER_COOKIE)
         const binding = existing !== undefined && /^[A-Za-z0-9_-]{43}$/.test(existing) ? existing : randomBytes(32).toString('base64url')
