@@ -82,6 +82,9 @@ export class CompanyWecomAuthService extends Service {
       const logout = new URL(this.config.gatewayLogoutUrl)
       if (!['http:', 'https:'].includes(logout.protocol)) throw new Error('wecom-auth: gatewayLogoutUrl must use HTTP or HTTPS')
     }
+    if (this.config.gatewayIdentityEnabled && this.config.gatewayLogoutUrl === '') {
+      throw new Error('wecom-auth: gatewayLogoutUrl is required when gatewayIdentityEnabled is enabled')
+    }
     const secret = process.env.DSH_WECOM_APP_SECRET
     if (secret === undefined || secret.trim() === '') throw new Error('wecom-auth: set DSH_WECOM_APP_SECRET in the server environment')
     this.upstream = new WecomOfficial(this.config, secret, this.lifetime.signal)

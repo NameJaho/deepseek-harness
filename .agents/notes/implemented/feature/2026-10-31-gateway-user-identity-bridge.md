@@ -12,7 +12,7 @@ Some company deployments authenticate users at an upstream portal rather than th
 
 The WeCom authentication bundle keeps its local OAuth flow and adds an opt-in gateway identity mode. When enabled, the Host accepts `X-User-Info` only as a trusted reverse-proxy assertion, validates `userId` and `userName`, creates a deterministic private Workspace identity, and applies the same member Remote policy. The browser receives the validated name through the existing `__DSH_WECOM_SESSION__` injection and `/auth/me` response.
 
-Gateway sessions do not create a local cookie. Account pages use `gatewayLogoutUrl` when configured; local WeCom sessions continue to use `/auth/wecom/logout`. The mode is disabled by default and must only be enabled when the public listener is protected by a proxy that strips client-supplied identity headers.
+Gateway sessions do not create a local cookie. Account pages use the required `gatewayLogoutUrl`; local WeCom sessions continue to use `/auth/wecom/logout`. The mode is disabled by default and must only be enabled when the public listener is protected by a proxy that strips client-supplied identity headers.
 
 ## Alternatives considered
 

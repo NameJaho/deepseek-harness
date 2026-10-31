@@ -32,7 +32,7 @@ kind: "package-bundle"
 
 `GET /login?redirect=/path` 开始登录。`GET /auth/me` 返回当前成员或 401。`POST /auth/wecom/logout` 要求公网 `Origin` 和 `X-DSH-Auth: 1`，撤销本地会话并清除 cookie。外部重定向值变为 `/`；合法路径和查询参数在登录后保留，凭据参数除外。
 
-当 `gatewayIdentityEnabled` 为 true 时，部署可以位于可信门户网关后面，由网关清除外部身份头并注入包含 `userId` 和 `userName` 的 URL 编码 `X-User-Info` JSON。DSH 会校验这两个字段，使用同一套私有 Workspace 权限策略，并通过 `/auth/me` 和账号页面提供用户名称。需要通过门户退出时，将 `gatewayLogoutUrl` 设置为门户退出地址。不要在没有网关保护的监听地址上启用此模式：`X-User-Info` 是可信代理的断言，不是浏览器凭据，应用无法分辨直接请求伪造的 header。
+当 `gatewayIdentityEnabled` 为 true 时，部署可以位于可信门户网关后面，由网关清除外部身份头并注入包含 `userId` 和 `userName` 的 URL 编码 `X-User-Info` JSON。DSH 会校验这两个字段，使用同一套私有 Workspace 权限策略，并通过 `/auth/me` 和账号页面提供用户名称。此时必须将 `gatewayLogoutUrl` 设置为门户退出地址。不要在没有网关保护的监听地址上启用此模式：`X-User-Info` 是可信代理的断言，不是浏览器凭据，应用无法分辨直接请求伪造的 header。
 
 此层设置 Connection 的 `requireBrowserLogin: true`。Owner 浏览器 cookie、根路径启动令牌和 `/connect` 凭据均不能接纳公网调用方，即使登录提供方卸载也不会恢复。每个成员都会在 `DSH_WECOM_WORKSPACE_ROOT` 下获得一个持久的 `default` Workspace；Remote 列表和命令只会返回该 Workspace 及其中的会话，`session/create` 也会拒绝其他 Workspace 或原始 `cwd`。成员 principal 保持 `wecom-user`，不是 Owner。
 

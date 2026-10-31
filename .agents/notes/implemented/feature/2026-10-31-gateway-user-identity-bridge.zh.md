@@ -12,7 +12,7 @@ Status: implemented
 
 WeCom 认证包保留本地 OAuth 流程，并增加可选的网关身份模式。启用后，Host 只把 `X-User-Info` 当作可信反向代理断言，校验 `userId` 和 `userName`，创建确定性的私有 Workspace 身份，并应用与成员相同的 Remote 权限策略。浏览器通过现有 `__DSH_WECOM_SESSION__` 注入和 `/auth/me` 响应获得已校验的姓名。
 
-网关会话不会创建本地 Cookie。账号页面在配置 `gatewayLogoutUrl` 时跳转到门户退出地址；本地 WeCom 会话继续使用 `/auth/wecom/logout`。该模式默认关闭，只有在公共监听地址由会清除客户端身份 header 的代理保护时才能启用。
+网关会话不会创建本地 Cookie。账号页面使用必填的 `gatewayLogoutUrl` 跳转到门户退出地址；本地 WeCom 会话继续使用 `/auth/wecom/logout`。该模式默认关闭，只有在公共监听地址由会清除客户端身份 header 的代理保护时才能启用。
 
 ## 考虑过的替代方案
 
