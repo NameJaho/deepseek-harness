@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
-import { clientBuildEnvironmentDefines } from '../../scripts/client-build-environment.ts'
+import { clientBuildEnvironmentDefines, DEFAULT_CLIENT_TITLE } from '../../scripts/client-build-environment.ts'
 import { productWebBundleIsolation } from './product-isolation.ts'
 import { katexWoff2Fonts } from './katex-fonts.ts'
 
@@ -12,20 +12,42 @@ const src = (rel: string): string => fileURLToPath(new URL(rel, import.meta.url)
 const STANDALONE_ERROR = 'apps/web is not a standalone application: bare Vite cannot inject window.__DSH_BOOT__. '
   + 'From a repository checkout, run `pnpm dsh web`; an installed package uses `dsh web`. '
   + 'For client-plugin HMR, run `pnpm run dev:web`, which starts `dsh web` and the rebuild watchers together.'
-const DEFAULT_CLIENT_TITLE = 'DSH Local Build'
+const TITLE_PLACEHOLDER = `<title>${DEFAULT_CLIENT_TITLE}</title>`
+const APPLE_TITLE_PLACEHOLDER = `<meta name="apple-mobile-web-app-title" content="${DEFAULT_CLIENT_TITLE}" />`
 
-/** Escape build-time text before placing it in the HTML title element. */
+/** Escape build-time text before placing it in HTML text or a double-quoted attribute. */
 function escapeHtmlText(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-/** Project the public build title into the initial HTML document. */
+/**
+ * Project the public build title into the HTML title, the Apple home-screen
+ * title, and the install manifest `name` and `short_name`.
+ */
 function clientDocumentTitle(): Plugin {
-  const title = escapeHtmlText(process.env.DSH_CLIENT_TITLE ?? DEFAULT_CLIENT_TITLE)
+  const rawTitle = process.env.DSH_CLIENT_TITLE ?? DEFAULT_CLIENT_TITLE
+  const title = escapeHtmlText(rawTitle)
+  let write = true
+  let outputDirectory = ''
   return {
     name: 'dsh-client-document-title',
+    configResolved(config) {
+      write = config.build.write
+      outputDirectory = resolve(config.root, config.build.outDir)
+    },
     transformIndexHtml(html) {
-      return html.replace('<title>DSH Local Build</title>', `<title>${title}</title>`)
+      if (!html.includes(TITLE_PLACEHOLDER) || !html.includes(APPLE_TITLE_PLACEHOLDER)) {
+        throw new Error('vite: index.html lost its product title placeholders')
+      }
+      return html
+        .replace(TITLE_PLACEHOLDER, `<title>${title}</title>`)
+        .replace(APPLE_TITLE_PLACEHOLDER, `<meta name="apple-mobile-web-app-title" content="${title}" />`)
+    },
+    async closeBundle() {
+      if (!write) return
+      const path = resolve(outputDirectory, 'manifest.webmanifest')
+      const manifest = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>
+      await writeFile(path, `${JSON.stringify({ ...manifest, name: rawTitle, short_name: rawTitle }, null, 2)}\n`)
     },
   }
 }

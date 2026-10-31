@@ -22,6 +22,9 @@ const OFFICIAL_CLIENT_BUILD_ENVIRONMENT = {
   DSH_CLIENT_TITLE: 'DeepSeek Harness',
 } as const
 
+/** Product title for repository builds whose environment supplies no `DSH_CLIENT_TITLE`. */
+export const DEFAULT_CLIENT_TITLE = 'HMWORK'
+
 /** Public variable carrying the source commit embedded in client artifacts. */
 const CLIENT_COMMIT_HASH_VARIABLE = 'DSH_CLIENT_COMMIT_HASH'
 
@@ -111,7 +114,8 @@ export function repositoryGitDirty(root: string): boolean | undefined {
 
 /**
  * Resolve the public environment for a complete default build from one checkout.
- * Repository-owned metadata replaces inherited values; other public values pass through.
+ * Repository-owned metadata replaces inherited values; other public values pass through,
+ * and an absent `DSH_CLIENT_TITLE` resolves to {@link DEFAULT_CLIENT_TITLE}.
  * @param root - repository root supplying version and Git metadata.
  * @param environment - caller environment supplying optional commit and public extensions.
  * @returns complete public client environment for the default build.
@@ -127,6 +131,7 @@ export function repositoryClientBuildEnvironment(
   const dirty = repositoryGitDirty(root)
   return {
     ...inherited,
+    DSH_CLIENT_TITLE: inherited.DSH_CLIENT_TITLE ?? DEFAULT_CLIENT_TITLE,
     DSH_CLIENT_COMMIT_HASH: repositoryCommitHash(root, environment),
     ...(dirty === true ? { DSH_CLIENT_GIT_DIRTY: 'true' } : {}),
     DSH_CLIENT_VERSION: repositoryVersion(root),

@@ -119,6 +119,124 @@ interface McpResourceProvider {
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
+<a id="ctxcompanymcp--companymcpremote"></a>
+
+### `ctx.companyMcp` — `CompanyMcpRemote`
+
+Browser-safe catalog reads, refresh, enablement and discovery.
+
+```ts cordis-catalog
+/** Read the current catalog.
+ * @returns servers, tools and the latest refresh failure; never endpoints or headers.
+ */
+@Remote catalog(): Promise<CompanyMcpCatalog>
+
+/** Follow catalog changes.
+ * @param signal - subscriber cancellation.
+ * @returns the current catalog and one snapshot per change.
+ */
+@Remote({ mode: 'stream' }) follow(signal: AbortSignal): AsyncIterable<CompanyMcpCatalog>
+
+/** Refresh the catalog; a failed refresh clears inaccessible servers.
+ * @param signal - caller cancellation.
+ * @returns refreshed catalog or empty catalog with `failure`.
+ */
+@Remote refresh(signal: AbortSignal): Promise<CompanyMcpCatalog>
+
+/** Enable or disable one server for this member.
+ * @param request - server identity and enablement.
+ * @returns updated catalog.
+ */
+@Remote configure(request: { readonly id: CompanyMcpId; readonly enabled: boolean }): Promise<CompanyMcpCatalog>
+
+/** Refresh and read one server's tools.
+ * @param request - server identity.
+ * @param signal - caller cancellation.
+ * @returns current tools with parameters and fingerprints.
+ */
+@Remote discover(request: { readonly id: CompanyMcpId }, signal: AbortSignal): Promise<readonly CompanyMcpTool[]>
+```
+
+Source: [`packages/company/mcp-provider/src/index.ts`](../../packages/company/mcp-provider/src/index.ts)
+
+<a id="ctxcompanymcpprovider--companymcpprovider-abstract-seam"></a>
+
+### `ctx.companyMcpProvider` — `CompanyMcpProvider` (abstract seam)
+
+Abstract company MCP provider. Exactly one implementation registers as `ctx.companyMcpProvider`.
+
+Implementations keep endpoints, headers and tokens private, discard inaccessible data after a failed refresh, report unknown or failed upstream outcomes as failures rather than empty results, and emit `company-mcp/changed` after every observable catalog change.
+
+```ts cordis-catalog
+/** Read a freshly authorized catalog for one verified member.
+ * @param subject - verified request or Session owner, never browser input.
+ * @returns servers with enablement, state and tools; `loaded` is false before the first successful refresh.
+ */
+abstract catalog(subject: WecomMarketSubject): Promise<CompanyMcpCatalog>
+
+/** Replace the catalog after validating a complete upstream response.
+ * @param subject - verified request or Session owner, never browser input.
+ * @param signal - caller cancellation.
+ * @returns the new catalog, or an empty catalog with `failure` when the refresh failed.
+ */
+abstract refresh(subject: WecomMarketSubject, signal?: AbortSignal): Promise<CompanyMcpCatalog>
+
+/** Persist one member’s preference; credentials are deployment configuration, not preferences.
+ * @param subject - verified request or Session owner, never browser input.
+ * @param request - server identity and enablement.
+ * @returns the updated catalog.
+ * @throws RemoteError `company-mcp/not-found` for an unknown server.
+ */
+abstract configure( subject: WecomMarketSubject, request: { readonly id: CompanyMcpId; readonly enabled: boolean }, ): Promise<CompanyMcpCatalog>
+
+/** Refresh and read one server's current tools for display.
+ * @param subject - verified request or Session owner, never browser input.
+ * @param id - server identity.
+ * @param signal - caller cancellation.
+ * @returns current tools with parameters and fingerprints.
+ * @throws RemoteError when the refresh fails or the server is unknown, disabled or unavailable.
+ */
+abstract discover(subject: WecomMarketSubject, id: CompanyMcpId, signal: AbortSignal): Promise<readonly CompanyMcpTool[]>
+
+/** Read one usable server's tools after fresh authorization for Agent publication.
+ * @param subject - verified request or Session owner, never browser input.
+ * @param id - server identity selected by an Agent.
+ * @returns tools with fingerprints.
+ * @throws RemoteError when the server is unauthorized, disabled or unavailable.
+ */
+abstract discoverTools(subject: WecomMarketSubject, id: CompanyMcpId): Promise<readonly CompanyMcpTool[]>
+
+/** Resolve a model-facing tool for one run.
+ * @param subject - verified request or Session owner, never browser input.
+ * @param name - model-facing tool name.
+ * @returns current schema, executable definition and fingerprint, or undefined when no server owns the name.
+ * @throws RemoteError when the owning server is disabled or unavailable, or the tool no longer exists.
+ */
+abstract resolveTool(subject: WecomMarketSubject, name: string): Promise<CompanyMcpResolvedTool | undefined>
+
+/** Describe the non-secret route of a model-facing tool.
+ * @param subject - verified request or Session owner, never browser input.
+ * @param name - model-facing tool name.
+ * @returns server, raw tool name, description and fingerprint, or undefined when unknown.
+ */
+abstract describeTool(subject: WecomMarketSubject, name: string): Promise<CompanyMcpToolRoute | undefined>
+
+/** Project the catalog for Agent capability selectors.
+ * @param subject - verified request or Session owner, never browser input.
+ * @returns server summaries without schemas.
+ */
+async capabilityCatalog(subject: WecomMarketSubject): Promise<readonly CompanyMcpCapability[]>
+
+/** Stream catalog snapshots: the current one, then one per `company-mcp/changed`, coalescing bursts.
+ * @param subject - verified request or Session owner, never browser input.
+ * @param signal - subscriber cancellation.
+ * @returns catalog snapshots until the signal aborts.
+ */
+async *follow(subject: WecomMarketSubject, signal: AbortSignal): AsyncIterable<CompanyMcpCatalog>
+```
+
+Source: [`packages/company/mcp-provider/src/provider.ts`](../../packages/company/mcp-provider/src/provider.ts)
+
 <a id="ctxmcpresources--mcpresourceruntime"></a>
 
 ### `ctx.mcpResources` — `McpResourceRuntime`
@@ -136,4 +254,23 @@ register(server: string, provider: McpResourceProvider): () => void
 ```
 
 Source: [`packages/mcp/mcp-resources/src/index.ts`](../../packages/mcp/mcp-resources/src/index.ts)
+
+<a id="company-mcp-events"></a>
+
+### `company-mcp/*` events
+
+<a id="company-mcpchanged--emit"></a>
+
+#### `company-mcp/changed` — emit
+
+Catalog, enablement or reported server state changed.
+
+```ts cordis-catalog
+/** Catalog, enablement or reported server state changed.
+ * @mode emit
+ */
+'company-mcp/changed'(): void
+```
+
+Source: [`packages/company/mcp-provider/src/provider.ts`](../../packages/company/mcp-provider/src/provider.ts)
 <!-- END GENERATED cordis-surface -->

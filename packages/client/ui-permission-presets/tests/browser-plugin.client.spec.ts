@@ -154,6 +154,23 @@ async function bench() {
 }
 
 describe('ui-permission browser plugin', () => {
+  it('routes editing choices before the current-session command and removes the transition on unload', async () => {
+    const b = await bench()
+    onTestFinished(() => b.ctx.fiber.dispose())
+    b.values.set(sid('usage'), { currentValue: 'read-only' })
+    const transition = vi.fn(async (_sessionId: SessionId, preset: string) => preset === 'workspace-write' ? true : undefined)
+    const fiber = await b.ctx.plugin(Object.assign((child: Context) => {
+      child.effect(() => child.permissionSelection.register(transition))
+    }, { inject: ['permissionSelection'] }))
+    await b.popup().onSelect({ id: 'workspace-write', label: 'Edit' }, { sessionId: sid('usage') })
+    expect(transition).toHaveBeenCalledWith(sid('usage'), 'workspace-write')
+    expect(b.commands).toEqual([])
+    await b.popup().onSelect({ id: 'read-only', label: 'Read' }, { sessionId: sid('usage') })
+    expect(b.commands).toEqual(['/permission read-only'])
+    await fiber.dispose()
+    await b.popup().onSelect({ id: 'workspace-write', label: 'Write' }, { sessionId: sid('usage') })
+    expect(b.commands.at(-1)).toBe('/permission workspace-write')
+  })
   it('dismisses stale slash choices on a catalog invalidation and removes that subscription on disposal', async () => {
     const b = await bench()
     const initial = b.dismissed.length

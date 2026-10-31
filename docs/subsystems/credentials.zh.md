@@ -131,6 +131,83 @@ async begin(request: AuthorizationRequest): Promise<AuthorizationOutcome>
 
 Source: [`packages/credentials/authorization/src/index.ts`](../../packages/credentials/authorization/src/index.ts)
 
+<a id="ctxcompanywecomauth--companywecomauthservice"></a>
+
+### `ctx.companyWecomAuth` — `CompanyWecomAuthService`
+
+Required browser login; local revocation stops admission before durable writes.
+
+```ts cordis-catalog
+/** Register business grants in the calling plugin's lifecycle.
+ * @param provider - committed resource ownership and explicit action grants.
+ * @returns a disposer removing all grants contributed by this provider.
+ */
+registerResourceProvider(provider: WecomResourceProvider): () => Promise<void>
+
+/** Build ordinary conversation and Workspace grants for business-owned Sessions.
+ * @param ids - Session identities already authorized by the calling business provider.
+ * @returns explicit user operations; deployment settings, filesystem mutation and native openers are excluded.
+ */
+sessionBindings(ids: readonly SessionId[]): RemoteAccessBinding[]
+
+/** Resolve the current Remote caller or trusted tool initiator's company ownership scope.
+ * @param member - authenticated company principal from an access-policy dispatch; omission resolves the caller.
+ * @returns stable enterprise scope, or `local-owner` outside an enterprise call or initiating Session.
+ * @throws WecomAuthError for unsupported non-owner principals.
+ */
+ownerScope(member?: CompanyUserPrincipal): CompanyOwnerScope
+
+/** Read the current member's default Workspace Session identities for business grants.
+ * @param principal - authenticated member supplied by the access-policy dispatcher.
+ * @returns owned Session identities; unknown or mismatched identities return an empty list.
+ */
+defaultWorkspaceSessions(principal: CompanyUserPrincipal): readonly SessionId[]
+
+/** Resolve retained ownership for a member default Workspace or business-owned Session.
+ * @param sessionId - tool-initiating or source Session identity.
+ * @returns stable owner, or undefined when no provider retains ownership; logout does not transfer ownership.
+ */
+sessionOwner(sessionId: SessionId): CompanyOwnerScope | undefined
+
+/** Resolve verified WeCom identity for an authenticated request or an owned Session.
+ * @param sessionId - trusted execution Session; omission uses the Remote caller or tool initiator.
+ * @returns enterprise-scoped market subject; display names and portal ids are excluded.
+ * @throws WecomAuthError when no enabled official WeCom identity owns the operation.
+ */
+marketSubject(sessionId?: SessionId): WecomMarketSubject
+
+/** Begin a durable, browser-bound, single-use login attempt.
+ * @param request - trusted request authority.
+ * @param browserNonce - random HttpOnly browser binding.
+ * @param redirect - site-local requested destination; unsafe destinations become `/`.
+ * @returns public identifiers, callback URI and unpredictable state.
+ */
+async beginLogin(request: ConnectionTrustRequest, browserNonce: string, redirect: string | null): Promise<WecomLoginConfig>
+
+/** Consume state before exchanging the code with official APIs.
+ * @param request - callback headers including the initiating browser cookie.
+ * @param input - untrusted callback fields.
+ * @returns persisted member session and signed cookie; failures require a fresh login.
+ */
+async exchange(request: ConnectionTrustRequest, input: unknown): Promise<WecomLoginResult & { readonly cookie: string }>
+
+/** Resolve only enabled, unexpired, unrevoked local sessions for this deployment.
+ * @param request - browser cookie and authority.
+ * @returns credential-free member view, or null when admission is denied.
+ */
+getCurrentSession(request: ConnectionTrustRequest): WecomSessionView | null
+
+/** Revoke the local session and its Peer's streams before persistence.
+ * @param request - browser cookie; absent or invalid cookies are harmless.
+ * @returns completed durable revocation; storage failure keeps in-process admission denied.
+ */
+async logout(request: ConnectionTrustRequest): Promise<void>
+```
+
+Types: [SessionId](core.zh.md)
+
+Source: [`packages/company/wecom-auth/src/index.ts`](../../packages/company/wecom-auth/src/index.ts)
+
 <a id="ctxcredentials--credentialprovider-abstract-seam"></a>
 
 ### `ctx.credentials` — `CredentialProvider` (abstract seam)

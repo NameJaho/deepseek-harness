@@ -361,30 +361,30 @@ Host service backing the generated `ctx.remote.workspace` namespace.
 /**
  * Hide one known Session from Workspace grouping surfaces.
  * @param request - Session identity to archive.
- * @returns the complete resulting archive set.
+ * @returns the resulting archive set, limited to Sessions the caller may see.
  */
-@Remote('archiveSession') archiveSession(request: WorkspaceArchiveSessionRequest): Promise<WorkspaceArchiveValue>
+@Remote('archiveSession') async archiveSession(request: WorkspaceArchiveSessionRequest): Promise<WorkspaceArchiveValue>
 
 /**
  * Restore one archived Session to Workspace grouping surfaces.
  * @param request - Session identity to unarchive.
- * @returns the complete resulting archive set.
+ * @returns the resulting archive set, limited to Sessions the caller may see.
  */
-@Remote('unarchiveSession') unarchiveSession(request: WorkspaceUnarchiveSessionRequest): Promise<WorkspaceArchiveValue>
+@Remote('unarchiveSession') async unarchiveSession(request: WorkspaceUnarchiveSessionRequest): Promise<WorkspaceArchiveValue>
 
 /**
  * Surface one known unarchived Session ahead of unpinned Sessions.
  * @param request - Session identity to pin.
- * @returns the complete resulting pin set, most recently pinned first.
+ * @returns the resulting pin set, most recently pinned first, limited to Sessions the caller may see.
  */
-@Remote('pinSession') pinSession(request: WorkspacePinSessionRequest): Promise<WorkspacePinValue>
+@Remote('pinSession') async pinSession(request: WorkspacePinSessionRequest): Promise<WorkspacePinValue>
 
 /**
  * Remove one Session's pin without changing its saved Session order.
  * @param request - Session identity to unpin.
- * @returns the complete resulting pin set, most recently pinned first.
+ * @returns the resulting pin set, most recently pinned first, limited to Sessions the caller may see.
  */
-@Remote('unpinSession') unpinSession(request: WorkspaceUnpinSessionRequest): Promise<WorkspacePinValue>
+@Remote('unpinSession') async unpinSession(request: WorkspaceUnpinSessionRequest): Promise<WorkspacePinValue>
 
 /**
  * Stream a complete Workspace baseline followed by ordered increments. A

@@ -1,0 +1,6 @@
+# Host deployments supply the direct retrieve source list as JSON; the endpoint is protected by the internal network.
+- insert:
+    - id: company-knowledge
+      name: '@deepseek-ai/dsh-company-knowledge'
+      config:
+        sources: !!js JSON.parse(process.env.DSH_COMPANY_KNOWLEDGE_SOURCES ?? '[]')

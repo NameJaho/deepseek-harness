@@ -1,0 +1,61 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/company/external-agent-subagent/README.md
+/:
+  en: 6bda4e6bc49b8574
+  zh: 7462c3a328658978
+/deepseek-ai-dsh-company-external-agent-subagent:
+  en: 8b02353a976d8dbc
+  zh: c07343aa39a4bcfc
+/deepseek-ai-dsh-company-external-agent-subagent/summary:
+  en: 866f8afa8f1ed870
+  zh: 1b4b93a0cc51d878
+/deepseek-ai-dsh-company-external-agent-subagent/table-of-contents:
+  en: a85928bf1aa8b079
+  zh: e7adca88e540c74b
+/deepseek-ai-dsh-company-external-agent-subagent/private-configuration:
+  en: fbb83b48d0499524
+  zh: 550cee12fbb36eba
+/deepseek-ai-dsh-company-external-agent-subagent/calls-records-and-continuation:
+  en: 46b1f27a1c542672
+  zh: 33f05d87c16e0542
+/deepseek-ai-dsh-company-external-agent-subagent/failure-handling:
+  en: 44f9c9c614b70c1b
+  zh: 4eecfd8d24f7dbb0
+/deepseek-ai-dsh-company-external-agent-subagent/integration-and-verification:
+  en: 1ec0a5020696a6d0
+  zh: 24c65dd7c3a10b19
+/deepseek-ai-dsh-company-external-agent-subagent/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-company-external-agent-subagent/model-experience/external-app-task:
+  en: 41070bdb67409ccf
+  zh: 9cda4a2ff1c5f23d
+/deepseek-ai-dsh-company-external-agent-subagent/model-experience/external-app-task/what-the-model-sees:
+  en: e366a3c290b63bf8
+  zh: 4029d599af1d88bb
+/deepseek-ai-dsh-company-external-agent-subagent/model-experience/external-app-task/token-effect:
+  en: 0d633b06b7671dd7
+  zh: 83389ab74c0421d3
+/deepseek-ai-dsh-company-external-agent-subagent/model-experience/external-app-task/kv-cache-effect:
+  en: 71fe41bc84de9dac
+  zh: 76b715f149f2b47d
+/deepseek-ai-dsh-company-external-agent-subagent/model-experience/parent-settlement-through-the-subagent-manager:
+  en: 381330a2dc844897
+  zh: 65b6d6bab751d0c3
+/deepseek-ai-dsh-company-external-agent-subagent/model-experience/parent-settlement-through-the-subagent-manager/what-the-model-sees:
+  en: 633239c98afa068d
+  zh: 44e97e2d16febcc7
+/deepseek-ai-dsh-company-external-agent-subagent/model-experience/parent-settlement-through-the-subagent-manager/token-effect:
+  en: d2f0057bfd4c4131
+  zh: 6a3f93d80ba9ac4b
+/deepseek-ai-dsh-company-external-agent-subagent/model-experience/parent-settlement-through-the-subagent-manager/kv-cache-effect:
+  en: 0759b79ceac0e146
+  zh: db47ee05d844056c
+/deepseek-ai-dsh-company-external-agent-subagent/known-limitations-and-deferred-work:
+  en: ae5ef0bd1b93cc87
+  zh: cde54719d2b94c51
+/deepseek-ai-dsh-company-external-agent-subagent/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 6c5f9788c6536776

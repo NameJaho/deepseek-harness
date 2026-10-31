@@ -134,3 +134,18 @@ it.each([
 ])('rejects invalid probe limits %j', (config) => {
   expect(() => PluginRegistryProbe.Config(config)).toThrow()
 })
+
+it.each([
+  [{}, {}],
+  [{ visibleItems: ['fixture-mcp'] }, { visibleItems: ['fixture-mcp'] }],
+])('embeds the Plugins page presentation in every index while the web server is present: %j', async (config, value) => {
+  const { ctx } = await mount(config)
+  const collect = () => {
+    const table: Array<{ name?: string; value?: unknown }> = []
+    ctx.emit('webserver/index-inject', table as never, {} as never)
+    return table.filter(row => row.name === '__DSH_PLUGIN_PRESENTATION__')
+  }
+  expect(collect()).toEqual([])
+  ctx.provide('webServer', {} as never)
+  await vi.waitFor(() => { expect(collect()).toEqual([{ kind: 'global', name: '__DSH_PLUGIN_PRESENTATION__', value }]) })
+})

@@ -1,0 +1,151 @@
+# Bilingual-pair consistency record for login-branch-migration-plan.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/company/login-branch-migration-plan.md
+/login-branch-feature-migration-and-optimization-handoff:
+  en: 17e67212d12ac8f4
+  zh: 1b2e9054f92f1f85
+/login-branch-feature-migration-and-optimization-handoff/contents:
+  en: 4a36f7e6bda66269
+  zh: 56290e78e4404b2b
+/login-branch-feature-migration-and-optimization-handoff/1-branch-state-and-strategy:
+  en: ab5a7b2aeb2a3348
+  zh: b980a214ee94e95b
+/login-branch-feature-migration-and-optimization-handoff/2-scope:
+  en: 5458fc0c87b9fd57
+  zh: aac0d7881ec9544b
+/login-branch-feature-migration-and-optimization-handoff/2-scope/required:
+  en: 689a50b06e42fba3
+  zh: 0ccb59e873cc9f86
+/login-branch-feature-migration-and-optimization-handoff/2-scope/explicitly-excluded:
+  en: c9d4432ca6f84ad6
+  zh: 50af2cfcf191ee56
+/login-branch-feature-migration-and-optimization-handoff/2-scope/responsibility-split:
+  en: ba7319c30941cb73
+  zh: 2dc26e492118a589
+/login-branch-feature-migration-and-optimization-handoff/3-execution-order:
+  en: eba3489dfba9c3e0
+  zh: edc1547d12b66995
+/login-branch-feature-migration-and-optimization-handoff/3-execution-order/stage-0-clean-baseline:
+  en: d2d4fe724c944a55
+  zh: 462ab2488bde6c8e
+/login-branch-feature-migration-and-optimization-handoff/3-execution-order/stage-1-brand-text-and-build-variable:
+  en: 1789d085f295ed95
+  zh: 0364ee48e5b3a23b
+/login-branch-feature-migration-and-optimization-handoff/3-execution-order/stage-2-cloud-agent-and-external-mcp-seam:
+  en: 31371719b42efa18
+  zh: a1ff362884679d1d
+/login-branch-feature-migration-and-optimization-handoff/3-execution-order/stage-3-knowledge-host-runtime-and-page:
+  en: be6133505867d7c0
+  zh: 2d72a89563b305f1
+/login-branch-feature-migration-and-optimization-handoff/3-execution-order/stage-4-logo-and-acceptance:
+  en: f27b930f5e14f138
+  zh: 86168988ea91b1e3
+/login-branch-feature-migration-and-optimization-handoff/cloud-agent-product-flow-and-workspace-fence:
+  en: d872af86af513791
+  zh: 1a2cf6b16419be1c
+/login-branch-feature-migration-and-optimization-handoff/cloud-agent-product-flow-and-workspace-fence/publishing-from-an-ordinary-conversation:
+  en: dd998466cef1cf5d
+  zh: d11facdc33d3682a
+/login-branch-feature-migration-and-optimization-handoff/cloud-agent-product-flow-and-workspace-fence/cross-user-use-and-one-agent-workspace:
+  en: f445b11aa8fe634b
+  zh: 9bf7f3bcbdd96bca
+/login-branch-feature-migration-and-optimization-handoff/cloud-agent-product-flow-and-workspace-fence/creation-and-run-presets:
+  en: 450769e6953c1bc7
+  zh: 6c163b8b21c02d29
+/login-branch-feature-migration-and-optimization-handoff/cloud-agent-product-flow-and-workspace-fence/external-agents-as-subagents:
+  en: 84750d406b861d1b
+  zh: 21916e104d74cd6a
+/login-branch-feature-migration-and-optimization-handoff/cloud-agent-product-flow-and-workspace-fence/agent-information-and-capability-panes:
+  en: 516bf06aad30b333
+  zh: 6ac97938fd7c97cb
+/login-branch-feature-migration-and-optimization-handoff/4-brand-and-local-build-naming:
+  en: 6772fb73e1f6e3ae
+  zh: 8b234f8c9f28a57e
+/login-branch-feature-migration-and-optimization-handoff/4-brand-and-local-build-naming/current-code-locations:
+  en: 7cae47dd609483e3
+  zh: 90b69b6b547c5814
+/login-branch-feature-migration-and-optimization-handoff/4-brand-and-local-build-naming/recommended-brand-values:
+  en: c6110d15ddc5f024
+  zh: 8c50a79f12125a26
+/login-branch-feature-migration-and-optimization-handoff/4-brand-and-local-build-naming/implementation-requirements:
+  en: 2f21551d3eeb7ef1
+  zh: c74f1c3e896af8c7
+/login-branch-feature-migration-and-optimization-handoff/5-mcp-capability-migration:
+  en: 73d9d050c6f685c4
+  zh: 49bf222bd098c0fb
+/login-branch-feature-migration-and-optimization-handoff/5-mcp-capability-migration/user-capabilities-to-keep:
+  en: cd052eee28a82c90
+  zh: 4a1f74c625ab37f8
+/login-branch-feature-migration-and-optimization-handoff/5-mcp-capability-migration/backend-seam-to-replace:
+  en: 9d9ab6e690e2c793
+  zh: fc2a208d6862f532
+/login-branch-feature-migration-and-optimization-handoff/5-mcp-capability-migration/content-to-remove-or-omit:
+  en: 75bed99d6703b3dc
+  zh: 3fdd2faf938001f3
+/login-branch-feature-migration-and-optimization-handoff/5-mcp-capability-migration/mcp-ui-optimization:
+  en: ac4f727270cec5ba
+  zh: 602f65b2e2109858
+/login-branch-feature-migration-and-optimization-handoff/5-mcp-capability-migration/mcp-runtime-safety:
+  en: ce29724a1db122aa
+  zh: ab8e4e1e35ccb46f
+/login-branch-feature-migration-and-optimization-handoff/6-company-knowledge-migration:
+  en: ca764816c77fd87a
+  zh: f814c4309fef602c
+/login-branch-feature-migration-and-optimization-handoff/6-company-knowledge-migration/capability-migrated-from-master:
+  en: 7f4f4d103d718711
+  zh: 2dac2202f71ecf38
+/login-branch-feature-migration-and-optimization-handoff/6-company-knowledge-migration/recommended-interface-and-security:
+  en: d924be5adb5c7313
+  zh: 5d73ffb1f81a6db4
+/login-branch-feature-migration-and-optimization-handoff/6-company-knowledge-migration/knowledge-experience-in-cloud-agent:
+  en: 71437fa752f84cff
+  zh: 7ad65e0f1c9a2385
+/login-branch-feature-migration-and-optimization-handoff/6-company-knowledge-migration/knowledge-page-optimization:
+  en: 6ff3d6f153efc010
+  zh: 30a99a5774acd51d
+/login-branch-feature-migration-and-optimization-handoff/7-logo-migration:
+  en: e9b6e0c2764cd071
+  zh: abb677082aa5f090
+/login-branch-feature-migration-and-optimization-handoff/7-logo-migration/asset-processing:
+  en: 82cdc8ace7a95b06
+  zh: e54c47c4f4186ffe
+/login-branch-feature-migration-and-optimization-handoff/7-logo-migration/integration-locations:
+  en: 2c7e279353ad8771
+  zh: fac5a07713d932ca
+/login-branch-feature-migration-and-optimization-handoff/8-tests-and-acceptance:
+  en: f463b97bb11d1505
+  zh: 05a9f2f6508e98d4
+/login-branch-feature-migration-and-optimization-handoff/8-tests-and-acceptance/brand-acceptance:
+  en: dd7af58b67a3a236
+  zh: 1c821d5aee9feed9
+/login-branch-feature-migration-and-optimization-handoff/8-tests-and-acceptance/cloud-agent-product-acceptance:
+  en: fa063d16a1a76025
+  zh: 96ea253979e86497
+/login-branch-feature-migration-and-optimization-handoff/8-tests-and-acceptance/mcp-acceptance:
+  en: e23c31324dfde3bf
+  zh: 5fe79fd0befbb339
+/login-branch-feature-migration-and-optimization-handoff/8-tests-and-acceptance/knowledge-acceptance:
+  en: c42d09f96ebdb83c
+  zh: d18558e18a1eb00f
+/login-branch-feature-migration-and-optimization-handoff/8-tests-and-acceptance/required-repository-checks:
+  en: a30846f6d5d33873
+  zh: 827c97cc2c3f86d9
+/login-branch-feature-migration-and-optimization-handoff/9-risks-rollback-and-deliverables:
+  en: 7428bc75abe3f0b6
+  zh: 5d0de34f7b393d5a
+/login-branch-feature-migration-and-optimization-handoff/9-risks-rollback-and-deliverables/main-risks:
+  en: 7436ade2ca14aa90
+  zh: f9bd5d1938bc407f
+/login-branch-feature-migration-and-optimization-handoff/9-risks-rollback-and-deliverables/rollback:
+  en: 15ea290e74e4af43
+  zh: 03e0951b0c9f58db
+/login-branch-feature-migration-and-optimization-handoff/9-risks-rollback-and-deliverables/deliverables:
+  en: 623dc1cff97ae7b4
+  zh: 5bc87322f488476a
+/login-branch-feature-migration-and-optimization-handoff/10-ai-execution-checklist:
+  en: f1456d2191b664cb
+  zh: b3c47dc9a523067e
+/login-branch-feature-migration-and-optimization-handoff/dev-note:
+  en: e7ceabff7b26c099
+  zh: 9eb5309b87f37e13

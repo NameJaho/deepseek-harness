@@ -288,6 +288,24 @@ describe('dsh family version coherence', () => {
   })
 })
 
+describe('private company deployment packages', () => {
+  it.each(['cloud-agent', 'cloud-agent-runtime', 'external-agent-subagent', 'knowledge', 'mcp-provider', 'wecom-auth'])(
+    'keeps %s private while enforcing version, exports and payload requirements', (name) => {
+      const dir = `packages/company/${name}`
+      const manifest = JSON.parse(readFileSync(new URL(`../${dir}/package.json`, import.meta.url), 'utf8')) as WorkspaceManifest['manifest']
+      expect(checkWorkspaceManifest({ dir, manifest })).toEqual([])
+      expect(checkWorkspaceManifest({ dir, manifest: { ...manifest, private: false } }))
+        .toContainEqual(expect.stringContaining('package.json must set "private": true'))
+      expect(checkWorkspaceManifest({ dir, manifest: { ...manifest, publishConfig: { access: 'public' } } }))
+        .toContainEqual(expect.stringContaining('private company package must omit publishConfig'))
+      expect(checkWorkspaceManifest({ dir, manifest: { ...manifest, version: '0.0.0' } }))
+        .toContainEqual(expect.stringContaining('version must match root version'))
+      expect(checkWorkspaceManifest({ dir, manifest: { ...manifest, files: [] } }))
+        .toContainEqual(expect.stringContaining('package.json files must be'))
+    },
+  )
+})
+
 describe('package payload constraints', () => {
   it.each([
     ['./art/icon.svg', ['art/icon.svg']],

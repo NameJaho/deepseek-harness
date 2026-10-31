@@ -104,6 +104,7 @@ const NO_CONFIG: ConfigLedger = { items: [], bundles: new Set(), rows: new Set()
 function renderTab(
   state: Partial<PluginManagerState> = {}, config: Partial<ConfigLedger> = {},
   bodies: SlotBodies = {}, forms: Record<string, ConfigPageForm> = {}, tabs: readonly PluginTab[] = [],
+  visibleItems?: readonly string[],
 ) {
   const ctx = new Context()
   onTestFinished(async () => { await ctx.fiber.dispose() })
@@ -163,6 +164,7 @@ function renderTab(
   const navigation = createNavigationStore().create()
   const props: PluginManagerPageProps = {
     createHeaderRef: vi.fn(() => vi.fn()),
+    visibleItems,
     useStore: bindSnapshotSelector(navigation), actions: navigation.actions,
     ...standard,
     t,
@@ -226,6 +228,20 @@ function renderTab(
 }
 
 describe('PluginManagerPage', () => {
+  it.each([false, true])('keeps the full manager by default and curates only Host-selected items: %s', (curated) => {
+    renderTab({ packages: [pkg()] }, { items: [
+      { id: 'fixture-mcp', label: 'Fixture MCP' },
+      { id: 'fixture-knowledge', label: 'Fixture Knowledge' },
+      { id: 'bash', label: 'Shell' },
+    ] }, {}, {}, [], curated ? ['fixture-mcp', 'fixture-knowledge'] : undefined)
+    for (const name of ['Fixture MCP', 'Fixture Knowledge']) {
+      expect(screen.getByRole('button', { name: en.openDetail.replace('{name}', name) })).toBeTruthy()
+    }
+    expect(screen.queryByRole('button', { name: en.openDetail.replace('{name}', 'Shell') }) !== null).toBe(!curated)
+    expect(screen.queryByRole('button', { name: en.addPlugin }) !== null).toBe(!curated)
+    expect(document.querySelector('[data-plugin-package="dsh-better-sidebar"]') !== null).toBe(!curated)
+  })
+
   it('shows no tabs without contributions, and switches between Installed and a contributed tab', () => {
     const { actions, navigation, setTabs } = renderTab({ packages: [pkg()] }, {}, {
       'plugins.tab:discover': (_view, owner) => {

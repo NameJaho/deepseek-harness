@@ -43,6 +43,7 @@ DSH_WECOM_WORKSPACE_ROOT="${DSH_WECOM_WORKSPACE_ROOT:-$DSH_BASE/workspaces}"
 DSH_PROFILE="${DSH_PROFILE:-test-web}"
 export DSH_PUBLIC_URL
 export DSH_WECOM_WORKSPACE_ROOT
+export DSH_CLIENT_TITLE="${DSH_CLIENT_TITLE:-HMWORK}"
 export DSH_WECOM_CORP_ID="${DSH_WECOM_CORP_ID:-ww2ec793812513c257}"
 export DSH_WECOM_AGENT_ID="${DSH_WECOM_AGENT_ID:-1000239}"
 if [[ -z "${DSH_WECOM_APP_SECRET:-}" ]]; then
@@ -253,6 +254,17 @@ if [[ "$DSH_PROFILE_INIT" == "1" ]]; then
 fi
 # Profile overlays are outer CLI options and must precede runtime arguments.
 DSH_COMMAND+=(--patch "$DSH_REPO/packages/company/wecom-auth/cordis.patch.yml")
+# 成员授权 MCP、知识库和外部 Agent 按配置独立挂载。
+if [[ -n "${DSH_MCP_MARKET_URL:-}" ]]; then
+  DSH_COMMAND+=(--patch "$DSH_REPO/packages/company/mcp-provider/cordis.patch.yml")
+fi
+if [[ -n "${DSH_COMPANY_KNOWLEDGE_SOURCES:-}" ]]; then
+  DSH_COMMAND+=(--patch "$DSH_REPO/packages/company/knowledge/cordis.patch.yml")
+fi
+DSH_COMMAND+=(--patch "$DSH_REPO/packages/company/cloud-agent/cordis.patch.yml")
+if [[ -n "${DSH_COMPANY_EXTERNAL_AGENTS:-}" ]]; then
+  DSH_COMMAND+=(--patch "$DSH_REPO/packages/company/external-agent-subagent/cordis.patch.yml")
+fi
 DSH_COMMAND+=(--no-open --host "$DSH_HOST" --port "$DSH_PORT")
 if [[ -n "$DSH_PUBLIC_URL" ]]; then
   DSH_COMMAND+=(--public-url "$DSH_PUBLIC_URL")

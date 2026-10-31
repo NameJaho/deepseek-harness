@@ -49,6 +49,10 @@ export type PluginManagerPageProps =
   >
   & InjectFace<PluginManagerFace & PluginHeaderLayoutFace>
   & PropsStore<ReturnType<typeof createNavigationStore>>
+  & {
+    /** Host-selected `plugins.item` ids; when present, the page hides bundles and add controls. */
+    readonly visibleItems?: readonly string[] | undefined
+  }
 
 /** The page's slot renderer, narrowed to the configuration slots. */
 type RenderConfig = PluginManagerPageProps['renderSlot']
@@ -1557,7 +1561,9 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
 
   // The page omits profile bundles and persistent terminals. Other installed or offered bundles and
   // unreadable selections remain manageable; Settings' Plugin list inspects the full Host inventory.
-  const listed = state.packages.filter(pkg => !HIDDEN_BUNDLES.has(pkg.name)
+  // A Host `visibleItems` list curates the page down to those official items: no bundle is listed.
+  const { visibleItems } = props
+  const listed = visibleItems !== undefined ? [] : state.packages.filter(pkg => !HIDDEN_BUNDLES.has(pkg.name)
     && (pkg.listedByDefault !== false || pkg.enabled || pkg.installed || rowsRunning(pkg))
     && (pkg.installed || pkg.official || pkg.error !== undefined))
   const mine = listed.filter(pkg => !pkg.official)
@@ -1574,7 +1580,8 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
   const openPkg = view.kind === 'package' || view.kind === 'row'
     ? listed.find(pkg => pkg.name === view.name)
     : undefined
-  const openItem = view.kind === 'item' ? ledger.items.find(item => item.id === view.id) : undefined
+  const items = visibleItems === undefined ? ledger.items : ledger.items.filter(item => visibleItems.includes(item.id))
+  const openItem = view.kind === 'item' ? items.find(item => item.id === view.id) : undefined
   const openRow = view.kind === 'row' && openPkg !== undefined ? openPkg.rows.find(row => row.rowId === view.rowId) : undefined
   const onInstalled = tab === INSTALLED_TAB
   const showsCards = !onInstalled || (openPkg === undefined && openItem === undefined)
@@ -1620,7 +1627,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
       onSetEnabled={(enabled) => { setBundleEnabled(pkg.name, enabled) }}
     />
   )
-  const basicCards = ledger.items.map(item => (
+  const basicCards = items.map(item => (
     <ItemCard key={`item:${item.id}`} item={item} t={t} renderSlot={renderSlot} onOpen={() => { setView({ kind: 'item', id: item.id }) }} />
   ))
   const renderGroup = (id: 'basic' | 'extensions' | 'bundles', heading: string, cards: readonly ReactNode[]): ReactNode => {
@@ -1680,7 +1687,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
                       <span className={css.toolbarLabel}>{t('refresh')}</span>
                     </Button>
                   </Tooltip>
-                  {state.install.requestId === undefined
+                  {visibleItems !== undefined ? null : state.install.requestId === undefined
                     ? <AddPluginMenu t={t} disabled={!loaded} openInstall={props.openInstall} renderSlot={renderSlot} />
                     : (
                       <Tooltip label={t('installViewTask')} side="bottom" delayMs={500} focusDelayMs={500} portal disabled={!loaded}>

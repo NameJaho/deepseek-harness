@@ -76,6 +76,15 @@ const standardReleaseMemberDirectory = new RegExp(
 )
 /** Installable application assembled by electron-builder rather than published to npm. */
 const desktopApplicationDirectory = 'apps/desktop'
+/** Source-deployed company integrations are excluded from the public npm release. */
+const privateCompanyPackageDirectories = new Set([
+  'packages/company/cloud-agent',
+  'packages/company/cloud-agent-runtime',
+  'packages/company/external-agent-subagent',
+  'packages/company/knowledge',
+  'packages/company/mcp-provider',
+  'packages/company/wecom-auth',
+])
 const localArtifactDirs = new Set(['node_modules'])
 const appPackageFiles: Readonly<Record<string, readonly string[]>> = {
   '@deepseek-ai/dsh': ['lib/*.js', 'lib/types/*.d.ts'],
@@ -227,6 +236,7 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   '@deepseek-ai/dsh-experimental-inspector': ['lib/client.*.js', 'lib/worker.js', 'lib/devtools/**'],
   // Creator's composition guidance travels with the declaration package.
   '@deepseek-ai/dsh-agent-preset': ['skills'],
+  '@deepseek-ai/dsh-company-wecom-auth': ['assets/login-background.jpg'],
   // Personalized pages ship the location guidance used by their Creator.
   '@deepseek-ai/dsh-creation-recommendations': ['references/*.md', 'skills/*.md'],
   // Official-plugin recommendations ship the skill text their provider loads.
@@ -459,7 +469,7 @@ export function checkExperimentalNameExceptions(manifests: readonly WorkspaceMan
 
 function isReleaseMemberDirectory(dir: string): boolean {
   // The SSH carrier is distributed as executable archives, never as an npm application.
-  if (dir === 'packages/ssh/ssh-helper-runtime') return false
+  if (dir === 'packages/ssh/ssh-helper-runtime' || privateCompanyPackageDirectories.has(dir)) return false
   return standardReleaseMemberDirectory.test(dir) || isPublicExperimentalPackageDirectory(dir)
 }
 
@@ -536,6 +546,10 @@ export function checkWorkspaceManifest({ dir, manifest }: WorkspaceManifest): st
     }
   } else if (!experimentalPackageDirectory.test(dir) && manifest.private !== true) {
     errors.push(`${label}: package.json must set "private": true`)
+  }
+
+  if (privateCompanyPackageDirectories.has(dir) && manifest.publishConfig !== undefined) {
+    errors.push(`${label}: private company package must omit publishConfig`)
   }
 
   if (manifest.name && vendoredPackages.has(manifest.name)) {

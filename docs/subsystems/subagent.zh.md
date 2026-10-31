@@ -402,6 +402,39 @@ type SubagentDescendantListEntry = SubagentListEntry & {
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
+<a id="ctxexternalagentsubagents--externalagentsubagentprovider"></a>
+
+### `ctx.externalAgentSubagents` — `ExternalAgentSubagentProvider`
+
+Registers swappable external backends on ctx.subagents; never inherits local capabilities.
+
+```ts cordis-catalog
+/** Read configured logical agents only; no endpoint, credential reference or inputs.
+ * @returns immutable-by-convention logical descriptors.
+ */
+catalog(): readonly ExternalAgentDescriptor[]
+
+/** Start through the standard logged carrier, optionally continuing an owned successful call.
+ * @param agentId - configured logical agent, not a URL or platform id.
+ * @param spec - normal managed activation request; provider is selected by agentId.
+ * @param continuationOf - prior successful child's identity; absence starts fresh. Live-only and latest-child-only.
+ * @returns managed activation with standard parent catalog and result delivery.
+ */
+startActivation(agentId: ExternalAgentId, spec: Omit<SubagentActivationSpec, 'provider' | 'childId'>, continuationOf?: SessionId): Promise<SubagentActivation>
+
+/** Read execution facts under their exact live parent.
+ * @param agentId - configured logical agent.
+ * @param parent - exact original live parent.
+ * @param childId - managed child's identity.
+ * @returns safe retained input/output digests, status and structured failure.
+ */
+describeRun(agentId: ExternalAgentId, parent: SubagentActivationSpec['request']['parent'], childId: SessionId): ExternalAgentRunDescriptor
+```
+
+Types: [SessionId](core.zh.md)
+
+Source: [`packages/company/external-agent-subagent/src/index.ts`](../../packages/company/external-agent-subagent/src/index.ts)
+
 <a id="ctxsubagentmodelselection--subagentmodelselectionconfig"></a>
 
 ### `ctx.subagentModelSelection` — `SubagentModelSelectionConfig`

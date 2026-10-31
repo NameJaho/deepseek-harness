@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-31-direct-knowledge-retrieve-protocol.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-31-direct-knowledge-retrieve-protocol.md
+/agent-note-direct-knowledge-retrieve-protocol:
+  en: da0fc561e99e3069
+  zh: 4c34d799b8af8d53
+/agent-note-direct-knowledge-retrieve-protocol/problem:
+  en: dd89651bff35089f
+  zh: aa8cb70385acbaf1
+/agent-note-direct-knowledge-retrieve-protocol/decision:
+  en: 7452b5ce339f4cce
+  zh: ce21ea06970bac4a
+/agent-note-direct-knowledge-retrieve-protocol/alternatives-considered:
+  en: 5927ac29d6359c35
+  zh: 05e2fcce8cf01e2a
+/agent-note-direct-knowledge-retrieve-protocol/consequences:
+  en: d975f89a9834d1b5
+  zh: df300f54292ea4c5

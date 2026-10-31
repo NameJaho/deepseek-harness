@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-31-private-company-source-deployment.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-10-31-private-company-source-deployment.md
+/agent-note-private-company-source-deployment:
+  en: 2102bbf23da49242
+  zh: 447128032f14b052
+/agent-note-private-company-source-deployment/problem:
+  en: dab08d582af237e4
+  zh: 7abf146fa0192cb5
+/agent-note-private-company-source-deployment/decision:
+  en: 15d1fc9ccee4d917
+  zh: f52f4229854a7a88
+/agent-note-private-company-source-deployment/alternatives-considered:
+  en: c1c6a9847314b38c
+  zh: fa7421a9306209d7
+/agent-note-private-company-source-deployment/consequences:
+  en: 4660948aeb4c927d
+  zh: 51cb73c6da490e1d

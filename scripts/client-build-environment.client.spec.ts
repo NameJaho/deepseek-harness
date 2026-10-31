@@ -9,6 +9,7 @@ import {
   clientBuildEnvironmentDefines,
   clientBuildProcessEnvironment,
   clientBuildValueDefines,
+  DEFAULT_CLIENT_TITLE,
   officialClientBuildEnvironment,
   readClientBuildRecord,
   repositoryClientBuildEnvironment,
@@ -191,8 +192,13 @@ describe('client build environment', () => {
     })).toEqual({
       DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7),
       DSH_CLIENT_EXTRA: 'preserved',
+      DSH_CLIENT_TITLE: DEFAULT_CLIENT_TITLE,
       DSH_CLIENT_VERSION: '1.2.3-rc.4',
     })
+    expect(repositoryClientBuildEnvironment(fixtureRoot, {
+      DSH_CLIENT_COMMIT_HASH: COMMIT_HASH,
+      DSH_CLIENT_TITLE: 'Deployment title',
+    }).DSH_CLIENT_TITLE).toBe('Deployment title')
     expect(officialClientBuildEnvironment(fixtureRoot)).toEqual({
       DSH_CLIENT_BUILD_PROFILE: 'official',
       DSH_CLIENT_COMMIT_HASH: commit,
@@ -225,6 +231,7 @@ describe('client build environment', () => {
     })).toEqual({
       DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7),
       DSH_CLIENT_GIT_DIRTY: 'true',
+      DSH_CLIENT_TITLE: DEFAULT_CLIENT_TITLE,
       DSH_CLIENT_VERSION: '1.2.3-rc.4',
     })
 
@@ -248,6 +255,7 @@ describe('client build environment', () => {
       DSH_CLIENT_GIT_DIRTY: 'true',
     })).toEqual({
       DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7),
+      DSH_CLIENT_TITLE: DEFAULT_CLIENT_TITLE,
       DSH_CLIENT_VERSION: '2.0.0',
     })
   })

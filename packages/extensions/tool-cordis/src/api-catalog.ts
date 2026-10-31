@@ -699,120 +699,6 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
-    key: 'cloudAgents',
-    summary: 'Durable directory retaining exact releases and per-member Session ownership.',
-    description: 'Durable directory retaining exact releases and per-member Session ownership.',
-    methods: [
-      {
-        signature: '@Remote async catalog(): Promise<CloudAgentCatalog>',
-        description: 'Read owned drafts, public-or-owned releases and private usage groups.',
-        parameters: [],
-        returns: 'authoritative credential-free directory and capability choices.',
-      },
-      {
-        signature: '@Remote({ mode: \'stream\' }) async *follow(signal: AbortSignal): AsyncIterable<CloudAgentCatalog>',
-        description: 'Follow committed directory and provider changes, coalescing slow readers.',
-        parameters: [{ name: 'signal', description: 'subscriber cancellation.' }],
-        returns: 'initial and subsequent authoritative catalogs.',
-      },
-      {
-        signature: '@Remote({ resources: { session: (_draft, authoringSessionId) => authoringSessionId } }) create(draft: CloudAgentDraft, authoringSessionId?: SessionId): Promise<CloudAgentRecord>',
-        description: 'Create a private draft from a live authorized conversation.',
-        parameters: [{ name: 'draft', description: 'validated reusable fields.' }, { name: 'authoringSessionId', description: 'owning live editor; omission rejects creation.' }],
-        returns: 'committed record; no release is created.',
-      },
-      {
-        signature: 'saveFromConversation(agent: Agent, requestId: string, draft: CloudAgentDraft, id?: CloudAgentId, expectedRevision?: number, createNew: boolean = false): Promise<CloudAgentRecord>',
-        description: 'Save one conversation\'s reusable requirements with executor-call deduplication.',
-        parameters: [{ name: 'agent', description: 'live initiating Agent.' }, { name: 'requestId', description: 'tool executor call identity.' }, { name: 'draft', description: 'complete reusable definition.' }, { name: 'id', description: 'existing draft; omission uses this conversation\'s draft.' }, { name: 'expectedRevision', description: 'exact revision for replacing an existing draft.' }, { name: 'createNew', description: 'request a separate draft; a bound editor must use another Session.' }],
-        returns: 'committed record, including on an exact replay.',
-      },
-      {
-        signature: '@Remote({ resources: { session: request => request.sourceSessionId } }) startAuthoring(request: { readonly id?: CloudAgentId readonly sourceSessionId?: SessionId readonly prompt?: string readonly reuse?: boolean readonly creationPreset?: string }, signal: AbortSignal): Promise<{ readonly sessionId: SessionId }>',
-        description: 'Open an owner-private editor with a selectable creation preset.',
-        parameters: [{ name: 'request', description: 'optional owned draft, source Session, extraction prompt and selectable creation preset; reuse returns a live matching editor.' }, { name: 'signal', description: 'creation cancellation.' }],
-        returns: 'ready Session identity; failed preparation rolls back its resources.',
-      },
-      {
-        signature: '@Remote({ resources: { session: request => request.authoringSessionId } }) update(request: CloudAgentUpdateRequest): Promise<CloudAgentRecord>',
-        description: 'Replace a draft without modifying any retained release.',
-        parameters: [{ name: 'request', description: 'owning editor, exact revision and complete new definition.' }],
-        returns: 'next revision; stale writes preserve the current record.',
-      },
-      {
-        signature: '@Remote({ resources: { session: request => request.authoringSessionId } }) publish(request: CloudAgentPublishRequest): Promise<CloudAgentRecord>',
-        description: 'Publish a confirmed revision and audience, deduplicating an exact publication replay.',
-        parameters: [{ name: 'request', description: 'owning editor, confirmed draft revision and public/private visibility; omission means public.' }],
-        returns: 'the committed record; stale unrelated revisions fail without creating a release.',
-      },
-      {
-        signature: '@Remote({ resources: { session: request => request.authoringSessionId } }) unpublish(request: CloudAgentRevisionRequest): Promise<CloudAgentRecord>',
-        description: 'Withdraw publication while preserving existing private Sessions and releases.',
-        parameters: [{ name: 'request', description: 'owning editor and exact record revision.' }],
-        returns: 'updated record.',
-      },
-      {
-        signature: '@Remote startSession(request: CloudAgentStartRequest, signal: AbortSignal): Promise<CloudAgentSession>',
-        description: 'Start an exact current public-or-owned release with only its pinned capabilities.',
-        parameters: [{ name: 'request', description: 'exact directory entry and optional selectable run preset and model override.' }, { name: 'signal', description: 'creation cancellation.' }],
-        returns: 'fresh owner-private ordinary Session.',
-      },
-      {
-        signature: '@Remote({ resources: { session: request => request.authoringSessionId } }) preview(request: CloudAgentRevisionRequest, signal: AbortSignal): Promise<CloudAgentSession>',
-        description: 'Snapshot and test an owned draft without publishing it.',
-        parameters: [{ name: 'request', description: 'exact draft revision and live editor.' }, { name: 'signal', description: 'creation cancellation.' }],
-        returns: 'independent private Session pinned to a preview release.',
-      },
-      {
-        signature: '@Remote({ resources: { session: request => request.authoringSessionId } }) clone(request: CloudAgentStartRequest): Promise<CloudAgentRecord>',
-        description: 'Clone an accessible published release into a private editor-owned draft.',
-        parameters: [{ name: 'request', description: 'current directory release and authorized editor.' }],
-        returns: 'independent record with no copied conversations.',
-      },
-      {
-        signature: '@Remote delete(request: { readonly id: CloudAgentId; readonly expectedRevision: number }): Promise<void>',
-        description: 'Tombstone an owned definition; immutable releases and usage Sessions remain private and recoverable.',
-        parameters: [{ name: 'request', description: 'owned Agent and exact revision.' }],
-        returns: 'after the durable tombstone is committed.',
-      },
-      {
-        signature: '@Remote({ resources: { session: request => request.sessionIds } }) deleteUnboundAuthoringSessions(request: { readonly sessionIds: readonly SessionId[] }): Promise<void>',
-        description: 'Archive and remove only the caller\'s unsaved editors.',
-        parameters: [{ name: 'request', description: 'exact unbound editor Session identities.' }],
-        returns: 'after archiving and removing private workspace registrations and files.',
-      },
-      {
-        signature: 'async validateCapabilities(releaseId: string, sessionId?: SessionId): Promise<void>',
-        description: 'Check selected server enablement and every pinned MCP signature before execution.',
-        parameters: [{ name: 'releaseId', description: 'trusted immutable release identity.' }, { name: 'sessionId', description: 'verified member Session identity used for MCP authorization.' }],
-      },
-      {
-        signature: 'async releaseMcpTools(releaseId: string, sessionId?: SessionId): Promise<readonly ToolDefinition[]>',
-        description: 'Resolve signature-checked wrappers through the single execution provider.',
-        parameters: [{ name: 'releaseId', description: 'trusted release selected by the scoped runtime.' }, { name: 'sessionId', description: 'verified member Session identity used for MCP authorization.' }],
-        returns: 'release-only tools; every invocation rechecks authorization and current schema.',
-      },
-      {
-        signature: 'conversationFiles(agent: Agent): FileAttachmentRef[]',
-        description: 'List only attachments retained by the invoking live release Session.',
-        parameters: [{ name: 'agent', description: 'trusted executor initiator.' }],
-        returns: 'recorded references, including compacted history.',
-      },
-      {
-        signature: 'readConversationFile(agent: Agent, request: ConversationFileReadRequest, signal: AbortSignal): Promise<ConversationFilePage>',
-        description: 'Read a bounded verified page of this conversation\'s attachment.',
-        parameters: [{ name: 'agent', description: 'trusted live initiator.' }, { name: 'request', description: 'attachment id and bounded text offset/limit.' }, { name: 'signal', description: 'read cancellation.' }],
-        returns: 'verified UTF-8 page; no arbitrary Host path is accepted.',
-      },
-      {
-        signature: 'conversationReport(agent: Agent, name: string, content: string): CloudAgentReport',
-        description: 'Prepare a bounded report for persistence by the invoking tool pipeline.',
-        parameters: [{ name: 'agent', description: 'live release initiator.' }, { name: 'name', description: 'plain filename.' }, { name: 'content', description: 'complete report text.' }],
-        returns: 'durable report metadata without a Host path.',
-      },
-    ],
-  },
-  {
     key: 'commands',
     summary: 'Human-command registry.',
     description: 'Human-command registry. Plain-context definitions are global; definitions registered through a command-injected child of an agent context shadow globals for that agent.',
@@ -873,177 +759,6 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'start', description: 'first surface seq, inclusive.' }, { name: 'end', description: 'last surface seq, inclusive.' }, { name: 'agent', description: 'context whose session is mutated and whose routing options guide summarization.' }, { name: 'signal', description: 'optional cancellation; model-backed implementations must forward it.' }],
         returns: 'the appended event seqs, summary, replaced range, and token accounting.',
         throws: ['when compaction is active or the range is missing, reversed, or unbalanced.'],
-      },
-    ],
-  },
-  {
-    key: 'companyMcp',
-    summary: 'Browser-safe catalog reads, refresh, enablement and discovery.',
-    description: 'Browser-safe catalog reads, refresh, enablement and discovery.',
-    methods: [
-      {
-        signature: '@Remote catalog(): Promise<CompanyMcpCatalog>',
-        description: 'Read the current catalog.',
-        parameters: [],
-        returns: 'servers, tools and the latest refresh failure; never endpoints or headers.',
-      },
-      {
-        signature: '@Remote({ mode: \'stream\' }) follow(signal: AbortSignal): AsyncIterable<CompanyMcpCatalog>',
-        description: 'Follow catalog changes.',
-        parameters: [{ name: 'signal', description: 'subscriber cancellation.' }],
-        returns: 'the current catalog and one snapshot per change.',
-      },
-      {
-        signature: '@Remote refresh(signal: AbortSignal): Promise<CompanyMcpCatalog>',
-        description: 'Refresh the catalog; a failed refresh clears inaccessible servers.',
-        parameters: [{ name: 'signal', description: 'caller cancellation.' }],
-        returns: 'refreshed catalog or empty catalog with `failure`.',
-      },
-      {
-        signature: '@Remote configure(request: { readonly id: CompanyMcpId; readonly enabled: boolean }): Promise<CompanyMcpCatalog>',
-        description: 'Enable or disable one server for this member.',
-        parameters: [{ name: 'request', description: 'server identity and enablement.' }],
-        returns: 'updated catalog.',
-      },
-      {
-        signature: '@Remote discover(request: { readonly id: CompanyMcpId }, signal: AbortSignal): Promise<readonly CompanyMcpTool[]>',
-        description: 'Refresh and read one server\'s tools.',
-        parameters: [{ name: 'request', description: 'server identity.' }, { name: 'signal', description: 'caller cancellation.' }],
-        returns: 'current tools with parameters and fingerprints.',
-      },
-    ],
-  },
-  {
-    key: 'companyMcpProvider',
-    summary: 'Abstract company MCP provider.',
-    description: 'Abstract company MCP provider. Exactly one implementation registers as `ctx.companyMcpProvider`.\n\nImplementations keep endpoints, headers and tokens private, discard inaccessible data after a failed refresh, report unknown or failed upstream outcomes as failures rather than empty results, and emit `company-mcp/changed` after every observable catalog change.',
-    methods: [
-      {
-        signature: 'abstract catalog(subject: WecomMarketSubject): Promise<CompanyMcpCatalog>',
-        description: 'Read a freshly authorized catalog for one verified member.',
-        parameters: [{ name: 'subject', description: 'verified request or Session owner, never browser input.' }],
-        returns: 'servers with enablement, state and tools; `loaded` is false before the first successful refresh.',
-      },
-      {
-        signature: 'abstract refresh(subject: WecomMarketSubject, signal?: AbortSignal): Promise<CompanyMcpCatalog>',
-        description: 'Replace the catalog after validating a complete upstream response.',
-        parameters: [{ name: 'subject', description: 'verified request or Session owner, never browser input.' }, { name: 'signal', description: 'caller cancellation.' }],
-        returns: 'the new catalog, or an empty catalog with `failure` when the refresh failed.',
-      },
-      {
-        signature: 'abstract configure( subject: WecomMarketSubject, request: { readonly id: CompanyMcpId; readonly enabled: boolean }, ): Promise<CompanyMcpCatalog>',
-        description: 'Persist one member’s preference; credentials are deployment configuration, not preferences.',
-        parameters: [{ name: 'subject', description: 'verified request or Session owner, never browser input.' }, { name: 'request', description: 'server identity and enablement.' }],
-        returns: 'the updated catalog.',
-        throws: ['RemoteError `company-mcp/not-found` for an unknown server.'],
-      },
-      {
-        signature: 'abstract discover(subject: WecomMarketSubject, id: CompanyMcpId, signal: AbortSignal): Promise<readonly CompanyMcpTool[]>',
-        description: 'Refresh and read one server\'s current tools for display.',
-        parameters: [{ name: 'subject', description: 'verified request or Session owner, never browser input.' }, { name: 'id', description: 'server identity.' }, { name: 'signal', description: 'caller cancellation.' }],
-        returns: 'current tools with parameters and fingerprints.',
-        throws: ['RemoteError when the refresh fails or the server is unknown, disabled or unavailable.'],
-      },
-      {
-        signature: 'abstract discoverTools(subject: WecomMarketSubject, id: CompanyMcpId): Promise<readonly CompanyMcpTool[]>',
-        description: 'Read one usable server\'s tools after fresh authorization for Agent publication.',
-        parameters: [{ name: 'subject', description: 'verified request or Session owner, never browser input.' }, { name: 'id', description: 'server identity selected by an Agent.' }],
-        returns: 'tools with fingerprints.',
-        throws: ['RemoteError when the server is unauthorized, disabled or unavailable.'],
-      },
-      {
-        signature: 'abstract resolveTool(subject: WecomMarketSubject, name: string): Promise<CompanyMcpResolvedTool | undefined>',
-        description: 'Resolve a model-facing tool for one run.',
-        parameters: [{ name: 'subject', description: 'verified request or Session owner, never browser input.' }, { name: 'name', description: 'model-facing tool name.' }],
-        returns: 'current schema, executable definition and fingerprint, or undefined when no server owns the name.',
-        throws: ['RemoteError when the owning server is disabled or unavailable, or the tool no longer exists.'],
-      },
-      {
-        signature: 'abstract describeTool(subject: WecomMarketSubject, name: string): Promise<CompanyMcpToolRoute | undefined>',
-        description: 'Describe the non-secret route of a model-facing tool.',
-        parameters: [{ name: 'subject', description: 'verified request or Session owner, never browser input.' }, { name: 'name', description: 'model-facing tool name.' }],
-        returns: 'server, raw tool name, description and fingerprint, or undefined when unknown.',
-      },
-      {
-        signature: 'async capabilityCatalog(subject: WecomMarketSubject): Promise<readonly CompanyMcpCapability[]>',
-        description: 'Project the catalog for Agent capability selectors.',
-        parameters: [{ name: 'subject', description: 'verified request or Session owner, never browser input.' }],
-        returns: 'server summaries without schemas.',
-      },
-      {
-        signature: 'async *follow(subject: WecomMarketSubject, signal: AbortSignal): AsyncIterable<CompanyMcpCatalog>',
-        description: 'Stream catalog snapshots: the current one, then one per `company-mcp/changed`, coalescing bursts.',
-        parameters: [{ name: 'subject', description: 'verified request or Session owner, never browser input.' }, { name: 'signal', description: 'subscriber cancellation.' }],
-        returns: 'catalog snapshots until the signal aborts.',
-      },
-    ],
-  },
-  {
-    key: 'companyWecomAuth',
-    summary: 'Required browser login; local revocation stops admission before durable writes.',
-    description: 'Required browser login; local revocation stops admission before durable writes.',
-    methods: [
-      {
-        signature: 'registerResourceProvider(provider: WecomResourceProvider): () => Promise<void>',
-        description: 'Register business grants in the calling plugin\'s lifecycle.',
-        parameters: [{ name: 'provider', description: 'committed resource ownership and explicit action grants.' }],
-        returns: 'a disposer removing all grants contributed by this provider.',
-      },
-      {
-        signature: 'sessionBindings(ids: readonly SessionId[]): RemoteAccessBinding[]',
-        description: 'Build ordinary conversation and Workspace grants for business-owned Sessions.',
-        parameters: [{ name: 'ids', description: 'Session identities already authorized by the calling business provider.' }],
-        returns: 'explicit user operations; deployment settings, filesystem mutation and native openers are excluded.',
-      },
-      {
-        signature: 'ownerScope(member?: CompanyUserPrincipal): CompanyOwnerScope',
-        description: 'Resolve the current Remote caller or trusted tool initiator\'s company ownership scope.',
-        parameters: [{ name: 'member', description: 'authenticated company principal from an access-policy dispatch; omission resolves the caller.' }],
-        returns: 'stable enterprise scope, or `local-owner` outside an enterprise call or initiating Session.',
-        throws: ['WecomAuthError for unsupported non-owner principals.'],
-      },
-      {
-        signature: 'defaultWorkspaceSessions(principal: CompanyUserPrincipal): readonly SessionId[]',
-        description: 'Read the current member\'s default Workspace Session identities for business grants.',
-        parameters: [{ name: 'principal', description: 'authenticated member supplied by the access-policy dispatcher.' }],
-        returns: 'owned Session identities; unknown or mismatched identities return an empty list.',
-      },
-      {
-        signature: 'sessionOwner(sessionId: SessionId): CompanyOwnerScope | undefined',
-        description: 'Resolve retained ownership for a member default Workspace or business-owned Session.',
-        parameters: [{ name: 'sessionId', description: 'tool-initiating or source Session identity.' }],
-        returns: 'stable owner, or undefined when no provider retains ownership; logout does not transfer ownership.',
-      },
-      {
-        signature: 'marketSubject(sessionId?: SessionId): WecomMarketSubject',
-        description: 'Resolve verified WeCom identity for an authenticated request or an owned Session.',
-        parameters: [{ name: 'sessionId', description: 'trusted execution Session; omission uses the Remote caller or tool initiator.' }],
-        returns: 'enterprise-scoped market subject; display names and portal ids are excluded.',
-        throws: ['WecomAuthError when no enabled official WeCom identity owns the operation.'],
-      },
-      {
-        signature: 'async beginLogin(request: ConnectionTrustRequest, browserNonce: string, redirect: string | null): Promise<WecomLoginConfig>',
-        description: 'Begin a durable, browser-bound, single-use login attempt.',
-        parameters: [{ name: 'request', description: 'trusted request authority.' }, { name: 'browserNonce', description: 'random HttpOnly browser binding.' }, { name: 'redirect', description: 'site-local requested destination; unsafe destinations become `/`.' }],
-        returns: 'public identifiers, callback URI and unpredictable state.',
-      },
-      {
-        signature: 'async exchange(request: ConnectionTrustRequest, input: unknown): Promise<WecomLoginResult & { readonly cookie: string }>',
-        description: 'Consume state before exchanging the code with official APIs.',
-        parameters: [{ name: 'request', description: 'callback headers including the initiating browser cookie.' }, { name: 'input', description: 'untrusted callback fields.' }],
-        returns: 'persisted member session and signed cookie; failures require a fresh login.',
-      },
-      {
-        signature: 'getCurrentSession(request: ConnectionTrustRequest): WecomSessionView | null',
-        description: 'Resolve only enabled, unexpired, unrevoked local sessions for this deployment.',
-        parameters: [{ name: 'request', description: 'browser cookie and authority.' }],
-        returns: 'credential-free member view, or null when admission is denied.',
-      },
-      {
-        signature: 'async logout(request: ConnectionTrustRequest): Promise<void>',
-        description: 'Revoke the local session and its Peer\'s streams before persistence.',
-        parameters: [{ name: 'request', description: 'browser cookie; absent or invalid cookies are harmless.' }],
-        returns: 'completed durable revocation; storage failure keeps in-process admission denied.',
       },
     ],
   },
@@ -4775,28 +4490,28 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the updated Workspace projection.',
       },
       {
-        signature: '@Remote(\'archiveSession\') archiveSession(request: WorkspaceArchiveSessionRequest): Promise<WorkspaceArchiveValue>',
+        signature: '@Remote(\'archiveSession\') async archiveSession(request: WorkspaceArchiveSessionRequest): Promise<WorkspaceArchiveValue>',
         description: 'Hide one known Session from Workspace grouping surfaces.',
         parameters: [{ name: 'request', description: 'Session identity to archive.' }],
-        returns: 'the complete resulting archive set.',
+        returns: 'the resulting archive set, limited to Sessions the caller may see.',
       },
       {
-        signature: '@Remote(\'unarchiveSession\') unarchiveSession(request: WorkspaceUnarchiveSessionRequest): Promise<WorkspaceArchiveValue>',
+        signature: '@Remote(\'unarchiveSession\') async unarchiveSession(request: WorkspaceUnarchiveSessionRequest): Promise<WorkspaceArchiveValue>',
         description: 'Restore one archived Session to Workspace grouping surfaces.',
         parameters: [{ name: 'request', description: 'Session identity to unarchive.' }],
-        returns: 'the complete resulting archive set.',
+        returns: 'the resulting archive set, limited to Sessions the caller may see.',
       },
       {
-        signature: '@Remote(\'pinSession\') pinSession(request: WorkspacePinSessionRequest): Promise<WorkspacePinValue>',
+        signature: '@Remote(\'pinSession\') async pinSession(request: WorkspacePinSessionRequest): Promise<WorkspacePinValue>',
         description: 'Surface one known unarchived Session ahead of unpinned Sessions.',
         parameters: [{ name: 'request', description: 'Session identity to pin.' }],
-        returns: 'the complete resulting pin set, most recently pinned first.',
+        returns: 'the resulting pin set, most recently pinned first, limited to Sessions the caller may see.',
       },
       {
-        signature: '@Remote(\'unpinSession\') unpinSession(request: WorkspaceUnpinSessionRequest): Promise<WorkspacePinValue>',
+        signature: '@Remote(\'unpinSession\') async unpinSession(request: WorkspaceUnpinSessionRequest): Promise<WorkspacePinValue>',
         description: 'Remove one Session\'s pin without changing its saved Session order.',
         parameters: [{ name: 'request', description: 'Session identity to unpin.' }],
-        returns: 'the complete resulting pin set, most recently pinned first.',
+        returns: 'the resulting pin set, most recently pinned first, limited to Sessions the caller may see.',
       },
       {
         signature: '@Remote({ mode: \'stream\' }) async *follow(signal: AbortSignal): AsyncIterable<WorkspaceFollowFrame>',
@@ -6081,102 +5796,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ClientArtifactBaseline {\n    readonly path: string;\n    readonly mtimeMs: number;\n    readonly ctimeMs: number;\n    readonly size: number;\n}',
   },
   {
-    name: 'CloudAgentCapabilities',
-    declaration: 'export interface CloudAgentCapabilities {\n    readonly mcpTools: readonly {\n        readonly name: string;\n        readonly description: string;\n    }[];\n    readonly mcpServers: readonly CloudAgentMcpServer[];\n    readonly skills: readonly {\n        readonly name: string;\n        readonly description: string;\n    }[];\n}',
-  },
-  {
-    name: 'CloudAgentCatalog',
-    declaration: 'export interface CloudAgentCatalog {\n    readonly conversations: readonly CloudAgentConversation[];\n    readonly mine: readonly CloudAgentRecord[];\n    readonly published: readonly CloudAgentPublicEntry[];\n    readonly usage: readonly CloudAgentUsageEntry[];\n    readonly models: ModelCatalog;\n    readonly capabilities: CloudAgentCapabilities;\n}',
-  },
-  {
-    name: 'CloudAgentConversation',
-    declaration: 'export interface CloudAgentConversation {\n    readonly sessionId: SessionId;\n    readonly agentId: CloudAgentId | null;\n    readonly role: \'authoring\' | \'usage\';\n    readonly releaseId?: CloudAgentReleaseId | undefined;\n    readonly ownerId?: CloudAgentOwnerId | undefined;\n    readonly deletedAt?: number | undefined;\n    readonly creationPreset?: string | undefined;\n    readonly runPreset?: string | undefined;\n    readonly effectiveDigest?: string | undefined;\n}',
-  },
-  {
-    name: 'CloudAgentDraft',
-    declaration: 'export interface CloudAgentDraft {\n    readonly name: string;\n    readonly description: string;\n    readonly instructions: string;\n    readonly provider: string;\n    readonly model: string;\n    readonly mcpTools?: readonly string[] | undefined;\n    readonly mcpServers?: readonly CompanyMcpId[] | undefined;\n    readonly skills?: readonly string[] | undefined;\n}',
-  },
-  {
-    name: 'CloudAgentId',
-    declaration: 'export type CloudAgentId = Branded<\'cloud-agent-id\'>;',
-  },
-  {
-    name: 'CloudAgentMcpBinding',
-    declaration: 'export interface CloudAgentMcpBinding {\n    readonly name: string;\n    readonly fingerprint: string;\n}',
-  },
-  {
-    name: 'CloudAgentMcpServer',
-    declaration: 'export type CloudAgentMcpServer = CompanyMcpCapability;',
-  },
-  {
-    name: 'CloudAgentOwnerId',
-    declaration: 'export type CloudAgentOwnerId = Branded<\'cloud-agent-owner-id\'>;',
-  },
-  {
-    name: 'CloudAgentPublicEntry',
-    declaration: 'export interface CloudAgentPublicEntry {\n    readonly id: CloudAgentId;\n    readonly ownerId: CloudAgentOwnerId;\n    readonly release: CloudAgentRelease;\n}',
-  },
-  {
-    name: 'CloudAgentPublishRequest',
-    declaration: 'export interface CloudAgentPublishRequest extends CloudAgentRevisionRequest {\n    readonly visibility?: CloudAgentVisibility | undefined;\n}',
-  },
-  {
-    name: 'CloudAgentRecord',
-    declaration: 'export interface CloudAgentRecord {\n    readonly id: CloudAgentId;\n    readonly ownerId: CloudAgentOwnerId;\n    readonly revision: number;\n    readonly draft: CloudAgentDraft;\n    readonly draftMcpBindings?: readonly CloudAgentMcpBinding[] | undefined;\n    readonly draftSkillSnapshots?: readonly CloudAgentSkillSnapshot[] | undefined;\n    readonly draftCapabilityPreset?: string | undefined;\n    readonly releases: readonly CloudAgentRelease[];\n    readonly publishedReleaseId: CloudAgentReleaseId | null;\n    readonly createdAt: number;\n    readonly updatedAt: number;\n    readonly deletedAt?: number | undefined;\n    readonly sourceSessionId?: SessionId | undefined;\n    readonly sourceThroughSeq?: number | undefined;\n    readonly lastAuthoringRequestId?: string | undefined;\n}',
-  },
-  {
-    name: 'CloudAgentRelease',
-    declaration: 'export interface CloudAgentRelease {\n    readonly id: CloudAgentReleaseId;\n    readonly kind: \'published\' | \'preview\';\n    readonly version: number;\n    readonly draftRevision: number;\n    readonly definition: CloudAgentDraft;\n    readonly createdAt: number;\n    readonly skillSnapshots?: readonly CloudAgentSkillSnapshot[] | undefined;\n    readonly mcpBindings?: readonly CloudAgentMcpBinding[] | undefined;\n    readonly capabilityPreset?: string | undefined;\n    readonly visibility?: CloudAgentVisibility | undefined;\n    readonly source?: CloudAgentReleaseSource | undefined;\n    readonly digest?: string | undefined;\n}',
-  },
-  {
-    name: 'CloudAgentReleaseId',
-    declaration: 'export type CloudAgentReleaseId = Branded<\'cloud-agent-release-id\'>;',
-  },
-  {
-    name: 'CloudAgentReleaseSource',
-    declaration: 'export interface CloudAgentReleaseSource {\n    readonly sessionId: SessionId;\n    readonly throughSeq: number;\n    readonly preset?: string | undefined;\n    readonly permission?: string | undefined;\n}',
-  },
-  {
-    name: 'CloudAgentReport',
-    declaration: 'export interface CloudAgentReport {\n    readonly name: string;\n    readonly content: string;\n    readonly mediaType: string;\n    readonly bytes: number;\n}',
-  },
-  {
-    name: 'CloudAgentRevisionRequest',
-    declaration: 'export interface CloudAgentRevisionRequest {\n    readonly authoringSessionId?: SessionId | undefined;\n    readonly id: CloudAgentId;\n    readonly expectedRevision: number;\n}',
-  },
-  {
-    name: 'CloudAgentSession',
-    declaration: 'export interface CloudAgentSession {\n    readonly sessionId: SessionId;\n    readonly releaseId: CloudAgentReleaseId;\n}',
-  },
-  {
-    name: 'CloudAgentSkillResource',
-    declaration: 'export interface CloudAgentSkillResource {\n    readonly path: string;\n    readonly base64: string;\n}',
-  },
-  {
-    name: 'CloudAgentSkillSnapshot',
-    declaration: 'export interface CloudAgentSkillSnapshot {\n    readonly name: string;\n    readonly description: string;\n    readonly content: string;\n    readonly resources: readonly CloudAgentSkillResource[];\n}',
-  },
-  {
-    name: 'CloudAgentStartRequest',
-    declaration: 'export interface CloudAgentStartRequest {\n    readonly authoringSessionId?: SessionId | undefined;\n    readonly id: CloudAgentId;\n    readonly releaseId: CloudAgentReleaseId;\n    readonly runPreset?: string | undefined;\n    readonly provider?: string | undefined;\n    readonly model?: string | undefined;\n}',
-  },
-  {
-    name: 'CloudAgentUpdateRequest',
-    declaration: 'export interface CloudAgentUpdateRequest {\n    readonly authoringSessionId?: SessionId | undefined;\n    readonly id: CloudAgentId;\n    readonly expectedRevision: number;\n    readonly draft: CloudAgentDraft;\n}',
-  },
-  {
-    name: 'CloudAgentUsageEntry',
-    declaration: 'export interface CloudAgentUsageEntry {\n    readonly agentId: CloudAgentId;\n    readonly ownerId: CloudAgentOwnerId;\n    readonly name: string;\n    readonly status: CloudAgentUsageStatus;\n    readonly release?: CloudAgentRelease | undefined;\n}',
-  },
-  {
-    name: 'CloudAgentUsageStatus',
-    declaration: 'export type CloudAgentUsageStatus = \'available\' | \'updated\' | \'withdrawn\' | \'deleted\' | \'access-lost\' | \'disabled\';',
-  },
-  {
-    name: 'CloudAgentVisibility',
-    declaration: 'export type CloudAgentVisibility = \'public\' | \'private\';',
-  },
-  {
     name: 'CollectedOutput',
     declaration: 'export interface CollectedOutput {\n    text: string;\n    truncated: boolean;\n    spillPath?: string;\n}',
   },
@@ -6251,22 +5870,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'CompactionTrigger',
     declaration: 'export type CompactionTrigger = \'pressure\' | \'context-overflow\';',
-  },
-  {
-    name: 'CompanyMcpResolvedTool',
-    declaration: 'export interface CompanyMcpResolvedTool {\n    readonly schema: ToolSchema;\n    readonly tool: ToolDefinition;\n    readonly fingerprint: string;\n}',
-  },
-  {
-    name: 'CompanyMcpToolRoute',
-    declaration: 'export interface CompanyMcpToolRoute {\n    readonly serverId: CompanyMcpId;\n    readonly rawName: string;\n    readonly description: string;\n    readonly fingerprint: string;\n}',
-  },
-  {
-    name: 'CompanyOwnerScope',
-    declaration: 'export type CompanyOwnerScope = Branded<\'company-owner-scope\'>;',
-  },
-  {
-    name: 'CompanyUserPrincipal',
-    declaration: 'export type CompanyUserPrincipal = WecomUserPrincipal | GatewayUserPrincipal;',
   },
   {
     name: 'CompositionRowEnablement',
@@ -6367,14 +5970,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ContinuableCreateSpec',
     declaration: 'export interface ContinuableCreateSpec {\n    readonly seed?: readonly SessionEvent[];\n}',
-  },
-  {
-    name: 'ConversationFilePage',
-    declaration: 'export interface ConversationFilePage {\n    readonly attachment: FileAttachmentRef;\n    readonly offset: number;\n    readonly text: string;\n    readonly nextOffset: number | null;\n    readonly totalChars: number;\n}',
-  },
-  {
-    name: 'ConversationFileReadRequest',
-    declaration: 'export interface ConversationFileReadRequest {\n    readonly attachmentId: AttachmentIdType;\n    readonly offset?: number;\n    readonly limit?: number;\n}',
   },
   {
     name: 'CordisDynamicPackageId',
@@ -6923,10 +6518,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'FsWriteOutcome',
     declaration: 'export interface FsWriteOutcome {\n    operation: \'create\' | \'update\';\n    version: FsVersion;\n    before: string | null;\n    after: string;\n}',
-  },
-  {
-    name: 'GatewayUserPrincipal',
-    declaration: 'export interface GatewayUserPrincipal {\n    readonly kind: \'gateway-user\';\n    readonly identityId: WecomIdentityId;\n    readonly userId: WecomUserId;\n    readonly displayName: string;\n    readonly role: WecomUserRole;\n}',
   },
   {
     name: 'GenerateOptions',
@@ -10359,50 +9950,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WebUpgradeRoute',
     declaration: 'export interface WebUpgradeRoute {\n    path: string;\n    handler: (req: IncomingMessage, socket: Duplex, head: Buffer) => void | Promise<void>;\n}',
-  },
-  {
-    name: 'WecomCorpId',
-    declaration: 'export type WecomCorpId = Branded<\'wecom-corp-id\'>;',
-  },
-  {
-    name: 'WecomIdentityId',
-    declaration: 'export type WecomIdentityId = Branded<\'wecom-identity-id\'>;',
-  },
-  {
-    name: 'WecomLoginAttemptId',
-    declaration: 'export type WecomLoginAttemptId = Branded<\'wecom-login-attempt-id\'>;',
-  },
-  {
-    name: 'WecomLoginConfig',
-    declaration: 'export interface WecomLoginConfig {\n    readonly corpId: WecomCorpId;\n    readonly agentId: string;\n    readonly redirectUri: string;\n    readonly state: string;\n    readonly attemptId: WecomLoginAttemptId;\n    readonly expiresAt: number;\n}',
-  },
-  {
-    name: 'WecomLoginResult',
-    declaration: 'export interface WecomLoginResult {\n    readonly session: WecomSessionView;\n    readonly redirect: string;\n}',
-  },
-  {
-    name: 'WecomMarketSubject',
-    declaration: 'export interface WecomMarketSubject {\n    readonly scope: CompanyOwnerScope;\n    readonly corpId: WecomCorpId;\n    readonly sub: WecomUserId;\n}',
-  },
-  {
-    name: 'WecomResourceProvider',
-    declaration: 'export interface WecomResourceProvider {\n    readonly defaultWorkspaceCommands?: readonly string[];\n    bindings(principal: CompanyUserPrincipal): readonly RemoteAccessBinding[];\n    sessionOwner(sessionId: SessionId): CompanyOwnerScope | undefined;\n}',
-  },
-  {
-    name: 'WecomSessionView',
-    declaration: 'export interface WecomSessionView {\n    readonly identityId: WecomIdentityId;\n    readonly corpId: WecomCorpId;\n    readonly userId: WecomUserId;\n    readonly role: WecomUserRole;\n    readonly displayName?: string;\n    readonly logoutUrl?: string;\n    readonly expiresAt: number;\n}',
-  },
-  {
-    name: 'WecomUserId',
-    declaration: 'export type WecomUserId = Branded<\'wecom-user-id\'>;',
-  },
-  {
-    name: 'WecomUserPrincipal',
-    declaration: 'export interface WecomUserPrincipal {\n    readonly kind: \'wecom-user\';\n    readonly identityId: WecomIdentityId;\n    readonly corpId: WecomCorpId;\n    readonly userId: WecomUserId;\n    readonly role: WecomUserRole;\n}',
-  },
-  {
-    name: 'WecomUserRole',
-    declaration: 'export type WecomUserRole = \'admin\' | \'user\';',
   },
   {
     name: 'WeeklyInput',

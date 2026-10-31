@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/company/knowledge/README.md
+/:
+  en: e40eed994ccd2e9a
+  zh: 0374d2405c613f48
+/deepseek-ai-dsh-company-knowledge:
+  en: ddd8082bb135dc79
+  zh: 5b72b7e6847beb3f
+/deepseek-ai-dsh-company-knowledge/summary:
+  en: 732b95f15b06d7e3
+  zh: 3ea05ceb4ce0095b
+/deepseek-ai-dsh-company-knowledge/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 82ecb7d284fa0caa
+/deepseek-ai-dsh-company-knowledge/use-this-package:
+  en: 45b61d142a6305d4
+  zh: 0810334babcec57c
+/deepseek-ai-dsh-company-knowledge/understand-the-implementation:
+  en: cabd55a60432da11
+  zh: d7c68ea184d2eb53
+/deepseek-ai-dsh-company-knowledge/further-exploration:
+  en: 2d1d06e26aab174d
+  zh: 540c561ee4fab7dd
+/deepseek-ai-dsh-company-knowledge/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-company-knowledge/model-experience/approved-retrieval-evidence:
+  en: c08d94deb43a4b38
+  zh: c3ed3ba997ffa505
+/deepseek-ai-dsh-company-knowledge/model-experience/approved-retrieval-evidence/what-the-model-sees:
+  en: 6c335b966eda7b8d
+  zh: 41fa00e9c6ba6a99
+/deepseek-ai-dsh-company-knowledge/model-experience/approved-retrieval-evidence/token-effect:
+  en: 5001284a19b79e4d
+  zh: c8461983f98bb913
+/deepseek-ai-dsh-company-knowledge/model-experience/approved-retrieval-evidence/kv-cache-effect:
+  en: c58703bfb461dbb0
+  zh: cbc86ed9732b98bc
+/deepseek-ai-dsh-company-knowledge/known-limitations-and-deferred-work:
+  en: dee814c9d8b922a9
+  zh: 17d61a7c96332edc
+/deepseek-ai-dsh-company-knowledge/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 6c5f9788c6536776

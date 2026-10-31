@@ -33,6 +33,7 @@ import { PluginManagerController } from './manager-store.ts'
 import { en, ja, es, fr, de, ru, pt, zh, type PluginManagerLocaleKey } from './locales.ts'
 import { createNavigationStore } from './navigation-store.ts'
 import type {} from './slot-contract.ts'
+import { z } from 'zod'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -54,8 +55,10 @@ declare module '@deepseek-ai/cordis' {
        * @param packageName - npm package name of the bundle.
        */
       openBundle(packageName: string): void
-      /** Open an official plugin item without changing the current Session.
-       * @param id - registered plugin item identity.
+      /**
+       * Open an official plugin item without changing the current Session.
+       * An absent item displays the plugin list after loading.
+       * @param id - stable `plugins.item` registration id.
        */
       openItem(id: string): void
       /** Open the Plugins main list without opening a dialog or changing the current Session. */
@@ -80,6 +83,9 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
+/** Host `visibleItems` presentation embedded in the index; an absent list keeps the full manager. */
+const Presentation = z.object({ visibleItems: z.array(z.string().min(1)).optional() })
+
 /** Dictionary namespace owned by this plugin. */
 export const NS = 'pluginManager'
 
@@ -96,6 +102,7 @@ export const inject = ['slots', 'locale', 'remote', 'remote.pluginManager', 'rem
  * @param ctx - the browser plugin context.
  */
 export function apply(ctx: ClientContext): void {
+  const presentation = Presentation.parse((globalThis as { __DSH_PLUGIN_PRESENTATION__?: unknown }).__DSH_PLUGIN_PRESENTATION__ ?? {})
   ctx.effect(() => ctx.locale.register(NS, { zh, en, ja, es, fr, de, ru, pt }), 'ui-plugin-manager: dictionaries')
   const t = ctx.locale.bind(NS)
   const controller = new PluginManagerController(ctx)
@@ -138,7 +145,7 @@ export function apply(ctx: ClientContext): void {
         key: PANEL_ID,
         locale: NS,
         store,
-        inject: () => ({ ...face, createHeaderRef: createPluginHeaderRef }),
+        inject: () => ({ ...face, createHeaderRef: createPluginHeaderRef, ...presentation }),
         children: {
           'plugins.add.actions': { kind: 'list', scope: 'root' },
           'plugins.tab': { kind: 'list', scope: 'root' },
@@ -160,15 +167,15 @@ export function apply(ctx: ClientContext): void {
           instance.actions.setTab('installed')
           instance.actions.setView({ kind: 'list' })
         },
-        openItem: (id: string) => {
-          ctx.layout.selectPanel(PANEL_ID)
-          instance.actions.setTab('installed')
-          instance.actions.setView({ kind: 'item', id })
-        },
         openBundle: (packageName: string) => {
           ctx.layout.selectPanel(PANEL_ID)
           instance.actions.setTab('installed')
           instance.actions.setView({ kind: 'package', name: packageName })
+        },
+        openItem: (id: string) => {
+          ctx.layout.selectPanel(PANEL_ID)
+          instance.actions.setTab('installed')
+          instance.actions.setView({ kind: 'item', id })
         },
       })
       yield () => { void disposeNavigation() }

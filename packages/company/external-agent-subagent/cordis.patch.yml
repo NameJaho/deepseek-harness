@@ -1,0 +1,7 @@
+# Optional bundle only. Host deployment overlays supply private agent configuration.
+- insert:
+    - id: company-external-agent-subagent
+      name: '@deepseek-ai/dsh-company-external-agent-subagent'
+      config:
+        agents: !!js JSON.parse(process.env.DSH_COMPANY_EXTERNAL_AGENTS ?? '[]')
+        registerTools: true

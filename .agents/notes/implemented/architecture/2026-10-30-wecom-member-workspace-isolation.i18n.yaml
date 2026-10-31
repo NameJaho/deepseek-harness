@@ -4,7 +4,7 @@
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-30-wecom-member-workspace-isolation.md
 /agent-note-wecom-member-specific-default-workspaces:
   en: f79e49ff177c4825
-  zh: 86007e234268b1a2
+  zh: 14a7173de131dc02
 /agent-note-wecom-member-specific-default-workspaces/problem:
   en: a83d49098f4ae5a4
   zh: 50d3e4d0ba78ff5e

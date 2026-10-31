@@ -1,6 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-company-cloud-agent",
   "version": "0.2.2-alpha.2",
+  "private": true,
   "description": "Company Cloud Agent drafts, immutable releases, public directory and isolated per-session execution",
   "type": "module",
   "main": "lib/index.js",
@@ -28,8 +29,8 @@
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./src/*": "./src/*",
-    "./locale/*.json": "./locale/*.json",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
   "dsh": {
     "bundle": {
@@ -62,15 +63,14 @@
     "zod": "4.4.3"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-company-mcp-provider": "workspace:*",
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-session": "workspace:*",
     "@deepseek-ai/dsh-scope": "workspace:*",
     "@deepseek-ai/dsh-storage-domain": "workspace:*",
-    "@deepseek-ai/dsh-tools": "workspace:*"
+    "@deepseek-ai/dsh-tools": "workspace:*",
+    "@deepseek-ai/dsh-company-mcp-provider": "workspace:*"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-company-mcp-provider": "workspace:*",
     "@deepseek-ai/dsh-company-wecom-auth": "workspace:*",
     "@deepseek-ai/dsh-commands": "workspace:*",
     "@deepseek-ai/dsh-attachment": "workspace:*",
@@ -110,7 +110,9 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "@deepseek-ai/dsh-permission-presets": "workspace:*",
-    "@deepseek-ai/dsh-client-ui-permission-presets": "workspace:*"
+    "@deepseek-ai/dsh-client-ui-permission-presets": "workspace:*",
+    "@deepseek-ai/dsh-company-knowledge": "workspace:*",
+    "@deepseek-ai/dsh-company-mcp-provider": "workspace:*"
   },
   "files": [
     "locale/*.json",
@@ -122,13 +124,5 @@
     "lib/typert.host.d.ts",
     "lib/typert.remote-client.js",
     "lib/typert.remote-client.d.ts"
-  ],
-  "publishConfig": {
-    "access": "public"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
-    "directory": "packages/company/cloud-agent"
-  }
+  ]
 }

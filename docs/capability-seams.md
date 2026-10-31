@@ -322,6 +322,10 @@ flowchart LR
   svc_cordisInspect["ctx.cordisInspect<br/>Dynamic Cordis inspect registry"]
   pkg_experimental_liveshare["experimental-liveshare"]
   svc_liveshareShares["ctx.liveshareShares<br/>Owner share management Remote"]
+  pkg_company_knowledge["company-knowledge"]
+  svc_companyKnowledge["ctx.companyKnowledge<br/>Company knowledge retrieval"]
+  pkg_company_external_agent_subagent["company-external-agent-subagent"]
+  svc_externalAgentSubagents["ctx.externalAgentSubagents<br/>External agent subagent providers"]
   pkg_action_cards --> svc_actionCards
   pkg_agent --> svc_agents
   pkg_agent_default_model --> svc_agentDefaultModel
@@ -357,6 +361,8 @@ flowchart LR
   pkg_compaction_basic --> svc_compaction
   pkg_compaction_tool_result_pruner --> svc_toolResultPruner
   pkg_company_cloud_agent --> svc_cloudAgents
+  pkg_company_external_agent_subagent --> svc_externalAgentSubagents
+  pkg_company_knowledge --> svc_companyKnowledge
   pkg_company_mcp_provider --> svc_companyMcp
   pkg_company_mcp_provider --> svc_companyMcpProvider
   pkg_company_wecom_auth --> svc_companyWecomAuth
@@ -516,6 +522,7 @@ flowchart LR
   svc_clientModules --> pkg_client_hmr
   svc_cloudAgents --> pkg_company_cloud_agent_runtime
   svc_compaction --> pkg_compaction_basic
+  svc_companyKnowledge --> pkg_company_cloud_agent
   svc_companyMcp --> pkg_company_cloud_agent
   svc_companyMcpProvider --> pkg_company_cloud_agent
   svc_companyMcpProvider --> pkg_company_mcp_provider
@@ -777,5 +784,11 @@ flowchart LR
 | `ctx.dynamicCordisRunner` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | Owns the in-memory definition registry, the vm sandbox for host halves, and the request-run round trip; browser pages reach the same service over the wire through its remote namespace. |
 | `ctx.cordisInspect` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | Registers host inspect providers, mirrors the client provider manifest, and routes client queries through the dynamic Cordis transport. |
 | `ctx.liveshareShares` | `service` | [`experimental-liveshare`](../packages/experimental/liveshare) | - | - | - | Publishes the owner share-management operations as one Typert Remote namespace that the owner client face calls; every method delegates to the same operations the same-origin routes used. |
+| `ctx.companyWecomAuth` | `service` | [`company-wecom-auth`](../packages/company/wecom-auth) | - | [`company-cloud-agent`](../packages/company/cloud-agent) | - | Owns WeCom sign-in, member principals and member default Workspaces; Cloud Agent reads the signed-in member to scope catalogs and groups. |
+| `ctx.companyMcpProvider` | `seam` | [`company-mcp-provider`](../packages/company/mcp-provider) | [`company-mcp-provider`](../packages/company/mcp-provider) | [`company-mcp-provider`](../packages/company/mcp-provider), [`company-cloud-agent`](../packages/company/cloud-agent) | - | The only Host path that lists, enables and executes company MCP tools; the HTTP adapter talks to the external gateway. |
+| `ctx.companyMcp` | `service` | [`company-mcp-provider`](../packages/company/mcp-provider) | - | - | - | Publishes the provider catalog and enablement to the browser without gateway URLs, headers or upstream error bodies. |
+| `ctx.companyKnowledge` | `service` | [`company-knowledge`](../packages/company/knowledge) | - | [`company-cloud-agent`](../packages/company/cloud-agent) | - | Owns approved knowledge sources and validated HTTP retrieval; Cloud Agent releases retain a space fingerprint and search only through it. |
+| `ctx.cloudAgents` | `service` | [`company-cloud-agent`](../packages/company/cloud-agent) | - | [`company-cloud-agent-runtime`](../packages/company/cloud-agent-runtime) | - | Owns Cloud Agent authoring, immutable releases and shared use groups; the runtime pins each Session to its release tools and prompt. |
+| `ctx.externalAgentSubagents` | `service` | [`company-external-agent-subagent`](../packages/company/external-agent-subagent) | - | - | - | Registers one subagent backend per configured external app and keeps live-only run records; the normal delegation tool selects the backend. |
 
 Maintenance mode: hybrid: services are discovered from Cordis declarations; interface/implementation/consumer roles are classified in `scripts/gen-doc-graphs.ts` with a completeness guard.

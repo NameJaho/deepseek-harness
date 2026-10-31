@@ -986,6 +986,53 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'service',
     note: 'Publishes the owner share-management operations as one Typert Remote namespace that the owner client face calls; every method delegates to the same operations the same-origin routes used.',
   },
+  {
+    key: 'companyWecomAuth',
+    pkg: 'company-wecom-auth',
+    title: 'WeCom member login',
+    mode: 'service',
+    consumers: ['company-cloud-agent'],
+    note: 'Owns WeCom sign-in, member principals and member default Workspaces; Cloud Agent reads the signed-in member to scope catalogs and groups.',
+  },
+  {
+    key: 'companyMcpProvider',
+    pkg: 'company-mcp-provider',
+    title: 'Company MCP provider',
+    mode: 'seam',
+    implementations: ['company-mcp-provider'],
+    consumers: ['company-mcp-provider', 'company-cloud-agent'],
+    note: 'The only Host path that lists, enables and executes company MCP tools; the HTTP adapter talks to the external gateway.',
+  },
+  {
+    key: 'companyMcp',
+    pkg: 'company-mcp-provider',
+    title: 'Company MCP catalog Remote',
+    mode: 'service',
+    note: 'Publishes the provider catalog and enablement to the browser without gateway URLs, headers or upstream error bodies.',
+  },
+  {
+    key: 'companyKnowledge',
+    pkg: 'company-knowledge',
+    title: 'Company knowledge retrieval',
+    mode: 'service',
+    consumers: ['company-cloud-agent'],
+    note: 'Owns approved knowledge sources and validated HTTP retrieval; Cloud Agent releases retain a space fingerprint and search only through it.',
+  },
+  {
+    key: 'cloudAgents',
+    pkg: 'company-cloud-agent',
+    title: 'Cloud Agent catalog and releases',
+    mode: 'service',
+    consumers: ['company-cloud-agent-runtime'],
+    note: 'Owns Cloud Agent authoring, immutable releases and shared use groups; the runtime pins each Session to its release tools and prompt.',
+  },
+  {
+    key: 'externalAgentSubagents',
+    pkg: 'company-external-agent-subagent',
+    title: 'External agent subagent providers',
+    mode: 'service',
+    note: 'Registers one subagent backend per configured external app and keeps live-only run records; the normal delegation tool selects the backend.',
+  },
 ]
 
 function generatedHeader(title: string): string[] {

@@ -4,6 +4,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
+import type {} from '@deepseek-ai/dsh-host-webserver'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -19,6 +20,8 @@ export interface Config {
   registryProbeTimeoutMs: number
   /** Lifetime of a winning registry or unavailable result. */
   registryProbeCacheTtlMs: number
+  /** When present, the Plugins page shows only these `plugins.item` ids; absent keeps the full manager. */
+  visibleItems?: string[] | undefined
 }
 
 /** Compares public registry responses on the Host; the Client owns the initial selection. */
@@ -27,6 +30,8 @@ export default class PluginRegistryProbe extends TypertRemoteService {
     registryProbeEnabled: z.boolean().default(true),
     registryProbeTimeoutMs: z.natural().min(1).max(MAX_TIMER_DELAY_MS).default(1500),
     registryProbeCacheTtlMs: z.natural().default(300000),
+    // Arrays default to [] in schemastery; an absent list must stay absent so the full manager renders.
+    visibleItems: (z.array(z.string().min(1)) as z<string[] | undefined>).default(undefined),
   })
 
   private readonly lifetime = new AbortController()
@@ -35,6 +40,13 @@ export default class PluginRegistryProbe extends TypertRemoteService {
 
   constructor(ctx: Context, private readonly config: Config) {
     super(ctx, 'pluginRegistryProbe')
+    // Every page reads the same presentation; it does not vary by Peer.
+    ctx.inject(['webServer'], (web) => {
+      web.on('webserver/index-inject', (table) => {
+        table.push({ kind: 'global', name: '__DSH_PLUGIN_PRESENTATION__',
+          value: config.visibleItems === undefined ? {} : { visibleItems: config.visibleItems } })
+      })
+    })
     ctx.effect(() => async () => {
       this.lifetime.abort()
       await this.pending

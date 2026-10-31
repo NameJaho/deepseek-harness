@@ -1,6 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-company-cloud-agent-runtime",
   "version": "0.2.2-alpha.2",
+  "private": true,
   "description": "Scoped literal Cloud Agent prompts and release-scoped tool policies",
   "type": "module",
   "main": "lib/index.js",
@@ -12,8 +13,8 @@
       "default": "./lib/index.js"
     },
     "./src/*": "./src/*",
-    "./locale/*.json": "./locale/*.json",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
   "scripts": {
     "bundle": "tsdown"
@@ -41,13 +42,5 @@
     "locale/*.json",
     "lib/index.js",
     "lib/types/**/*.d.ts"
-  ],
-  "publishConfig": {
-    "access": "public"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
-    "directory": "packages/company/cloud-agent-runtime"
-  }
+  ]
 }

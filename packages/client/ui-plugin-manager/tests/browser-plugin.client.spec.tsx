@@ -119,6 +119,10 @@ describe('ui-plugin-manager browser plugin', () => {
     b.ctx.pluginNavigation.openBundle('dsh-navigation-test')
     expect(b.panelInfo.getSnapshot().activePanelId).toBe(PANEL_ID)
     expect(navigation.getSnapshot()).toEqual({ tab: 'installed', view: { kind: 'package', name: 'dsh-navigation-test' } })
+    assert(navigation.actions.setTab)
+    navigation.actions.setTab('fixture-discover')
+    b.ctx.pluginNavigation.openItem('fixture-mcp')
+    expect(navigation.getSnapshot()).toEqual({ tab: 'installed', view: { kind: 'item', id: 'fixture-mcp' } })
     b.selectPanel(null)
     expect(navigation.getSnapshot()).toEqual({ tab: 'installed', view: { kind: 'list' } })
     b.selectPanel(PANEL_ID)
@@ -131,6 +135,21 @@ describe('ui-plugin-manager browser plugin', () => {
     removeRoot()
     b.selectPanel(null)
     expect(navigation.getSnapshot()).toEqual({ tab: 'installed', view: { kind: 'package', name: 'dsh-navigation-test' } })
+  })
+
+  it('hands the Host-selected item list from the index to the page and omits it by default', async () => {
+    const b = await bench()
+    const removeRoot = declare(b.slots)
+    const full = b.ctx.plugin({ inject: [...inject], apply })
+    await full.await()
+    expect(b.slots.entries('main')[0]!.inject!()).not.toHaveProperty('visibleItems')
+    await full.dispose()
+    removeRoot()
+    vi.stubGlobal('__DSH_PLUGIN_PRESENTATION__', { visibleItems: ['fixture-mcp'] })
+    onTestFinished(() => { vi.unstubAllGlobals() })
+    declare(b.slots)
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    expect(b.slots.entries('main')[0]!.inject!()).toMatchObject({ visibleItems: ['fixture-mcp'] })
   })
 
   it('opens the Plugins list from another panel and resets bundle details without opening installation', async () => {
