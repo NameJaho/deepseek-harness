@@ -41,6 +41,8 @@ kind: "package-bundle"
 <a id="understand-the-implementation"></a>
 ## 理解实现
 
+业务目录可通过 `marketSubject()` 获取已验证调用者或 Session 持久化所有者的 `CompanyMarketSubject`。官方企微和可信门户身份保持分离；[MCP 市场 Provider](../mcp-provider/README.zh.md)解析两者的 HR 映射，不让浏览器传入身份参数。
+
 <details>
 <summary>实现内部 — 点击展开</summary>
 

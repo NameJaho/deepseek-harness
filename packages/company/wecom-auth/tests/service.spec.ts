@@ -16,7 +16,7 @@ import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-
 import Auth, { Config } from '../src/index.ts'
 import { WecomOfficial } from '../src/upstream.ts'
 import type {} from '../src/types.ts'
-import type { WecomLoginConfig } from '../src/types.ts'
+import type { CompanyOwnerScope, WecomLoginConfig } from '../src/types.ts'
 
 const publicOrigin = 'https://login.example'
 const config = Config({ corpId: 'wwfixture', agentId: '1000239', publicOrigin } as Config)
@@ -139,7 +139,12 @@ it('admits a trusted gateway identity and exposes its configured logout destinat
   const admitted = f.ctx.connection.admit({ headers: gatewayHeaders })
   if (!('peer' in admitted)) throw new Error('Expected gateway Peer')
   expect(admitted.peer.principal.kind).toBe('gateway-user')
-  expect(() => authForPeer(f.ctx, admitted.peer).marketSubject()).toThrow(expect.objectContaining({ code: 'wecom-auth/forbidden' }))
+  const viewer = { scope: 'gateway:portal-user', portalUserId: 'portal-user', displayName: 'Portal User' }
+  expect(authForPeer(f.ctx, admitted.peer).marketSubject()).toEqual(viewer)
+  const retained = brandString<SessionId>('gateway-market-session')
+  f.ctx.companyWecomAuth.registerResourceProvider({ bindings: () => [], sessionOwner: id => id === retained
+    ? brandString<CompanyOwnerScope>('gateway:portal-user') : undefined })
+  expect(f.ctx.companyWecomAuth.marketSubject(retained)).toEqual(viewer)
   const me = await f.request('/auth/me', { headers: gatewayHeaders })
   expect(me.status).toBe(200)
   expect(await me.json()).toMatchObject({ session: { userId: 'portal-user', displayName: 'Portal User', logoutUrl: 'https://portal.example/logout' } })

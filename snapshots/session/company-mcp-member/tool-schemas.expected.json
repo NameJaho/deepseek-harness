@@ -245,12 +245,11 @@
       }
     },
     {
-      "name": "mcp__company_9261ceef0b96__lookup",
-      "description": "Read the current member’s permitted customer summary.",
+      "name": "member_mcp_catalog",
+      "description": "Read the current member’s permitted MCP directory.",
       "parameters": {
         "type": "object",
-        "properties": {},
-        "additionalProperties": false
+        "properties": {}
       }
     },
     {
@@ -477,6 +476,25 @@
         },
         "required": [
           "url"
+        ]
+      }
+    },
+    {
+      "name": "web_search",
+      "description": "Search the web for current information. Returns an optional summary answer and a list of source URLs.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "queries": {
+            "type": "array",
+            "description": "1–4 search queries; their results are merged.",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "queries"
         ]
       }
     },

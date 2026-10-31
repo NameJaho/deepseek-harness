@@ -54,8 +54,8 @@
   en: 3abfd29330bf7924
   zh: 3abfd29330bf7924
 /session-persistence-event-catalog/events/cloud-agent/cloud-agent-binding-log-only:
-  en: 05eccb8961e688be
-  zh: 92c27b47eddf59ab
+  en: 7410e7fbd64befea
+  zh: bd5181bdbb6e7450
 /session-persistence-event-catalog/events/command:
   en: 2cecb5b0ee955732
   zh: 2cecb5b0ee955732
@@ -1008,8 +1008,8 @@
   en: ca03de888e0b04ca
   zh: bc192db2e83eb7c1
 /session-persistence-event-catalog/resolved-persistence-types/cloudagentconversation:
-  en: 36bbdfeedf036706
-  zh: 0f8981cfc91019e9
+  en: 8724f593b0348025
+  zh: 2f1322e4f7554861
 /session-persistence-event-catalog/resolved-persistence-types/commandsource:
   en: 459a6f8c8800d3e5
   zh: f1b2626c08c62b4d
@@ -1059,8 +1059,8 @@
   en: f8556a42a6d319e4
   zh: 11f44cee1395053c
 /session-persistence-event-catalog/resolved-persistence-types/gatewayuserprincipal:
-  en: 9794d0cf9ce13d66
-  zh: a30ed27a14506796
+  en: 0d71acbc5ad9f6e4
+  zh: a8d97dbb4bfe6b88
 /session-persistence-event-catalog/resolved-persistence-types/goalblockreason:
   en: b1589f9578a585dd
   zh: 3783dbbd8793bb37
@@ -1386,8 +1386,8 @@
   en: d34b4286937ba13a
   zh: da37541a658d617d
 /session-persistence-event-catalog/resolved-persistence-types/string:
-  en: 18495a29b2b1da60
-  zh: 793408a7c6d09355
+  en: 810892ccc33aa60a
+  zh: 3c2d15ffb0f49092
 /session-persistence-event-catalog/resolved-persistence-types/string~2:
   en: 0089620bf4638263
   zh: 1922bef1713094bb

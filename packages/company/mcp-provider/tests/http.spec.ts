@@ -1,8 +1,7 @@
-/** Authenticated Market adapter behavior against a deterministic internal API fixture. */
+/** Existing Market wire formats, exact member mapping and read-only directory isolation. */
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
-import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import { afterEach, expect, it, onTestFinished, vi } from 'vitest'
@@ -10,38 +9,71 @@ import HttpCompanyMcpProvider, { Config } from '../src/http.ts'
 import CompanyMcpRemote from '../src/index.ts'
 import { companyMcpToolName } from '../src/provider.ts'
 import type { CompanyMcpId } from '../src/types.ts'
-import type { CompanyOwnerScope, WecomCorpId, WecomUserId, WecomMarketSubject } from '@deepseek-ai/dsh-company-wecom-auth/types'
+import type { CompanyOwnerScope, CompanyMarketSubject, PortalUserId, WecomCorpId, WecomUserId, WecomMarketSubject } from '@deepseek-ai/dsh-company-wecom-auth/types'
 
-const TOKEN = 'PRIVATE_MARKET_TOKEN'
-const subject: WecomMarketSubject = { scope: brandString<CompanyOwnerScope>('wecom:corp:alice'), corpId: brandString<WecomCorpId>('corp'), sub: brandString<WecomUserId>('alice') }
-const rawConfig: Readonly<Config> = { baseUrl: 'https://market.example/mcp-market', corpId: 'corp', tokenRef: 'DSH_MCP_MARKET_TOKEN',
-  catalogTimeoutMs: 200, callTimeoutMs: 200, maxCatalogBytes: 2 * 1024 * 1024, maxResultBytes: 1024 * 1024,
-  maxServers: 100, maxTools: 100, pageSize: 100 }
-const config = Config(rawConfig)
-const crm = brandString<CompanyMcpId>('crm')
+const subject: WecomMarketSubject = { scope: brandString<CompanyOwnerScope>('wecom:corp:alice'),
+  corpId: brandString<WecomCorpId>('corp'), sub: brandString<WecomUserId>('alice') }
+const bob: WecomMarketSubject = { ...subject, scope: brandString<CompanyOwnerScope>('wecom:corp:bob'), sub: brandString<WecomUserId>('bob') }
+const crm = brandString<CompanyMcpId>('10001')
 const lookup = companyMcpToolName(crm, 'lookup')
-const server = { id: 'crm', path: 'crm-service', name: 'CRM', description: 'Customer records', authorized: true, published: true, status: 'available' }
-const tool = { name: 'lookup', description: 'Find a customer', inputSchema: { type: 'object', properties: { q: { type: 'string' } }, required: ['q'] } }
+const rawConfig = { baseUrl: 'https://market.example/mcp-market', corpId: 'corp', catalogTimeoutMs: 2000,
+  maxCatalogBytes: 2 * 1024 * 1024, maxServers: 100, maxIdentityRecords: 100, maxTools: 100, pageSize: 100 }
+const members = [{ userId: 101, thirdUid: 'alice', name: 'Alice', userStatus: '3' },
+  { userId: 102, thirdUid: 'bob', name: 'Bob', userStatus: '3' }]
+const servers = [{ id: 10001, name: 'crm', displayName: 'CRM', description: 'Customer records', accessStatus: 'open', authorized: false, toolCount: 1 },
+  { id: 10002, name: 'finance', displayName: 'Finance', description: 'Finance records', accessStatus: 'open', authorized: true, toolCount: 1 },
+  { id: 10003, name: 'shared', displayName: 'Shared', description: 'Open service', accessStatus: 'open', authorized: true, toolCount: 3 },
+  { id: 10004, name: 'maintenance', displayName: 'Maintenance', description: '', accessStatus: 'refactoring', authorized: true, toolCount: 1 }]
+const upstreamTool = { toolName: 'lookup', description: 'Find a customer',
+  inputSchema: JSON.stringify({ type: 'object', properties: { q: { type: 'string' } }, required: ['q'] }) }
 
 afterEach(() => { vi.unstubAllGlobals() })
 
-async function fixture(options: { authorized?: boolean; changed?: boolean; loader?: boolean } = {}) {
-  const requests: Array<{ url: string; init: RequestInit | undefined }> = []
-  const state = { authorized: options.authorized ?? true, changed: options.changed ?? false, actor: subject,
-    revoked: new Set<string>(), response: new Map<string, unknown>() }
+async function fixture(options: { loader?: boolean; config?: Partial<Config> } = {}) {
+  const requests: Array<{ path: string; headers: Headers; body: Record<string, unknown> }> = []
+  const state = { revoked: new Set<string>(), tools: [upstreamTool], members: [...members],
+    overrides: new Map<string, unknown>(), actor: subject as CompanyMarketSubject, queries: servers }
+  const page = <T>(records: T[], body: Record<string, unknown>) => {
+    const pageNum = Number(body.pageNum), pageSize = Number(body.pageSize)
+    return { records: records.slice((pageNum - 1) * pageSize, pageNum * pageSize), total: records.length, pageNum, pageSize }
+  }
   vi.stubGlobal('fetch', vi.fn(async (input: string | URL, init?: RequestInit) => {
-    requests.push({ url: String(input), init })
-    const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as { sub: string; id?: string; path?: string; tool?: string }
-    const route = new URL(input).pathname.split('/').at(-1) ?? ''
-    if (state.response.has(route)) return Response.json(state.response.get(route))
-    if (!state.authorized || state.revoked.has(body.sub)) return Response.json({ success: false, code: 'FORBIDDEN', data: null })
-    if (String(input).endsWith('/page')) return Response.json({ success: true, code: '200', data: { records: [server], total: 1, pageNum: 1, pageSize: 100 } })
-    if (String(input).endsWith('/detail')) return Response.json({ success: true, code: '200', data: { ...server, tools: [state.changed ? { ...tool, description: 'Changed' } : tool] } })
-    return Response.json({ success: true, code: '200', data: { isError: false, content: [{ type: 'text', text: `called:${body.tool}` }] } })
+    const path = new URL(input).pathname.replace('/mcp-market/', '')
+    if (typeof init?.body !== 'string') throw new Error('Expected a JSON request body')
+    const body = JSON.parse(init.body) as Record<string, unknown>
+    const headers = new Headers(init?.headers)
+    requests.push({ path, headers, body })
+    if (state.overrides.has(path)) return Response.json(state.overrides.get(path))
+    let data: unknown
+    switch (path) {
+      case 'api/mcp/admin/user/list':
+        data = page(state.members.filter(member => typeof body.keyword !== 'string' || member.thirdUid.includes(body.keyword)), body)
+        break
+      case 'api/mcp/list': {
+        const viewer = JSON.parse(decodeURIComponent(headers.get('x-user-info') ?? '')) as { userId: number }
+        if (![101, 102].includes(viewer.userId)) throw new Error('Expected mapped portal identity')
+        data = page(state.queries, body)
+        break
+      }
+      case 'api/internal/mcp/permission/check': {
+        const service = servers.find(server => server.name === body.path)
+        const member = members.find(member => member.thirdUid === body.sub)
+        const allowed = !state.revoked.has(String(body.sub)) && (service?.id === 10003
+          || service?.id === 10001 && body.sub === 'alice' || service?.id === 10002 && body.sub === 'bob')
+        data = { allowed, reason: allowed ? 'authorized' : 'not_authorized', sub: body.sub, path: body.path,
+          userId: member?.userId ?? null, mcpServiceId: service?.id ?? null }
+        break
+      }
+      case 'api/mcp/query/by/id':
+        data = { ...servers.find(server => server.id === body.id), streamableHttpUrl: 'https://private.example/mcp', integrationConfig: 'PRIVATE_CONFIG' }
+        break
+      case 'api/mcp/tool/list': data = state.tools; break
+      default: throw new Error(`Unsupported Market route ${path}`)
+    }
+    return Response.json({ success: true, code: '200', data })
   }))
   const ctx = new Context()
   onTestFinished(() => ctx.fiber.dispose())
-  ctx.provide('credentials', { resolve: vi.fn((_ref: CredentialRef) => Promise.resolve({ value: TOKEN, source: 'fixture' })) })
   ctx.provide('companyWecomAuth', { marketSubject: () => state.actor, registerResourceProvider: () => async () => {} })
   if (options.loader === true) {
     await ctx.plugin(Loader)
@@ -61,107 +93,135 @@ async function fixture(options: { authorized?: boolean; changed?: boolean; loade
         return modules.get(specifier)
       },
     }
-    await ctx.loader.create({ name: 'cordis:include', config: {
-      path: new URL('./fixtures/authorized.cordis.yml', import.meta.url).href,
-    } })
+    await ctx.loader.create({ name: 'cordis:include', config: { path: new URL('./fixtures/authorized.cordis.yml', import.meta.url).href } })
     await ctx.loader.await()
     for (const entry of ctx.loader.entries()) await entry.fiber?.await()
-  } else await ctx.plugin(HttpCompanyMcpProvider, config)
+  } else await ctx.plugin(HttpCompanyMcpProvider, Config({ ...rawConfig, ...options.config }))
   return { ctx, provider: ctx.companyMcpProvider, requests, state }
 }
-
 const codeOf = (error: unknown) => remoteErrorOf(error)?.code
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
 
-const bodyOf = (request: { init: RequestInit | undefined } | undefined): Record<string, unknown> => {
-  if (typeof request?.init?.body !== 'string') return {}
-  const parsed: unknown = JSON.parse(request.init.body)
-  return isRecord(parsed) ? parsed : {}
-}
+it('maps the official WeCom id to the portal account and uses only existing read APIs', async () => {
+  const { provider, requests } = await fixture()
+  expect(await provider.catalog(subject)).toMatchObject({ loaded: true, servers: [
+    { id: '10001', name: 'CRM', toolCount: 1, tools: [] }, { id: '10003', name: 'Shared', toolCount: 3 },
+  ] })
+  expect(requests[0]?.body).toMatchObject({ keyword: 'alice', activeOnly: true })
+  const list = requests.find(request => request.path === 'api/mcp/list')!
+  expect(JSON.parse(decodeURIComponent(list.headers.get('x-user-info')!))).toEqual({ userId: 101, userName: 'Alice' })
+  expect(list.body).toMatchObject({ accessFilter: 'all' })
+  expect(list.body).not.toHaveProperty('adminPermissionCode')
+  expect(requests.filter(request => request.path === 'api/internal/mcp/permission/check').every(request => request.body.sub === 'alice')).toBe(true)
+  expect(requests.every(request => !request.headers.has('authorization'))).toBe(true)
+  expect(requests.some(request => /authorized|invoke|grant|revoke|apply/.test(request.path))).toBe(false)
+})
 
-it('sends verified identity and service credentials, then returns only authorized published MCPs', async () => {
+it('isolates two users, includes open services, and clears revoked access on refresh', async () => {
+  const { provider, state } = await fixture()
+  expect((await provider.catalog(subject)).servers.map(server => server.id)).toEqual(['10001', '10003'])
+  expect((await provider.catalog(bob)).servers.map(server => server.id)).toEqual(['10002', '10003'])
+  state.revoked.add('alice')
+  expect(await provider.refresh(subject)).toMatchObject({ loaded: true, servers: [] })
+  expect((await provider.catalog(bob)).servers).toHaveLength(2)
+})
+
+it('maps a trusted portal login to its exact HR account and WeCom subject', async () => {
+  const { provider, requests } = await fixture()
+  expect((await provider.catalog({ scope: brandString<CompanyOwnerScope>('gateway:102'), portalUserId: brandString<PortalUserId>('102'), displayName: 'Portal Bob' }))
+    .servers.map(server => server.id)).toEqual(['10002', '10003'])
+  expect(requests.filter(request => request.path.endsWith('permission/check')).every(request => request.body.sub === 'bob')).toBe(true)
+})
+
+it('matches thirdUid exactly instead of accepting fuzzy names or reusing the WeCom id as portal userId', async () => {
+  const { provider, state } = await fixture()
+  state.members = [{ userId: 999, thirdUid: 'alice-other', name: 'alice', userStatus: '3' }]
+  expect(await provider.catalog(subject)).toMatchObject({ loaded: false, servers: [], failure: { code: 'company-mcp/member-unresolved' } })
+  state.members = [members[0]!, { ...members[0]!, userId: 999 }]
+  expect(await provider.catalog(subject)).toMatchObject({ loaded: false, failure: { code: 'company-mcp/member-unresolved' } })
+})
+
+it('paginates the member directory and MCP catalog without truncating authorized results', async () => {
+  const { provider, requests } = await fixture({ config: { pageSize: 1 } })
+  expect((await provider.catalog(subject)).servers.map(server => server.id)).toEqual(['10001', '10003'])
+  expect(requests.filter(request => request.path === 'api/mcp/list').map(request => request.body.pageNum)).toEqual([1, 2, 3, 4])
+})
+
+it('reads string inputSchema only on explicit tool discovery and excludes connection data', async () => {
   const { provider, requests } = await fixture()
   const catalog = await provider.catalog(subject)
-  expect(catalog.loaded).toBe(true)
-  expect(catalog.servers[0]).toMatchObject({ id: 'crm', name: 'CRM', tools: [{ name: lookup, rawName: 'lookup' }] })
-  expect(new Headers(requests[0]?.init?.headers).get('authorization')).toBe(`Bearer ${TOKEN}`)
-  expect(bodyOf(requests[0])).toMatchObject({ corpId: 'corp', sub: 'alice' })
+  expect(requests.some(request => request.path === 'api/mcp/tool/list')).toBe(false)
+  const tools = await provider.discoverTools(subject, crm)
+  expect(tools[0]).toMatchObject({ name: lookup, rawName: 'lookup', parametersJson: upstreamTool.inputSchema })
+  expect(requests.at(-1)?.body).toEqual({ mcpServiceId: 10001 })
+  expect(JSON.stringify({ catalog, tools })).not.toMatch(/private\.example|PRIVATE_CONFIG|streamableHttpUrl|integrationConfig/)
 })
 
-it('clears the catalog when authorization is revoked', async () => {
-  const { provider, state } = await fixture()
-  expect((await provider.catalog(subject)).servers).toHaveLength(1)
-  state.authorized = false
-  const result = await provider.refresh(subject)
-  expect(result).toMatchObject({ loaded: false, servers: [], failure: { code: 'company-mcp/forbidden' } })
-})
-
-it('rechecks the schema and dispatches the authorized tool with the raw Market path', async () => {
+it('does not fetch details or tools for another member’s MCP or a revoked grant', async () => {
   const { provider, requests, state } = await fixture()
-  const resolved = await provider.resolveTool(subject, lookup)
-  if (resolved === undefined) throw new Error('lookup should resolve')
-  expect(await resolved.tool.execute({ q: 'a' }, { signal: new AbortController().signal, agent: { id: 'session' } } as never)).toBe('called:lookup')
-  const requestBody = bodyOf(requests.at(-1))
-  expect(requestBody).toMatchObject({ path: 'crm-service', tool: 'lookup' })
-  expect(typeof requestBody.schemaFingerprint).toBe('string')
-  state.changed = true
-  await expect(resolved.tool.execute({ q: 'a' }, { signal: new AbortController().signal, agent: { id: 'session' } } as never))
-    .rejects.toSatisfy(error => codeOf(error) === 'company-mcp/tool-changed')
-})
-
-it('uses an unknown-outcome error for a failed invocation response', async () => {
-  const { provider } = await fixture()
-  const resolved = await provider.resolveTool(subject, lookup)
-  if (resolved === undefined) throw new Error('lookup should resolve')
-  const original = globalThis.fetch
-  vi.stubGlobal('fetch', vi.fn(async (input: string | URL, init?: RequestInit) => {
-    if (String(input).endsWith('/invoke')) throw new TypeError('network failed')
-    return original(input, init)
-  }))
-  await expect(resolved.tool.execute({}, { signal: new AbortController().signal, agent: { id: 'session' } } as never))
-    .rejects.toSatisfy(error => codeOf(error) === 'company-mcp/call-outcome-unknown')
-})
-
-it('composes the HTTP provider and browser Remote through the real Loader', async () => {
-  const { ctx } = await fixture({ loader: true })
-  expect([...ctx.loader.entries()].filter(entry => entry.fiber === undefined && !entry.disabled)).toEqual([])
-  expect((await ctx.companyMcp.catalog()).servers.map(item => item.id)).toEqual(['crm'])
-  expect((await ctx.companyMcp.catalog()).servers[0]?.enabled).toBe(true)
-})
-
-it('denies a second member and a cross-member execution without dispatching an invocation', async () => {
-  const { provider, state, requests } = await fixture()
-  const aliceTool = await provider.resolveTool(subject, lookup)
-  if (aliceTool === undefined) throw new Error('lookup should resolve')
-  state.actor = { ...subject, scope: brandString<CompanyOwnerScope>('wecom:corp:bob'), sub: brandString<WecomUserId>('bob') }
-  state.revoked.add('bob')
-  expect((await provider.catalog(state.actor)).servers).toEqual([])
-  expect((await provider.catalog(subject)).servers).toHaveLength(1)
-  await expect(aliceTool.tool.execute({}, { signal: new AbortController().signal, agent: { id: 'bob-session' } } as never))
-    .rejects.toSatisfy(error => codeOf(error) === 'company-mcp/forbidden')
-  expect(requests.filter(request => request.url.endsWith('/invoke'))).toEqual([])
-})
-
-it('rechecks a revoked grant on an already resolved tool before invoking it', async () => {
-  const { provider, state, requests } = await fixture()
-  const resolved = await provider.resolveTool(subject, lookup)
-  if (resolved === undefined) throw new Error('lookup should resolve')
+  await expect(provider.discoverTools(bob, crm)).rejects.toSatisfy(error => codeOf(error) === 'company-mcp/forbidden')
   state.revoked.add('alice')
-  await expect(resolved.tool.execute({}, { signal: new AbortController().signal, agent: { id: 'session' } } as never))
+  await expect(provider.discoverTools(subject, crm)).rejects.toSatisfy(error => codeOf(error) === 'company-mcp/forbidden')
+  expect(requests.some(request => request.path === 'api/mcp/tool/list')).toBe(false)
+})
+
+it('denies a resource absent from the published visible list before querying detail', async () => {
+  const { provider, requests } = await fixture()
+  await expect(provider.discoverTools(subject, brandString<CompanyMcpId>('99999')))
     .rejects.toSatisfy(error => codeOf(error) === 'company-mcp/forbidden')
-  expect(requests.filter(request => request.url.endsWith('/invoke'))).toEqual([])
+  expect(requests.some(request => request.path === 'api/mcp/query/by/id')).toBe(false)
 })
 
 it.each([
-  { success: false, code: '200', data: { records: [server], total: 1, pageNum: 1, pageSize: 100 } },
-  { success: true, code: '500', data: { records: [server], total: 1, pageNum: 1, pageSize: 100 } },
-  { success: true, code: '200', data: { records: [{ ...server, authorized: false }], total: 1, pageNum: 1, pageSize: 100 } },
-  { success: true, code: '200', data: { records: [{ ...server, published: false }], total: 1, pageNum: 1, pageSize: 100 } },
-])('clears the catalog on unsuccessful or unauthorized Market responses: %j', async (response) => {
+  { sub: 'bob', path: 'crm', mcpServiceId: 10001, userId: 101 },
+  { sub: 'alice', path: 'other', mcpServiceId: 10001, userId: 101 },
+  { sub: 'alice', path: 'crm', mcpServiceId: 10002, userId: 101 },
+  { sub: 'alice', path: 'crm', mcpServiceId: 10001, userId: 102 },
+])('rejects mismatched permission responses: %j', async (fields) => {
   const { provider, state } = await fixture()
-  expect((await provider.catalog(subject)).servers).toHaveLength(1)
-  state.response.set('page', response)
+  state.overrides.set('api/internal/mcp/permission/check', { success: true, code: '200',
+    data: { allowed: true, reason: 'authorized', ...fields } })
+  expect(await provider.catalog(subject)).toMatchObject({ loaded: false, servers: [] })
+})
+
+it('reports deferred execution without issuing any tool invocation request', async () => {
+  const { provider, requests } = await fixture()
+  const resolved = await provider.resolveTool(subject, lookup)
+  expect(resolved).toBeDefined()
+  const count = requests.length
+  await expect(resolved!.tool.execute({}, { signal: new AbortController().signal } as never))
+    .rejects.toSatisfy(error => codeOf(error) === 'company-mcp/call-unavailable')
+  expect(requests).toHaveLength(count)
+})
+
+it('keeps the member list available when tool schemas are absent or malformed', async () => {
+  const { provider, state } = await fixture()
+  state.tools = [{ ...upstreamTool, inputSchema: '' }]
+  expect((await provider.catalog(subject)).servers).toHaveLength(2)
+  await expect(provider.discoverTools(subject, crm)).rejects.toSatisfy(error => codeOf(error) === 'company-mcp/invalid-response')
+})
+
+it.each([
+  { success: false, code: '200', data: null },
+  { success: true, code: '500', data: null },
+  { success: true, code: '200', data: { records: [servers[0], servers[0]], total: 2, pageNum: 1, pageSize: 100 } },
+])('clears the catalog on failed envelopes or duplicate records', async (response) => {
+  const { provider, state } = await fixture()
+  expect((await provider.catalog(subject)).servers).toHaveLength(2)
+  state.overrides.set('api/mcp/list', response)
   expect(await provider.refresh(subject)).toMatchObject({ loaded: false, servers: [] })
+})
+
+it.each([{ maxCatalogBytes: 1 }, { maxServers: 1 }, { maxIdentityRecords: 1, pageSize: 1 }])('bounds complete directory reads: %j', async (config) => {
+  const { provider } = await fixture({ config })
+  const member = config.maxIdentityRecords === undefined ? subject
+    : { scope: brandString<CompanyOwnerScope>('gateway:102'), portalUserId: brandString<PortalUserId>('102'), displayName: 'Bob' }
+  expect(await provider.catalog(member)).toMatchObject({ loaded: false, servers: [] })
+})
+
+it('composes the credential-free provider and member Remote through the real Loader', async () => {
+  const { ctx, state } = await fixture({ loader: true })
+  expect([...ctx.loader.entries()].filter(entry => entry.fiber === undefined && !entry.disabled)).toEqual([])
+  expect((await ctx.companyMcp.catalog()).servers.map(server => server.id)).toEqual(['10001', '10003'])
+  state.actor = bob
+  expect((await ctx.companyMcp.catalog()).servers.map(server => server.id)).toEqual(['10002', '10003'])
 })

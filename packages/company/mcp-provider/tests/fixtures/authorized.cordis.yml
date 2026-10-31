@@ -2,5 +2,4 @@
   config:
     baseUrl: https://market.example/mcp-market
     corpId: corp
-    tokenRef: DSH_MCP_MARKET_TOKEN
 - name: '@deepseek-ai/dsh-company-mcp-provider'

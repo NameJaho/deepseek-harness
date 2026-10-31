@@ -41,6 +41,8 @@ The layer sets Connection's `requireBrowserLogin: true`. Owner browser cookies, 
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
 
+Business directory reads obtain a `CompanyMarketSubject` for the verified caller or retained Session owner with `marketSubject()`. Official WeCom and trusted portal identities remain distinct; the [MCP Market provider](../mcp-provider/README.md) resolves their HR mapping without exposing identities as browser arguments.
+
 <details>
 <summary>Implementation internals — click to expand</summary>
 

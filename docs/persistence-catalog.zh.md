@@ -336,7 +336,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 'cloud-agent/binding': CloudAgentConversation
 ```
 
-来源：[`packages/company/cloud-agent/src/types.ts:261`](../packages/company/cloud-agent/src/types.ts)
+来源：[`packages/company/cloud-agent/src/types.ts:263`](../packages/company/cloud-agent/src/types.ts)
 
 ### `command/*`
 
@@ -3296,7 +3296,7 @@ SHA-256: `84bbfdce7d2eab5b0c53e72ff7406db856c8bfd621b965b72fd86598ba493bf7`
 
 SHA-256: `93932f22fd2a7bd0f7800c51d4d5727cfe4029b87682486c83f62adb89c16919`
 
-来源：[`packages/company/cloud-agent/src/types.ts:163`](../packages/company/cloud-agent/src/types.ts)
+来源：[`packages/company/cloud-agent/src/types.ts:165`](../packages/company/cloud-agent/src/types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -3606,7 +3606,7 @@ SHA-256: `5808e36c95355f0e745201b5db1b6bcec4ebf5adb75d3e82d7d59cc89635ab80`
 
 SHA-256: `10a3feeb965bf336cf32db7b8ebdc833a84fe9b4defc9db71b67283e50451a17`
 
-来源：[`packages/company/wecom-auth/src/types.ts:98`](../packages/company/wecom-auth/src/types.ts)
+来源：[`packages/company/wecom-auth/src/types.ts:111`](../packages/company/wecom-auth/src/types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -5772,7 +5772,7 @@ SHA-256: `5d03ba38734809bcbd2a55221bd938b3b3fc34b49bb686c6113e9e4931e3aa78`
 
 SHA-256: `4cd48f3e5108bd6ebedf7301c3638839b8b2b9db8dbd493974177fbdeb91a01b`
 
-来源：[`packages/api/session-controller/src/types.ts:388`](../packages/api/session-controller/src/types.ts) · [`packages/attachment/attachment/src/brand.ts:6`](../packages/attachment/attachment/src/brand.ts) · [`packages/compaction/compaction/src/brand.ts:4`](../packages/compaction/compaction/src/brand.ts) · [`packages/company/cloud-agent/src/types.ts:47`](../packages/company/cloud-agent/src/types.ts) · [`packages/company/cloud-agent/src/types.ts:49`](../packages/company/cloud-agent/src/types.ts) · [`packages/company/cloud-agent/src/types.ts:51`](../packages/company/cloud-agent/src/types.ts) · [`packages/company/wecom-auth/src/types.ts:11`](../packages/company/wecom-auth/src/types.ts) · [`packages/company/wecom-auth/src/types.ts:7`](../packages/company/wecom-auth/src/types.ts) · [`packages/company/wecom-auth/src/types.ts:9`](../packages/company/wecom-auth/src/types.ts) · [`packages/core/session/src/types.ts:21`](../packages/core/session/src/types.ts) · [`packages/experimental/agent-team/src/types.ts:21`](../packages/experimental/agent-team/src/types.ts) · [`packages/experimental/agent-team/src/types.ts:33`](../packages/experimental/agent-team/src/types.ts) · [`packages/experimental/agent-team/src/types.ts:9`](../packages/experimental/agent-team/src/types.ts) · [`packages/experimental/webhook/src/brand.ts:12`](../packages/experimental/webhook/src/brand.ts) · [`packages/experimental/webhook/src/brand.ts:6`](../packages/experimental/webhook/src/brand.ts) · [`packages/experimental/webhook/src/brand.ts:9`](../packages/experimental/webhook/src/brand.ts) · [`packages/feedback/message-feedback/src/types.ts:14`](../packages/feedback/message-feedback/src/types.ts) · [`packages/goal/goal/src/types.ts:17`](../packages/goal/goal/src/types.ts) · [`packages/interaction/commands/src/brand.ts:31`](../packages/interaction/commands/src/brand.ts) · [`packages/interaction/user-approval/src/types.ts:17`](../packages/interaction/user-approval/src/types.ts) · [`packages/jobs/jobs/src/brand.ts:19`](../packages/jobs/jobs/src/brand.ts) · [`packages/llm/llm-retry/src/brand.ts:4`](../packages/llm/llm-retry/src/brand.ts) · [`packages/llm/llm/src/brand.ts:16`](../packages/llm/llm/src/brand.ts) · [`packages/llm/llm/src/brand.ts:31`](../packages/llm/llm/src/brand.ts) · [`packages/llm/llm/src/brand.ts:43`](../packages/llm/llm/src/brand.ts) · [`packages/llm/llm/src/brand.ts:67`](../packages/llm/llm/src/brand.ts) · [`packages/schedule/schedule/src/types.ts:14`](../packages/schedule/schedule/src/types.ts) · [`packages/session/session-title/src/index.ts:42`](../packages/session/session-title/src/index.ts) · [`packages/session/session-title/src/types.ts:17`](../packages/session/session-title/src/types.ts) · [`packages/workflow/workflow/src/types.ts:13`](../packages/workflow/workflow/src/types.ts)
+来源：[`packages/api/session-controller/src/types.ts:388`](../packages/api/session-controller/src/types.ts) · [`packages/attachment/attachment/src/brand.ts:6`](../packages/attachment/attachment/src/brand.ts) · [`packages/compaction/compaction/src/brand.ts:4`](../packages/compaction/compaction/src/brand.ts) · [`packages/company/cloud-agent/src/types.ts:49`](../packages/company/cloud-agent/src/types.ts) · [`packages/company/cloud-agent/src/types.ts:51`](../packages/company/cloud-agent/src/types.ts) · [`packages/company/cloud-agent/src/types.ts:53`](../packages/company/cloud-agent/src/types.ts) · [`packages/company/wecom-auth/src/types.ts:11`](../packages/company/wecom-auth/src/types.ts) · [`packages/company/wecom-auth/src/types.ts:7`](../packages/company/wecom-auth/src/types.ts) · [`packages/company/wecom-auth/src/types.ts:9`](../packages/company/wecom-auth/src/types.ts) · [`packages/core/session/src/types.ts:21`](../packages/core/session/src/types.ts) · [`packages/experimental/agent-team/src/types.ts:21`](../packages/experimental/agent-team/src/types.ts) · [`packages/experimental/agent-team/src/types.ts:33`](../packages/experimental/agent-team/src/types.ts) · [`packages/experimental/agent-team/src/types.ts:9`](../packages/experimental/agent-team/src/types.ts) · [`packages/experimental/webhook/src/brand.ts:12`](../packages/experimental/webhook/src/brand.ts) · [`packages/experimental/webhook/src/brand.ts:6`](../packages/experimental/webhook/src/brand.ts) · [`packages/experimental/webhook/src/brand.ts:9`](../packages/experimental/webhook/src/brand.ts) · [`packages/feedback/message-feedback/src/types.ts:14`](../packages/feedback/message-feedback/src/types.ts) · [`packages/goal/goal/src/types.ts:17`](../packages/goal/goal/src/types.ts) · [`packages/interaction/commands/src/brand.ts:31`](../packages/interaction/commands/src/brand.ts) · [`packages/interaction/user-approval/src/types.ts:17`](../packages/interaction/user-approval/src/types.ts) · [`packages/jobs/jobs/src/brand.ts:19`](../packages/jobs/jobs/src/brand.ts) · [`packages/llm/llm-retry/src/brand.ts:4`](../packages/llm/llm-retry/src/brand.ts) · [`packages/llm/llm/src/brand.ts:16`](../packages/llm/llm/src/brand.ts) · [`packages/llm/llm/src/brand.ts:31`](../packages/llm/llm/src/brand.ts) · [`packages/llm/llm/src/brand.ts:43`](../packages/llm/llm/src/brand.ts) · [`packages/llm/llm/src/brand.ts:67`](../packages/llm/llm/src/brand.ts) · [`packages/schedule/schedule/src/types.ts:14`](../packages/schedule/schedule/src/types.ts) · [`packages/session/session-title/src/index.ts:42`](../packages/session/session-title/src/index.ts) · [`packages/session/session-title/src/types.ts:17`](../packages/session/session-title/src/types.ts) · [`packages/workflow/workflow/src/types.ts:13`](../packages/workflow/workflow/src/types.ts)
 
 `string`
 

@@ -2,7 +2,7 @@
 import { companyMcpFingerprint } from '@deepseek-ai/dsh-company-mcp-provider'
 import { lstat, readdir, readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import type { WecomMarketSubject } from '@deepseek-ai/dsh-company-wecom-auth/types'
+import type { CompanyMarketSubject } from '@deepseek-ai/dsh-company-wecom-auth/types'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ToolSchema } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-skill'
@@ -26,7 +26,7 @@ export function toolFingerprint(schema: ToolSchema): string {
  * @param preset - capability preset; omission selects the deployment default.
  * @returns selectable names and descriptions.
  */
-export async function capabilityCatalog(ctx: Context, subject: WecomMarketSubject, preset?: string): Promise<CloudAgentCapabilities> {
+export async function capabilityCatalog(ctx: Context, subject: CompanyMarketSubject, preset?: string): Promise<CloudAgentCapabilities> {
   await using lease = await ctx.agentPresets.acquireScope(preset)
   const skills = ctx.get('skills')
   const mcpServers = await ctx.companyMcpProvider.capabilityCatalog(subject)

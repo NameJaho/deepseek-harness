@@ -100,6 +100,14 @@ describe.each([{ name: 'English', dict: en }, { name: 'Chinese', dict: zh }])('$
 })
 
 describe('MCP failure and pending presentation', () => {
+  it('explains a missing Market identity mapping without displaying a misleading empty permissions result', () => {
+    render(<CompanyMcpPage {...mcpProps({ catalog: { loaded: false, servers: [],
+      failure: { code: 'company-mcp/member-unresolved', message: 'Private mapping diagnostic' } },
+    busy: false, loading: false, error: true })} />)
+    expect(screen.getByRole('alert').textContent).toContain(en.mcpMemberUnresolved)
+    expect(screen.queryByText('Private mapping diagnostic')).toBe(null)
+    expect(screen.queryByText(en.mcpEmpty)).toBe(null)
+  })
   it('retains cards on failure, offers retry, and disables duplicate management submissions', () => {
     const props = mcpProps({ catalog: { loaded: true, servers: [server] }, busy: false, loading: false, error: true })
     const { rerender } = render(<CompanyMcpPage {...props} />)

@@ -50,7 +50,7 @@ export function CapabilityChoices({ catalog, selection, busy, t, onChange }: {
           onChange={(checked) => { onChange({ ...selection, mcpServers: toggle(selection.mcpServers, server.id, checked) }) }} />
         <p>{server.description || t('mcpListNoDescription')}</p><div className={css.capabilityMeta}>
           <Tag tone={mcpStatusTones[server.status]}>{t(mcpStatuses[server.status])}</Tag>{!server.enabled && <Tag>{t('mcpDisabled')}</Tag>}
-          <Tag>{t('mcpToolsCount', { count: String(server.toolNames.length) })}</Tag></div>
+          <Tag>{t('mcpToolsCount', { count: String(server.toolCount ?? server.toolNames.length) })}</Tag></div>
       </div>)}
       {(selection.mcpServers ?? []).filter(id => !catalog.mcpServers.some(server => server.id === id)).map(id =>
         <Checkbox key={id} label={id} checked disabled={busy} onChange={(checked) => {

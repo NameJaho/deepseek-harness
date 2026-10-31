@@ -23,6 +23,7 @@ export interface CompanyMcpServer {
   readonly enabled: boolean
   readonly status: CompanyMcpStatus
   readonly updatedAt?: number | undefined
+  readonly toolCount?: number | undefined
   readonly tools: readonly CompanyMcpTool[]
 }
 /** Complete member-scoped catalog returned by the Market Remote. */
@@ -41,6 +42,7 @@ export interface CompanyMcpCapability {
   readonly enabled: boolean
   readonly status: CompanyMcpStatus
   readonly toolNames: readonly string[]
+  readonly toolCount?: number | undefined
 }
 
 /** Platform-assigned identity of an editable agent. */

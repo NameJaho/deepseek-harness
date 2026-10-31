@@ -1404,8 +1404,8 @@ describe('headless recorded-session snapshots', () => {
               const log = actualLogs[0]!.content
               const results = parseSessionLog(log).flatMap(event => event.type === 'tool/result' ? [event.data.message] : [])
               expect(results).toMatchObject([
-                { toolCallId: 'member-1', isError: false, content: [{ type: 'text', text: 'Member-authorized CRM result.' }] },
-                { toolCallId: 'member-2', isError: true, content: [{ type: 'text', text: 'Error: MCP access is unavailable for this account; check your Market permissions' }] },
+                { toolCallId: 'member-1', isError: false, content: [{ type: 'text', text: '[{"id":"10001","name":"CRM","toolCount":1}]' }] },
+                { toolCallId: 'member-2', isError: false, content: [{ type: 'text', text: '[]' }] },
               ])
               expect(log).not.toContain('SNAPSHOT_MARKET_SERVICE')
               expect(log).not.toContain('wecom:fixture:alice')

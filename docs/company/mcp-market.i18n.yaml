@@ -3,29 +3,29 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/company/mcp-market.md
 /:
-  en: 78439039fb208ebd
-  zh: 1b4ed0f135b64d2f
-/mcp-market-integration:
-  en: 4cb43e70036142f5
-  zh: 0cd1bbba94efa9c7
-/mcp-market-integration/summary:
-  en: 61db166368a4b9dd
-  zh: e4838efbc4596843
-/mcp-market-integration/table-of-contents:
-  en: ab04448d820e703e
-  zh: edab89edd54200bf
-/mcp-market-integration/identity-and-service-authentication:
-  en: 831acf117f80719d
-  zh: f5e470d6d7189a80
-/mcp-market-integration/internal-routes:
-  en: ffcb5dc7bcade063
-  zh: fe9420b0bbf78f6b
-/mcp-market-integration/invocation-checks:
-  en: 7e63a5d435944d9f
-  zh: 8ab06736c4d73cfa
-/mcp-market-integration/deployment-and-verification:
-  en: 3b1ba44d2ce33ba0
-  zh: 801dafffc273d424
-/mcp-market-integration/dev-note:
+  en: 790073473d49f393
+  zh: fa9e4a1f077b208b
+/mcp-market-member-directory:
+  en: 39ba429c0b2b4ca0
+  zh: 3e9448994da3806f
+/mcp-market-member-directory/summary:
+  en: 6426caa694eb9c93
+  zh: 54dc0552cea7e443
+/mcp-market-member-directory/table-of-contents:
+  en: 169433fb69fe9bd7
+  zh: a1f26901bbf214ef
+/mcp-market-member-directory/identity-resolution:
+  en: 47089af5268fe1af
+  zh: 38b11759a24d3e40
+/mcp-market-member-directory/existing-read-apis:
+  en: 7b71b079460ffbb0
+  zh: a0c88a5a7d99930b
+/mcp-market-member-directory/directory-and-tool-details:
+  en: 2a6d3016fb4d43ec
+  zh: b08e10e62f6356e0
+/mcp-market-member-directory/deployment-and-verification:
+  en: 485bf204b0660238
+  zh: 6f851507d0e5a6e4
+/mcp-market-member-directory/dev-note:
   en: b75c8458928b72b9
   zh: 003ba4e17b4b5269

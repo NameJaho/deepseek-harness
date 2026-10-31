@@ -41,12 +41,25 @@ export interface WecomResourceProvider {
   sessionOwner(sessionId: SessionId): CompanyOwnerScope | undefined
 }
 
-/** Server-derived identity accepted by the internal Market API; never accepted as Remote input. */
+/** Server-derived official WeCom identity; never accepted as Remote input. */
 export interface WecomMarketSubject {
   readonly scope: CompanyOwnerScope
   readonly corpId: WecomCorpId
   readonly sub: WecomUserId
 }
+
+/** Verified portal identity whose WeCom mapping is resolved by the Market. */
+export interface PortalMarketSubject {
+  readonly scope: CompanyOwnerScope
+  readonly portalUserId: PortalUserId
+  readonly displayName: string
+}
+
+/** Portal account identifier, distinct from an official WeCom member id. */
+export type PortalUserId = Branded<'company-portal-user-id'>
+
+/** Login or Session owner used to read the member's Market directory. */
+export type CompanyMarketSubject = WecomMarketSubject | PortalMarketSubject
 
 /** Public QR/OAuth parameters and unpredictable state. */
 export interface WecomLoginConfig {

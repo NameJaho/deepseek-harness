@@ -14,7 +14,7 @@ import type { RemoteAccessAction, RemoteAccessBinding, RemoteAccessCondition, Re
 import type {} from '@deepseek-ai/dsh-workspace'
 import type {} from '@deepseek-ai/dsh-agent'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { CompanyOwnerScope, CompanyUserPrincipal, WecomResourceProvider, WecomMarketSubject } from './types.ts'
+import type { CompanyOwnerScope, CompanyUserPrincipal, WecomResourceProvider, CompanyMarketSubject, PortalUserId } from './types.ts'
 import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
 import { z } from 'zod'
@@ -331,13 +331,18 @@ export class CompanyWecomAuthService extends Service {
     void task.catch((error: unknown) => { this.owner.logger.warn(`wecom-auth: gateway Workspace provisioning failed: ${String(error)}`) })
   }
 
-  /** Resolve verified WeCom identity for an authenticated request or an owned Session.
+  /** Resolve the verified company identity for a request or an owned Session.
    * @param sessionId - trusted execution Session; omission uses the Remote caller or tool initiator.
-   * @returns enterprise-scoped market subject; display names and portal ids are excluded.
-   * @throws WecomAuthError when no enabled official WeCom identity owns the operation.
+   * @returns official WeCom identity or trusted portal identity; neither contains credentials.
+   * @throws WecomAuthError when no active company identity owns the operation.
    */
-  marketSubject(sessionId?: SessionId): WecomMarketSubject {
+  marketSubject(sessionId?: SessionId): CompanyMarketSubject {
     const principal = this.ctx.invocation?.peer.principal
+    if (sessionId === undefined && principal?.kind === 'gateway-user') {
+      const member = this.gatewayIdentities.get(principal.identityId)?.principal
+      if (member?.userId !== principal.userId) throw new WecomAuthError('wecom-auth/forbidden', 403)
+      return { scope: this.ownerScope(member), portalUserId: brandString<PortalUserId>(member.userId), displayName: member.displayName }
+    }
     if (sessionId === undefined && principal?.kind === 'wecom-user') {
       const identity = this.state?.domain.table('identities').get(principal.identityId)
       if (identity?.enabled === true && identity.corpId === this.config.corpId
@@ -351,6 +356,9 @@ export class CompanyWecomAuthService extends Service {
     }
     const id = sessionId ?? this.owner.get('agents')?.currentInitiator()?.id
     const scope = id === undefined ? undefined : this.sessionOwner(id)
+    for (const { principal: member } of this.gatewayIdentities.values()) {
+      if (scope === `gateway:${member.userId}`) return { scope, portalUserId: brandString<PortalUserId>(member.userId), displayName: member.displayName }
+    }
     for (const [, identity] of this.state?.domain.table('identities').entries() ?? []) {
       if (identity.enabled && identity.corpId === this.config.corpId && scope === `wecom:${identity.corpId}:${identity.userId}`) {
         return { scope, corpId: identity.corpId, sub: identity.userId }

@@ -1,7 +1,7 @@
 /** Service Definition for company MCP catalogs and tool execution (`ctx.companyMcpProvider`). */
 import { createHash } from 'node:crypto'
 import { Service, type Context } from '@deepseek-ai/cordis'
-import type { WecomMarketSubject } from '@deepseek-ai/dsh-company-wecom-auth/types'
+import type { CompanyMarketSubject } from '@deepseek-ai/dsh-company-wecom-auth/types'
 import type { ToolSchema } from '@deepseek-ai/dsh-llm'
 import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
 import type { CompanyMcpCapability, CompanyMcpCatalog, CompanyMcpId, CompanyMcpTool, CompanyMcpToolRoute } from './types.ts'
@@ -19,7 +19,7 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-/** Current schema and executable definition of one model-facing tool. */
+/** Current schema, execution definition and fingerprint; an unconnected provider rejects execution. */
 export interface CompanyMcpResolvedTool {
   readonly schema: ToolSchema
   readonly tool: ToolDefinition
@@ -80,14 +80,14 @@ export abstract class CompanyMcpProvider extends Service {
    * @param subject - verified request or Session owner, never browser input.
    * @returns authorized servers with state and tools; `loaded` is false before the first successful refresh.
    */
-  abstract catalog(subject: WecomMarketSubject): Promise<CompanyMcpCatalog>
+  abstract catalog(subject: CompanyMarketSubject): Promise<CompanyMcpCatalog>
 
   /** Replace the catalog after validating a complete upstream response.
    * @param subject - verified request or Session owner, never browser input.
    * @param signal - caller cancellation.
    * @returns the new catalog, or an empty catalog with `failure` when the refresh failed.
    */
-  abstract refresh(subject: WecomMarketSubject, signal?: AbortSignal): Promise<CompanyMcpCatalog>
+  abstract refresh(subject: CompanyMarketSubject, signal?: AbortSignal): Promise<CompanyMcpCatalog>
 
   /** Refresh and read one server's current tools for display.
    * @param subject - verified request or Session owner, never browser input.
@@ -96,7 +96,7 @@ export abstract class CompanyMcpProvider extends Service {
    * @returns current tools with parameters and fingerprints.
    * @throws RemoteError when the refresh fails or the server is unknown, disabled or unavailable.
    */
-  abstract discover(subject: WecomMarketSubject, id: CompanyMcpId, signal: AbortSignal): Promise<readonly CompanyMcpTool[]>
+  abstract discover(subject: CompanyMarketSubject, id: CompanyMcpId, signal: AbortSignal): Promise<readonly CompanyMcpTool[]>
 
   /** Read one usable server's tools after fresh authorization for Agent publication.
    * @param subject - verified request or Session owner, never browser input.
@@ -104,31 +104,31 @@ export abstract class CompanyMcpProvider extends Service {
    * @returns tools with fingerprints.
    * @throws RemoteError when the server is unauthorized, disabled or unavailable.
    */
-  abstract discoverTools(subject: WecomMarketSubject, id: CompanyMcpId): Promise<readonly CompanyMcpTool[]>
+  abstract discoverTools(subject: CompanyMarketSubject, id: CompanyMcpId): Promise<readonly CompanyMcpTool[]>
 
   /** Resolve a model-facing tool for one run.
    * @param subject - verified request or Session owner, never browser input.
    * @param name - model-facing tool name.
-   * @returns current schema, executable definition and fingerprint, or undefined when no server owns the name.
+   * @returns current schema, definition and fingerprint, or undefined when no server owns the name; unconnected execution rejects.
    * @throws RemoteError when the owning server is disabled or unavailable, or the tool no longer exists.
    */
-  abstract resolveTool(subject: WecomMarketSubject, name: string): Promise<CompanyMcpResolvedTool | undefined>
+  abstract resolveTool(subject: CompanyMarketSubject, name: string): Promise<CompanyMcpResolvedTool | undefined>
 
   /** Describe the non-secret route of a model-facing tool.
    * @param subject - verified request or Session owner, never browser input.
    * @param name - model-facing tool name.
    * @returns server, raw tool name, description and fingerprint, or undefined when unknown.
    */
-  abstract describeTool(subject: WecomMarketSubject, name: string): Promise<CompanyMcpToolRoute | undefined>
+  abstract describeTool(subject: CompanyMarketSubject, name: string): Promise<CompanyMcpToolRoute | undefined>
 
   /** Project the catalog for Agent capability selectors.
    * @param subject - verified request or Session owner, never browser input.
    * @returns server summaries without schemas.
    */
-  async capabilityCatalog(subject: WecomMarketSubject): Promise<readonly CompanyMcpCapability[]> {
+  async capabilityCatalog(subject: CompanyMarketSubject): Promise<readonly CompanyMcpCapability[]> {
     return (await this.catalog(subject)).servers.map(server => ({ id: server.id, name: server.name,
       namespace: companyMcpNamespace(server.id), description: server.description, enabled: server.enabled,
-      status: server.status, toolNames: server.tools.map(tool => tool.name) }))
+      status: server.status, toolNames: server.tools.map(tool => tool.name), toolCount: server.toolCount }))
   }
 
   /** Stream catalog snapshots: the current one, then one per `company-mcp/changed`, coalescing bursts.
@@ -136,7 +136,7 @@ export abstract class CompanyMcpProvider extends Service {
    * @param signal - subscriber cancellation.
    * @returns catalog snapshots until the signal aborts.
    */
-  async *follow(subject: WecomMarketSubject, signal: AbortSignal): AsyncIterable<CompanyMcpCatalog> {
+  async *follow(subject: CompanyMarketSubject, signal: AbortSignal): AsyncIterable<CompanyMcpCatalog> {
     let changed = true
     let wake = Promise.withResolvers<void>()
     const notify = (): void => { changed = true; wake.resolve() }

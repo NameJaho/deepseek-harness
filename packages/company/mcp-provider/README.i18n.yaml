@@ -3,38 +3,38 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/company/mcp-provider/README.md
 /:
-  en: 6a51d1e4143708ee
-  zh: 2c79f4c317b9712b
+  en: a80726d6fe3d7e9a
+  zh: c2b16cac818a6e7a
 /deepseek-ai-dsh-company-mcp-provider:
   en: e6d0b425e6a876c4
   zh: c24a28b8e66416ee
 /deepseek-ai-dsh-company-mcp-provider/summary:
-  en: 20ca50c848da7b69
-  zh: ded3354ea3b8ff4a
+  en: b43a8b2583803bd6
+  zh: 044e91a5796c8c06
 /deepseek-ai-dsh-company-mcp-provider/table-of-contents:
-  en: d4e9596852e22009
+  en: 2e89ddb1e73218cb
   zh: 65e6e399d6b474c7
 /deepseek-ai-dsh-company-mcp-provider/use-this-package:
-  en: 7e42a1cb63977af4
-  zh: a8439dd2a3d78180
+  en: e7100ebce3d1ae56
+  zh: a7876654782eeffd
 /deepseek-ai-dsh-company-mcp-provider/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
-/deepseek-ai-dsh-company-mcp-provider/model-experience/authorized-mcp-tools:
-  en: 40f4130ae6e83871
-  zh: 8f3f9e9c0bfa6cb6
-/deepseek-ai-dsh-company-mcp-provider/model-experience/authorized-mcp-tools/what-the-model-sees:
-  en: f598b866baaa3264
-  zh: 1ac7cbb630eb8f5e
-/deepseek-ai-dsh-company-mcp-provider/model-experience/authorized-mcp-tools/token-effect:
-  en: ccc367be3c8cb054
-  zh: 8b01a71590b01e44
-/deepseek-ai-dsh-company-mcp-provider/model-experience/authorized-mcp-tools/kv-cache-effect:
-  en: 24ab0e50bf286613
-  zh: b0b8ad502779723e
+/deepseek-ai-dsh-company-mcp-provider/model-experience/member-directory-and-tool-definitions:
+  en: 3bc103fd8e838ec5
+  zh: 60786e54d48987b0
+/deepseek-ai-dsh-company-mcp-provider/model-experience/member-directory-and-tool-definitions/what-the-model-sees:
+  en: 1f0e44c74c3253f6
+  zh: 6b7942af03eb7cf5
+/deepseek-ai-dsh-company-mcp-provider/model-experience/member-directory-and-tool-definitions/token-effect:
+  en: a5d2cecdf71106b3
+  zh: 98cadc473f7fe7c8
+/deepseek-ai-dsh-company-mcp-provider/model-experience/member-directory-and-tool-definitions/kv-cache-effect:
+  en: 441519c06ada2f92
+  zh: 51e5fdaca83d7196
 /deepseek-ai-dsh-company-mcp-provider/known-limitations-and-deferred-work:
-  en: 780c59598505d020
-  zh: 01d989b6577d5c8a
+  en: 0c4f3f97a68b270f
+  zh: 6a55e4a9cc5af9a8
 /deepseek-ai-dsh-company-mcp-provider/known-limitations-and-deferred-work/dev-note:
-  en: 79c2926a0b58990e
-  zh: 8a731b6bc0fce756
+  en: dd2c628932447c15
+  zh: 07d829c02b6bb648

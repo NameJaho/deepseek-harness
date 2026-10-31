@@ -30,6 +30,8 @@ export interface CompanyMcpServer {
   readonly status: CompanyMcpStatus
   /** Upstream update time in epoch milliseconds, when reported. */
   readonly updatedAt?: number | undefined
+  /** Tool count from the directory; schemas load only on explicit discovery. */
+  readonly toolCount?: number | undefined
   readonly tools: readonly CompanyMcpTool[]
 }
 
@@ -60,6 +62,7 @@ export interface CompanyMcpCapability {
   readonly enabled: boolean
   readonly status: CompanyMcpStatus
   readonly toolNames: readonly string[]
+  readonly toolCount?: number | undefined
 }
 
 /** Non-secret route of one model-facing tool. */
@@ -81,6 +84,8 @@ export type CompanyMcpErrorCode =
   | 'company-mcp/call-failed'
   | 'company-mcp/stopping'
   | 'company-mcp/forbidden'
+  | 'company-mcp/member-unresolved'
+  | 'company-mcp/call-unavailable'
   | 'company-mcp/call-outcome-unknown'
 
 declare module '@deepseek-ai/dsh-typert-protocol' {
@@ -93,6 +98,8 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'company-mcp/tool-changed': { readonly name: string }
     'company-mcp/call-failed': { readonly name: string; readonly reason: string }
     'company-mcp/forbidden': Record<string, never>
+    'company-mcp/member-unresolved': Record<string, never>
+    'company-mcp/call-unavailable': Record<string, never>
     'company-mcp/call-outcome-unknown': { readonly name: string; readonly reason: string }
     'company-mcp/stopping': Record<string, never>
   }

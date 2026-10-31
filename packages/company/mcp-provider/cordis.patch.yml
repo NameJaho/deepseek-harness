@@ -4,6 +4,5 @@
       config:
         baseUrl: !!js process.env.DSH_MCP_MARKET_URL ?? ''
         corpId: !!js process.env.DSH_WECOM_CORP_ID ?? ''
-        tokenRef: DSH_MCP_MARKET_TOKEN
     - id: company-mcp
       name: '@deepseek-ai/dsh-company-mcp-provider'

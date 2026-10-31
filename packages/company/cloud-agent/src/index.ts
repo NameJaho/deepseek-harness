@@ -13,7 +13,7 @@ import type {} from '@deepseek-ai/dsh-permission-presets'
 import type { SessionForkPlacement, SessionPromptRequest } from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-company-mcp-provider'
 import type {} from '@deepseek-ai/dsh-company-wecom-auth'
-import type { WecomMarketSubject, CompanyOwnerScope } from '@deepseek-ai/dsh-company-wecom-auth/types'
+import type { CompanyMarketSubject, CompanyOwnerScope } from '@deepseek-ai/dsh-company-wecom-auth/types'
 import type { ToolDefinition, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import type { FileAttachmentRef } from '@deepseek-ai/dsh-attachment'
@@ -662,7 +662,7 @@ export class CloudAgentService extends TypertRemoteService {
       throw new RemoteError('cloud-agent/owner-required', 'The conversation belongs to another account', {})
     }
   }
-  private subject(sessionId?: SessionId): WecomMarketSubject {
+  private subject(sessionId?: SessionId): CompanyMarketSubject {
     const auth = this.ctx.get('companyWecomAuth')
     if (auth === undefined) throw new RemoteError('cloud-agent/owner-required', 'An authenticated company account is required', {})
     return auth.marketSubject(sessionId)

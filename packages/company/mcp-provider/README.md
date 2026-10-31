@@ -1,5 +1,5 @@
 ---
-description: "Member-authorized MCP Market provider, HTTP adapter and browser-safe catalog Remote."
+description: "Member-scoped directory and tool discovery through the existing MCP Market APIs."
 kind: "package-bundle"
 ---
 
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The provider reads the MCP Market through authenticated server-to-server endpoints. It derives the WeCom `sub` from the verified Remote caller or the initiating Session and never accepts a browser or model supplied subject. The Market returns only published MCPs for which that member has visibility and usage authorization.
+Signed-in members can view their permitted MCPs and inspect tool definitions. The provider resolves their Market identities, reads published visible candidates and filters them through the existing usage-permission check. It offers no application, grant, revoke or enablement action.
 
 ## Table of Contents
 
@@ -18,33 +18,39 @@ The provider reads the MCP Market through authenticated server-to-server endpoin
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
 
+<a id="use-this-package"></a>
 ## Use this package
 
-`baseUrl`, `corpId`, `tokenRef`, request limits, and timeouts are deployment configuration. The service expects `POST /api/internal/mcp/authorized/page`, `detail`, and `invoke`; each response must have `success: true` and `code: "200"`. MCP access permissions are read-only in DSH: it does not apply for, grant, revoke or enable access. The Market returns only the logged-in member's authorized, published MCPs for selection and invocation in Cloud Agents.
+The [patch](cordis.patch.yml) uses `DSH_MCP_MARKET_URL` and the existing `DSH_WECOM_CORP_ID`. `baseUrl`, `corpId`, timeouts and read limits belong to deployment configuration. The provider needs the company identity service and no separate service credential. See [existing read APIs and deployment requirements](../../../docs/company/mcp-market.md).
 
-Each tool invocation rechecks the member grant, publication, and schema fingerprint before forwarding `path`, raw tool name, arguments, and the fingerprint to the Market. A catalog failure clears the member catalog, so stale MCPs cannot remain executable.
+Directories use the Market list's tool counts and do not depend on tool discovery. Explicit discovery reads detail and tool definitions after checking the member's current directory. Refresh failures clear the directory. Tool schemas and fingerprints remain available to Cloud Agent drafts; execution rejects with `company-mcp/call-unavailable` before sending a request.
 
+<a id="model-experience"></a>
 ## Model Experience
 
-### Authorized MCP tools
+### Member directory and tool definitions
 
 #### What the model sees
 
-The model sees authorized MCP tool names such as `mcp__company_<hash>__<tool>`, descriptions, input schemas, and text results. It never sees Market URLs, service credentials, WeCom identity fields, or integration configuration.
+The provider registers no global model tool. Authoring consumers may expose permitted server summaries and discovered tool names such as `mcp__company_<hash>__lookup`, descriptions and schemas. Market URLs, HR records, identity headers and integration configuration remain private.
 
 #### Token effect
 
-The tool schemas and descriptions add tokens for the authorized member's current catalog. Catalog and invocation results enter the normal Session history and vary with Market permissions.
+A browser directory read adds no model tokens. An authoring consumer's catalog or explicit tool discovery can add permitted metadata to the normal Session history.
 
 #### KV Cache effect
 
-An unchanged authorized catalog keeps the MCP schema prefix stable. Permission changes, schema fingerprints, or tool publication changes replace the visible schema and can invalidate prefix reuse.
+Browser refreshes do not alter the model prompt. A consumer that selects discovered tool schemas can change the request prefix when its capability selection changes.
 
 ## Known Limitations and Deferred Work
 
-- The Market internal endpoints and service credential are deployment owned; local tests use a fixture and a deployed Market is required for integration testing.
-- The Market backend must provide the internal authenticated routes; this repository contains the DSH adapter and contract fixture only.
+<a id="known-limitations-and-deferred-work"></a>
 
+- Identity resolution requires a unique active HR mapping with a positive portal user id and nonempty WeCom id.
+- The backend must be reachable through the deployment's trusted internal network; public portal gateway authentication has not been integrated or production-tested.
+- Actual MCP transport authentication and tool execution are deferred. Directory or schema access does not imply an executable connection.
+
+<a id="dev-note"></a>
 ### Dev Note
 
-The provider must receive identity from `companyWecomAuth`; callers must never add a subject argument to the browser Remote.
+Browser Remote methods resolve the current login themselves and never accept a member id from browser input.

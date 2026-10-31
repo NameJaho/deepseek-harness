@@ -110,12 +110,12 @@ const SERVICE_ROLES: ServiceRole[] = [
   {
     key: 'companyMcpProvider', pkg: 'company-mcp-provider', title: 'Member-authorized MCP access', mode: 'seam',
     implementations: ['company-mcp-provider'], consumers: ['company-mcp-provider', 'company-cloud-agent'],
-    note: 'Queries the Market for a verified member and rechecks authorization and pinned schemas before every invocation.',
+    note: 'Reads existing Market APIs for a verified member’s permitted MCP directory and optional tool discovery; invocation is deferred.',
   },
   {
     key: 'companyMcp', pkg: 'company-mcp-provider', title: 'Member MCP catalog Remote', mode: 'service',
     consumers: ['company-cloud-agent'],
-    note: 'Derives caller identity on the Host and exposes authorized catalog and member enablement preferences.',
+    note: 'Derives the signed-in identity on the Host and exposes the member directory and tool discovery.',
   },
   {
     key: 'companyWecomAuth', pkg: 'company-wecom-auth', title: 'Company member authentication', mode: 'service',
@@ -1001,14 +1001,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['company-mcp-provider'],
     consumers: ['company-mcp-provider', 'company-cloud-agent'],
-    note: 'The only Host path that lists, enables and executes company MCP tools; the HTTP adapter talks to the external gateway.',
+    note: 'Reads existing Market APIs for a verified member’s permitted MCP directory and optional tool discovery; invocation is deferred.',
   },
   {
     key: 'companyMcp',
     pkg: 'company-mcp-provider',
     title: 'Company MCP catalog Remote',
     mode: 'service',
-    note: 'Publishes the provider catalog and enablement to the browser without gateway URLs, headers or upstream error bodies.',
+    note: 'Publishes the member directory to the browser without gateway URLs, headers or upstream error bodies.',
   },
   {
     key: 'companyKnowledge',

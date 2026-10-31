@@ -4,28 +4,25 @@
 #   pnpm run verify-translation-pairing --write docs/subsystems/company.md
 /:
   en: a7625d3798bab497
-  zh: 51a248c48dc39fc1
+  zh: c0c41306940dda10
 /company-deployment-integrations:
   en: f0fa40bd8a213bdf
-  zh: ec3a245f1c1df4ea
+  zh: ed0641adcf2ea1f3
 /company-deployment-integrations/summary:
-  en: 1eed6a3cf65b76df
-  zh: 78f5e483eb560373
+  en: 6d509b784fe06482
+  zh: f54ebf9d749876d4
 /company-deployment-integrations/table-of-contents:
   en: 4357d3d70f85ddc5
-  zh: d5c457fdc2c9bed5
+  zh: b42e622d76911466
 /company-deployment-integrations/identity-and-authorization:
-  en: a25d5b0b78eeec65
-  zh: 271ace4575e3b5e5
+  en: 65c81f15b119ffdf
+  zh: 04ed01faae4b7b89
 /company-deployment-integrations/service-ownership:
-  en: 72448de5ca406cea
-  zh: f4f10b1097b783ea
+  en: 2dac5bb0263cda4a
+  zh: 9a36129d1f0cc4b0
 /company-deployment-integrations/cordis-api-reference:
-  en: d37c7403e92a8df3
-  zh: a07ec545bc9173b2
-/company-deployment-integrations/cordis-api/company-mcp-events/company-mcp-changed-emit:
-  en: 67ce200d49f5caaa
-  zh: 67ce200d49f5caaa
+  en: 70954dd28945be07
+  zh: 183d54bf7dec94f2
 /company-deployment-integrations/dev-note:
   en: b75c8458928b72b9
   zh: 003ba4e17b4b5269

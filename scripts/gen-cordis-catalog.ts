@@ -999,6 +999,7 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   CompanyMcpToolRoute: 'packages/company/mcp-provider/README.md',
   CompanyMcpCapability: 'packages/company/mcp-provider/README.md',
   WecomMarketSubject: 'packages/company/mcp-provider/README.md',
+  CompanyMarketSubject: 'packages/company/wecom-auth/README.md',
   CompanyKnowledgeCatalog: 'packages/company/knowledge/README.md',
   CompanyKnowledgeSource: 'packages/company/knowledge/README.md',
   CompanyKnowledgeBinding: 'packages/company/knowledge/README.md',

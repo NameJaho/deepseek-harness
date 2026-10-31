@@ -7531,9 +7531,6 @@ importers:
       '@deepseek-ai/dsh-company-wecom-auth':
         specifier: workspace:*
         version: link:../wecom-auth
-      '@deepseek-ai/dsh-credentials':
-        specifier: workspace:*
-        version: link:../../credentials/credentials
       '@deepseek-ai/dsh-llm':
         specifier: workspace:*
         version: link:../../llm/llm

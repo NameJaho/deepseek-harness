@@ -1,5 +1,5 @@
 ---
-description: "按成员授权的 MCP 市场 Provider、HTTP 适配器和浏览器安全目录 Remote。"
+description: "通过 MCP 市场已有接口提供按成员隔离的目录和工具发现。"
 kind: "package-bundle"
 ---
 
@@ -9,7 +9,7 @@ kind: "package-bundle"
 
 ## 概述
 
-Provider 通过服务端凭据访问 MCP 市场。企微 `sub` 由已验证的 Remote 调用者或发起 Session 解析，浏览器和模型不能传入用户身份。市场只返回该成员可见、已上架且有使用权限的 MCP。
+登录成员可查看自己有使用权限的 MCP，并查看工具定义。Provider 解析市场身份，读取已上架且可见的候选服务，再通过已有使用权限检查过滤。不提供申请、授予、撤销或启用操作。
 
 ## 目录
 
@@ -21,34 +21,36 @@ Provider 通过服务端凭据访问 MCP 市场。企微 `sub` 由已验证的 R
 <a id="use-this-package"></a>
 ## 使用本包
 
-`baseUrl`、`corpId`、`tokenRef`、请求限制和超时属于部署配置。Provider 需要 `POST /api/internal/mcp/authorized/page`、`detail` 和 `invoke`，每个响应都必须满足 `success: true` 与 `code: "200"`。DSH 只读取 MCP 权限，不提交申请，也不授予、撤销或启用权限。市场仅返回当前成员已授权且已上架的 MCP，供 Cloud Agent 选择和调用。
+[patch](cordis.patch.yml) 使用 `DSH_MCP_MARKET_URL` 和已有 `DSH_WECOM_CORP_ID`。`baseUrl`、`corpId`、超时和读取上限属于部署配置。Provider 依赖公司身份服务，不需要独立服务凭据。见[已有只读接口与部署要求](../../../docs/company/mcp-market.zh.md)。
 
-每次工具调用都会重新检查成员授权、上架状态和 schema fingerprint，然后把 `path`、原始工具名、参数及 fingerprint 转发给市场。目录请求失败会清空当前成员目录，旧 MCP 不会继续执行。
+目录使用市场列表提供的工具数量，不依赖工具发现。显式发现工具时先检查当前成员目录，再读取详情及工具定义。刷新失败会清空目录。Cloud Agent 草稿仍可使用工具 schema 和 fingerprint；执行会在发送请求前返回 `company-mcp/call-unavailable`。
 
 <a id="model-experience"></a>
 ## 模型体验
 
-### 有权限的 MCP 工具
+### 成员目录与工具定义
 
 #### 模型看到什么
 
-模型只能看到当前成员有权限的 MCP 工具名、说明、输入 schema 和文本结果，不会看到市场地址、服务凭据、企微身份字段或 integrationConfig。
+Provider 不注册全局模型工具。创作功能可提供有权限的服务摘要、`mcp__company_<hash>__lookup` 等已发现工具的名称、说明和 schema。市场地址、HR 记录、身份头和 integrationConfig 保持私有。
 
 #### Token 影响
 
-当前成员目录中的工具 schema 和说明会占用模型 token。目录和执行结果进入正常 Session 历史，并随市场授权变化。
+浏览器目录查询不增加模型 token。创作功能的目录查询或显式工具发现可将有权限的元数据加入正常 Session 历史。
 
 #### KV Cache 影响
 
-授权目录不变时 MCP schema 前缀保持稳定。权限、schema fingerprint 或上架状态变化会替换可见 schema，并可能让前缀缓存失效。
+浏览器刷新不改变模型提示词。消费方选择已发现工具的 schema 时，能力选择变更可能改变请求前缀。
 
-<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与后续工作
 
-- 市场内部接口和服务凭据由部署方负责；当前本地测试使用 fixture，真实联调需要已部署的市场服务。
-- 市场后端需要提供带身份校验的内部接口；本仓库只包含 DSH 适配器和契约 fixture。
+<a id="known-limitations-and-deferred-work"></a>
+
+- 身份解析要求唯一的在职 HR 映射、正数门户用户 id 和非空企微 id。
+- 后端须能通过部署的可信内部网络访问；尚未接入或生产验证公网门户网关认证。
+- 实际 MCP 传输鉴权和工具执行暂缓，读取目录或 schema 不代表已经建立可执行连接。
 
 <a id="dev-note"></a>
 ### 开发备注
 
-Provider 必须从 `companyWecomAuth` 获取身份，浏览器 Remote 不得增加 subject 参数。
+浏览器 Remote 自行解析当前登录身份，不接受浏览器传入的成员 id。

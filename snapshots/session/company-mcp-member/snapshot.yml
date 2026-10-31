@@ -6,5 +6,3 @@ recording: authored
 header:
   class: company-mcp-member
   pin: true
-environment:
-  DSH_MCP_MARKET_TOKEN: SNAPSHOT_MARKET_SERVICE

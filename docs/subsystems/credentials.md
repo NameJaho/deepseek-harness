@@ -169,12 +169,12 @@ defaultWorkspaceSessions(principal: CompanyUserPrincipal): readonly SessionId[]
  */
 sessionOwner(sessionId: SessionId): CompanyOwnerScope | undefined
 
-/** Resolve verified WeCom identity for an authenticated request or an owned Session.
+/** Resolve the verified company identity for a request or an owned Session.
  * @param sessionId - trusted execution Session; omission uses the Remote caller or tool initiator.
- * @returns enterprise-scoped market subject; display names and portal ids are excluded.
- * @throws WecomAuthError when no enabled official WeCom identity owns the operation.
+ * @returns official WeCom identity or trusted portal identity; neither contains credentials.
+ * @throws WecomAuthError when no active company identity owns the operation.
  */
-marketSubject(sessionId?: SessionId): WecomMarketSubject
+marketSubject(sessionId?: SessionId): CompanyMarketSubject
 
 /** Begin a durable, browser-bound, single-use login attempt.
  * @param request - trusted request authority.

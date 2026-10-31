@@ -1,62 +1,64 @@
 ---
-description: "Internal Market API required by DSH for member-authorized MCP discovery and invocation."
+description: "Existing Market APIs used to display the signed-in member's permitted MCP directory."
 ---
 
-# MCP Market integration
+# MCP Market member directory
 
 English | [中文](mcp-market.zh.md)
 
 ## Summary
 
-DSH queries and invokes MCP tools for the authenticated WeCom member. This reference defines the internal API required from the Market backend. The backend implementation and production integration are deployment prerequisites; this repository supplies the DSH adapter and deterministic fixtures.
+The company MCP page shows the signed-in user's published, visible MCPs with current usage permission. The adapter uses existing Market APIs. Tool invocation and upstream gateway authentication are deferred.
 
 ## Table of Contents
 
-- [Identity and service authentication](#identity-and-service-authentication)
-- [Internal routes](#internal-routes)
-- [Invocation checks](#invocation-checks)
+- [Identity resolution](#identity-resolution)
+- [Existing read APIs](#existing-read-apis)
+- [Directory and tool details](#directory-and-tool-details)
 - [Deployment and verification](#deployment-and-verification)
 - [Dev Note](#dev-note)
 
-<a id="identity-and-service-authentication"></a>
-## Identity and service authentication
+<a id="identity-resolution"></a>
+## Identity resolution
 
-The Host resolves `corpId` and `sub` from an enabled official WeCom Principal or the retained owner of the initiating Session through `companyWecomAuth.marketSubject()`. `sub` is the official enterprise member UserId. Display names are excluded. A trusted gateway's `userId` has a separate owner scope and is refused until a verified mapping to an official member exists. Browser Remote methods do not accept identity arguments.
+The Host obtains a `CompanyMarketSubject` from the verified Remote caller or retained Session owner through `companyWecomAuth.marketSubject()`. Official WeCom subjects carry `corpId/sub`; trusted portal subjects carry their portal user id. The browser cannot supply another member's identity.
 
-Every Market request uses `Authorization: Bearer <service credential>` and JSON. The backend must authenticate the service, constrain it to the configured enterprise, and resolve the member's current visibility and usage authorization. Possessing the service credential alone does not grant a member access to every MCP. Public catalog and creator-only connection settings do not establish usage authorization.
+The adapter resolves official subjects with `admin/user/list`, using the WeCom id as a search keyword and accepting only an exact `thirdUid` match. Portal subjects match the exact numeric `userId` in the paginated HR records. Both require one active record with a positive portal user id and nonempty WeCom id. Missing or ambiguous mappings produce a structured failure instead of guessing from names or treating the WeCom id as a portal id.
 
-<a id="internal-routes"></a>
-## Internal routes
+Market list, detail and tool reads carry URL-encoded `X-User-Info` containing the resolved portal `userId/userName`. This is a trusted-backend identity assertion, not a login credential. Permission checks use the resolved WeCom `sub`. Raw HR records, identity headers and connection settings remain on the Host.
 
-The adapter sends `POST` requests below the configured `baseUrl`. Responses must be HTTP success and contain both `success: true` and string `code: "200"`; all other responses fail. Successful `data` fields are:
+<a id="existing-read-apis"></a>
+## Existing read APIs
 
-| Route | Request fields | Successful `data` |
+All routes below are existing `POST` endpoints relative to the configured Market root, including its `/mcp-market` context path. Controller success requires HTTP success plus `success: true`, string `code: "200"`, and the expected `data` fields.
+
+| Route | Request fields | Purpose |
 |---|---|---|
-| `/api/internal/mcp/authorized/page` | `corpId`, `sub`, `pageNum`, `pageSize` | `records`, `total`, `pageNum`, `pageSize` |
-| `/api/internal/mcp/authorized/detail` | `corpId`, `sub`, `id` | Server fields and `tools[]` |
-| `/api/internal/mcp/authorized/invoke` | `corpId`, `sub`, `id`, `path`, `tool`, `arguments`, `schemaFingerprint` | `isError`, `content[{type:"text",text}]` |
+| `/api/mcp/admin/user/list` | `keyword` for WeCom subjects, `activeOnly: true`, `pageNum/pageSize` | Resolve exact portal and WeCom identities from HR records |
+| `/api/mcp/list` | `accessFilter: "all"`, `pageNum/pageSize` | Read published candidates visible to the mapped portal user |
+| `/api/internal/mcp/permission/check` | `sub`, `path` | Check the actual member's current usage permission |
+| `/api/mcp/query/by/id` | numeric `id` | Recheck one selected server before explicit tool discovery |
+| `/api/mcp/tool/list` | numeric `mcpServiceId` | Read tool names, descriptions and string-encoded `inputSchema` |
 
-A server record contains string `id`, `path`, `name`, `description`, literal `authorized: true`, literal `published: true`, and `status` in `available`, `connecting`, `failed`, or `maintenance`. Each detail tool contains string `name`, string `description`, and an object `inputSchema` whose root `type` is `object`. Responses must exclude MCP endpoints, upstream credentials and `integrationConfig`.
+The list API establishes publication and portal visibility. The permission API does not check publication, so it cannot replace the list. Every returned server must also pass `allowed: true` with matching subject, path and resource identity. The adapter excludes refactoring services and sends no administrator permission declaration. It does not use application, grant or revoke endpoints.
 
-Pagination is one-based, has a configured size of at most 100, and must report a consistent `total` and unique server ids across pages. Detail must return the requested id and the same path as the page record. DSH validates the complete catalog before returning any servers. It rejects partial, duplicate, oversized or unsupported schema data. Provider [Config](../../packages/company/mcp-provider/src/http.ts) owns byte, count and timeout limits.
+<a id="directory-and-tool-details"></a>
+## Directory and tool details
 
-The backend returns `FORBIDDEN` or `NOT_FOUND` when membership, visibility, publication or usage authorization fails, and `TOOL_CHANGED` when the invocation fingerprint is stale. An HTTP 403 also denies access. Other failures return no catalog. An untrusted or interrupted invocation response produces an unknown-outcome error; users must inspect the operation before retrying. `isError: true` records a tool failure.
+Directory reads return server names, descriptions and the list's tool counts without fetching tool schemas or connection endpoints. Explicit discovery checks the current authorized directory again, then reads detail and tools. Tool schemas must decode from JSON strings to supported object schemas. A malformed tool schema fails discovery without making the directory unreadable.
 
-<a id="invocation-checks"></a>
-## Invocation checks
+Identity resolution, pagination and permission checks share a whole-operation timeout and byte budget. Page totals must stay consistent and server ids must be unique. Unsafe numeric ids, incomplete pages, oversized responses, mismatched permission responses and failed envelopes return an empty directory with a failure. There is no shared member catalog cache.
 
-The Market must recheck the member, selected MCP, publication and current schema for every detail and invocation request. Invocation must authorize the requested id, resolve its current path and raw tool name, and compare the supplied fingerprint before dispatch. These checks must share a consistent authorization/schema view with dispatch so a concurrent grant or tool change cannot be bypassed by an earlier detail response.
-
-DSH fingerprints the model-visible `{name, description, parameters}` with SHA-256 over canonical JSON: object keys sort lexically, arrays preserve order, and no extra whitespace is emitted. `parameters` is the detail tool's `inputSchema`. The public name is derived from the stable server id and raw tool name; the authoritative naming and fingerprint functions are [companyMcpToolName and companyMcpFingerprint](../../packages/company/mcp-provider/src/provider.ts). The backend must use the same representation when checking `schemaFingerprint`.
-
-DSH reads existing MCP permissions and lets members select authorized tools for their Cloud Agents. It does not submit applications or grant, revoke or enable permissions. Catalog requests read current authorization without a shared user cache; failure returns an empty catalog. Cloud Agent save and publication pin tool fingerprints. Start, model steps and execution recheck the current runner's rights. A member running another author's public Agent therefore uses the runner's MCP grants. Publication does not transfer the author's permissions.
+Cloud Agent draft capability metadata can still use discovered tools. Executable definitions reject with `company-mcp/call-unavailable` before any invocation request. The adapter neither calls an invented execution endpoint nor uses a user's directory access as an MCP transport credential.
 
 <a id="deployment-and-verification"></a>
 ## Deployment and verification
 
-The optional [Market patch](../../packages/company/mcp-provider/cordis.patch.yml) requires the WeCom authentication service and credential provider. Deployment supplies `DSH_MCP_MARKET_URL`, `DSH_WECOM_CORP_ID`, and the `DSH_MCP_MARKET_TOKEN` service credential reference. The [Cloud Agent patch](../../packages/company/cloud-agent/cordis.patch.yml) consumes this provider. Neither patch deploys the Market backend.
+The optional [Market patch](../../packages/company/mcp-provider/cordis.patch.yml) requires the company identity service. Set `DSH_MCP_MARKET_URL` to the existing backend root; official login uses the existing `DSH_WECOM_CORP_ID`. No separate Market service token is required by this adapter. Limits are in [Config](../../packages/company/mcp-provider/src/http.ts).
 
-Repository tests exercise two-member isolation, execution identity, revoked grants, unpublished MCPs, schema changes, failed envelopes and unknown invocation outcomes. A real Loader fixture composes the HTTP provider with its browser Remote. The `company-mcp-member` keyless recorded Session starts the shipped headless profile and records HTTP success followed by revocation. Real Market integration requires the backend routes and deployment credential; it has not been performed with the repository fixture.
+The current adapter targets a trusted internal backend. Access to the administrative HR read and internal permission check must be restricted by the deployment network. A public portal gateway may require its own login and resource-operation context; this adapter does not fabricate those credentials. Real gateway authentication and MCP execution need separate integration.
+
+Tests cover exact member mapping, two-user isolation, open services, revocation, pagination, read limits, failed envelopes and discovery failures. The real Loader composes the provider and member Remote. The `company-mcp-member` keyless headless snapshot records a permitted directory followed by an empty directory after revocation. Production Market connectivity has not been verified.
 
 <a id="dev-note"></a>
 ## Dev Note

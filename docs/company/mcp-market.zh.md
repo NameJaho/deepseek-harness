@@ -1,62 +1,64 @@
 ---
-description: "DSH 按成员权限发现与调用 MCP 所需的市场内部 API。"
+description: "使用市场已有接口展示当前登录成员有权限的 MCP 目录。"
 ---
 
-# MCP 市场接入
+# MCP 市场成员目录
 
 [English](mcp-market.md) | 中文
 
 ## 概述
 
-DSH 按当前已认证企微成员查询和调用 MCP 工具。本参考页定义市场后端需要提供的内部 API。后端实现与生产联调属于部署前提；本仓库提供 DSH 适配器及确定性 fixture。
+企业 MCP 页面展示当前登录用户已上架、可见且具有使用权限的 MCP。适配器使用市场已有接口，实际工具调用和上游网关认证暂未接入。
 
 ## 目录
 
-- [身份与服务认证](#identity-and-service-authentication)
-- [内部接口](#internal-routes)
-- [调用校验](#invocation-checks)
+- [身份解析](#identity-resolution)
+- [已有只读接口](#existing-read-apis)
+- [目录与工具详情](#directory-and-tool-details)
 - [部署与验证](#deployment-and-verification)
 - [开发备注](#dev-note)
 
-<a id="identity-and-service-authentication"></a>
-## 身份与服务认证
+<a id="identity-resolution"></a>
+## 身份解析
 
-Host 通过 `companyWecomAuth.marketSubject()` 从已启用的官方企微 Principal 或发起调用的 Session 持久化所有者解析 `corpId` 与 `sub`。`sub` 是官方企业成员 UserId，不使用显示名称。可信网关的 `userId` 有独立所有者范围，在建立到官方成员的已验证映射前会被拒绝。浏览器 Remote 不接受身份参数。
+Host 通过 `companyWecomAuth.marketSubject()` 从已验证的 Remote 调用者或 Session 持久化所有者取得 `CompanyMarketSubject`。官方企微身份提供 `corpId/sub`，可信门户身份提供门户用户 id。浏览器不能指定其他成员身份。
 
-所有市场请求使用 `Authorization: Bearer <服务凭据>` 和 JSON。后端必须验证服务身份、限制其企业范围，并解析成员当前的可见与使用授权。持有服务凭据本身不代表成员有权使用全部 MCP。公开目录或仅创建者可见的连接配置不能证明使用授权。
+适配器用企微 id 作为 `admin/user/list` 的搜索关键词，仅接受 `thirdUid` 精确相等的记录。门户身份在分页 HR 记录中按数字 `userId` 精确匹配。两者都要求唯一在职记录、正数门户用户 id 和非空企微 id。缺少或存在歧义的映射会返回结构化失败，不按姓名猜测，也不把企微 id 当成门户 id。
 
-<a id="internal-routes"></a>
-## 内部接口
+市场列表、详情和工具查询携带 URL 编码的 `X-User-Info`，包含解析后的门户 `userId/userName`。这是可信后端身份断言，不是登录凭据。权限检查使用解析后的企微 `sub`。原始 HR 记录、身份头和连接配置均保留在 Host。
 
-适配器在配置的 `baseUrl` 下发送 `POST` 请求。响应必须为 HTTP 成功状态，并同时满足 `success: true` 和字符串 `code: "200"`，其他情况均失败。成功 `data` 字段如下：
+<a id="existing-read-apis"></a>
+## 已有只读接口
 
-| 路由 | 请求字段 | 成功响应 `data` |
+下列均为已有 `POST` 接口，路径相对于配置的市场根地址，该根地址包含 `/mcp-market` context-path。Controller 成功响应必须同时满足 HTTP 成功、`success: true`、字符串 `code: "200"` 和预期的 `data` 字段。
+
+| 路由 | 请求字段 | 用途 |
 |---|---|---|
-| `/api/internal/mcp/authorized/page` | `corpId`、`sub`、`pageNum`、`pageSize` | `records`、`total`、`pageNum`、`pageSize` |
-| `/api/internal/mcp/authorized/detail` | `corpId`、`sub`、`id` | 服务字段和 `tools[]` |
-| `/api/internal/mcp/authorized/invoke` | `corpId`、`sub`、`id`、`path`、`tool`、`arguments`、`schemaFingerprint` | `isError`、`content[{type:"text",text}]` |
+| `/api/mcp/admin/user/list` | 企微身份传 `keyword`，以及 `activeOnly: true`、`pageNum/pageSize` | 从 HR 记录精确解析门户和企微身份 |
+| `/api/mcp/list` | `accessFilter: "all"`、`pageNum/pageSize` | 查询映射门户用户可见的已上架候选服务 |
+| `/api/internal/mcp/permission/check` | `sub`、`path` | 校验实际成员当前的使用权限 |
+| `/api/mcp/query/by/id` | 数字 `id` | 显式发现工具前复核所选服务 |
+| `/api/mcp/tool/list` | 数字 `mcpServiceId` | 读取工具名、说明和字符串编码的 `inputSchema` |
 
-服务记录包含字符串 `id`、`path`、`name`、`description`，字面值 `authorized: true`、`published: true`，以及 `available`、`connecting`、`failed`、`maintenance` 中的 `status`。详情工具包含字符串 `name`、`description` 和根 `type` 为 `object` 的对象 `inputSchema`。响应不得暴露 MCP 连接地址、上游凭据或 `integrationConfig`。
+列表接口负责上架状态和门户可见范围。权限接口不检查上架，因此不能代替列表。每个返回服务还必须满足 `allowed: true`，并核对身份、path 和资源 id。适配器排除改造中的服务，不发送管理员权限声明，也不调用申请、授予或撤销接口。
 
-分页从 1 开始，每页数量由配置指定且不超过 100，所有页的 `total` 必须一致，服务 id 不得重复。详情必须返回请求的 id 以及与分页记录一致的 path。DSH 验证完整目录后才返回服务；不完整、重复、超限或不支持的 schema 均被拒绝。字节、数量与超时限制由 Provider [Config](../../packages/company/mcp-provider/src/http.ts)负责。
+<a id="directory-and-tool-details"></a>
+## 目录与工具详情
 
-成员、可见范围、上架或使用授权校验失败时，后端返回 `FORBIDDEN` 或 `NOT_FOUND`；执行 fingerprint 过期时返回 `TOOL_CHANGED`。HTTP 403 也会拒绝访问。其他失败不返回目录。无法信任或被中断的执行响应会产生结果未知错误，用户重试前必须检查实际操作。`isError: true` 记录工具失败。
+目录查询直接返回服务名、说明和列表中的工具数量，不拉取工具 schema 或连接端点。显式发现工具时，先重新检查当前授权目录，再读取详情和工具。工具 schema 必须能从 JSON 字符串解码为受支持的对象 schema。工具 schema 非法只让详情发现失败，不影响目录读取。
 
-<a id="invocation-checks"></a>
-## 调用校验
+身份解析、分页和权限检查共享整次操作的超时及字节预算。分页总数必须一致，服务 id 不得重复。不安全的数字 id、不完整分页、超限响应、权限响应不匹配或失败信封均返回空目录及失败信息，不使用共享成员目录缓存。
 
-市场必须对每次详情和执行请求重新校验成员、所选 MCP、上架状态与当前 schema。执行前必须授权请求的 id、解析其当前 path 和原始工具名，并比对所传 fingerprint。这些校验必须与分发共享一致的授权/schema 视图，避免通过较早的详情响应绕过并发授权或工具变更。
-
-DSH 对模型可见的 `{name, description, parameters}` 生成 SHA-256 fingerprint，输入为对象键按字典序排序、数组保持顺序且无额外空白的规范 JSON。`parameters` 是详情工具的 `inputSchema`。公开工具名由稳定服务 id 和原始工具名生成；命名与 fingerprint 的权威实现为 [companyMcpToolName 和 companyMcpFingerprint](../../packages/company/mcp-provider/src/provider.ts)。后端校验 `schemaFingerprint` 时必须使用相同表示。
-
-DSH 读取既有 MCP 权限，成员可为 Cloud Agent 选择有权限的工具。DSH 不提交申请，也不授予、撤销或启用权限。目录请求读取当前授权，不使用共享用户缓存，失败返回空目录。Cloud Agent 保存和发布会固定工具 fingerprint，启动、模型步骤与执行均重新校验实际运行者权限。成员使用其他作者发布的公开 Agent 时使用自己的 MCP 授权，发布不会转移作者权限。
+Cloud Agent 草稿能力元数据仍可使用已发现的工具。执行定义在发出任何调用请求前返回 `company-mcp/call-unavailable`。适配器不会调用虚构的执行端点，也不会将目录访问权当成 MCP 传输凭据。
 
 <a id="deployment-and-verification"></a>
 ## 部署与验证
 
-可选的[市场 patch](../../packages/company/mcp-provider/cordis.patch.yml)依赖企微认证和凭据提供方。部署提供 `DSH_MCP_MARKET_URL`、`DSH_WECOM_CORP_ID` 和 `DSH_MCP_MARKET_TOKEN` 服务凭据引用。[Cloud Agent patch](../../packages/company/cloud-agent/cordis.patch.yml)消费该 Provider。这两个 patch 均不负责部署市场后端。
+可选的[市场 patch](../../packages/company/mcp-provider/cordis.patch.yml)依赖公司身份服务。`DSH_MCP_MARKET_URL` 指向已有后端根地址；官方登录复用已有的 `DSH_WECOM_CORP_ID`。适配器不要求独立市场服务 Token。请求限制见 [Config](../../packages/company/mcp-provider/src/http.ts)。
 
-仓库测试覆盖双成员隔离、执行身份、撤权、未上架 MCP、schema 变更、失败响应及执行结果未知。真实 Loader fixture 组合 HTTP Provider 和浏览器 Remote。`company-mcp-member` 无密钥录制 Session 启动正式 headless profile，记录 HTTP 成功及随后撤权。真实市场联调需要后端接口和部署凭据；仓库 fixture 未完成真实市场联调。
+当前适配器面向可信内部后端，管理端 HR 只读查询和内部权限检查须由部署网络限制访问。公网门户网关可能还要求自己的登录态和操作资源上下文；适配器不会伪造这些凭据。真实网关认证和 MCP 执行需要另行接入。
+
+测试覆盖身份精确映射、双用户隔离、开放服务、撤权、分页、读取上限、失败响应及工具发现失败。真实 Loader 组合 Provider 和成员 Remote。`company-mcp-member` 无密钥 headless 快照记录有权限的目录及撤权后的空目录。尚未验证生产市场连通性。
 
 <a id="dev-note"></a>
 ## 开发备注

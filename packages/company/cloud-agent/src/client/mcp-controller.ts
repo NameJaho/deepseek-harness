@@ -91,7 +91,7 @@ export class McpController {
       if (!result.ok) throw result.error
       const catalog = this.snapshot.catalog
       if (catalog !== null) this.set({ catalog: { ...catalog, servers: catalog.servers.map(server =>
-        server.id === id ? { ...server, tools: result.value } : server) } })
+        server.id === id ? { ...server, tools: result.value, toolCount: result.value.length } : server) } })
     }, 'mcpConnected', () => discoverMcp(id))
     return { hooks: { companyMcp: this }, refreshMcp, discoverMcp,
       retryMcp: () => (this.retry ?? refreshMcp)() }

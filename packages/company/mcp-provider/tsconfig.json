@@ -27,9 +27,6 @@
       "path": "../../core/tools"
     },
     {
-      "path": "../../credentials/credentials"
-    },
-    {
       "path": "../wecom-auth"
     }
   ]

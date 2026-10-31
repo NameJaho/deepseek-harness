@@ -81,13 +81,13 @@ function McpEntry({ entry, busy, discoverMcp, t }: EntryProps) {
     <div className={css.cardHeading}><h2>{entry.name}</h2><Tag tone={mcpStatusTones[entry.status]}>{t(mcpStatuses[entry.status])}</Tag>
     </div>
     <p className={css.description}>{entry.description || t('mcpListNoDescription')}</p>
-    <p className={css.metadata}>{t('mcpToolsCount', { count: String(entry.tools.length) })}</p>
+    <p className={css.metadata}>{t('mcpToolsCount', { count: String(entry.toolCount ?? entry.tools.length) })}</p>
     {entry.updatedAt !== undefined && <p className={css.metadata}>{t('mcpUpdated', { time: new Date(entry.updatedAt).toISOString() })}</p>}
     <Button variant="outline" disabled={busy || entry.status === 'maintenance'}
       onClick={() => { void discoverMcp(entry.id) }}>{t('mcpInspect')}</Button>
-    <details className={css.mcpTools}><summary>{t('mcpToolsCount', { count: String(entry.tools.length) })}</summary>
+    {entry.tools.length > 0 && <details className={css.mcpTools}><summary>{t('mcpToolsCount', { count: String(entry.tools.length) })}</summary>
       <div className={css.mcpToolList}>{entry.tools.map(tool => <ToolDisclosure key={tool.name} tool={tool} t={t} />)}</div>
-    </details>
+    </details>}
   </article>
 }
 
@@ -104,6 +104,7 @@ export function CompanyMcpPage(props: PageProps) {
   const entries = view.catalog?.servers.filter(entry => (filter === 'all' || entry.status === filter)
     && terms.every(term => `${entry.name} ${entry.description} ${entry.tools.map(tool => `${tool.name} ${tool.rawName} ${tool.description}`).join(' ')}`
       .toLocaleLowerCase().includes(term))) ?? []
+  const failure = view.catalog?.failure?.code === 'company-mcp/member-unresolved' ? 'mcpMemberUnresolved' : 'mcpFailed'
   return <section className={css.mcpPage} aria-busy={view.busy}>
     <div className={css.heading}><p className={css.help}>{props.t('mcpDiscoveryHelp')}</p>
       <Button variant="outline" disabled={view.busy} onClick={() => { void props.refreshMcp() }}>{props.t('mcpRefresh')}</Button></div>
@@ -117,11 +118,11 @@ export function CompanyMcpPage(props: PageProps) {
         {Object.entries(mcpStatuses).map(([value, key]) => <option key={value} value={value}>{props.t(key)}</option>)}
       </select></label>
     </div>
-    {view.error && <div className={css.notice} role="alert"><span>{props.t('mcpFailed')}</span>
+    {view.error && <div className={css.notice} role="alert"><span>{props.t(failure)}</span>
       <Button variant="outline" disabled={view.busy} onClick={() => { void props.retryMcp() }}>{props.t('retry')}</Button></div>}
     {view.catalog === null && view.loading ? <div className={css.grid} role="status" aria-label={props.t('loading')}>
       {['a', 'b', 'c'].map(key => <div key={key} className={css.skeleton} />)}</div>
-      : entries.length === 0 ? <p className={css.empty}>{props.t('mcpEmpty')}</p>
+      : entries.length === 0 ? !view.error && <p className={css.empty}>{props.t('mcpEmpty')}</p>
         : <div className={`${css.grid} ${css.mcpGrid}`}>{entries.map(entry => <McpEntry key={entry.id} entry={entry}
           busy={view.busy} discoverMcp={props.discoverMcp} t={props.t} />)}</div>}
   </section>
