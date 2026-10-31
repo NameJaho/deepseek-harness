@@ -16,6 +16,8 @@ import type {} from '@deepseek-ai/dsh-company-wecom-auth'
 import type { CompanyMarketSubject, CompanyOwnerScope } from '@deepseek-ai/dsh-company-wecom-auth/types'
 import type {} from '@deepseek-ai/dsh-company-knowledge'
 import type { CompanyKnowledgeDetailedSearchResult, CompanyKnowledgeRetrieveOptions } from '@deepseek-ai/dsh-company-knowledge/types'
+import type {} from '@deepseek-ai/dsh-user-questions'
+import { publicationQuestion, publicationVisibility, type PublicationLanguage } from './publication.ts'
 import type { ToolDefinition, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import type { FileAttachmentRef } from '@deepseek-ai/dsh-attachment'
@@ -442,6 +444,53 @@ export class CloudAgentService extends TypertRemoteService {
       const record = await this.requireRecord(request, ownerId)
       return this.saveRelease(record, 'published', request.authoringSessionId, visibility, authorize)
     })
+  }
+
+  /** Ask the human to choose public/private visibility for an exact saved revision.
+   * @param agent - live owning authoring Agent.
+   * @param id - saved draft selected in this conversation.
+   * @param revision - exact revision shown by the authoritative question.
+   * @param signal - cancellation while waiting or committing.
+   * @param language - language of the user's conversation.
+   * @param requestedVisibility - requested audience; omission retains an already published audience.
+   * @returns cancelled, published, or unchanged publication metadata.
+   */
+  async requestPublication(agent: Agent, id: CloudAgentId, revision: number, signal: AbortSignal,
+    language: PublicationLanguage, requestedVisibility?: 'public' | 'private'): Promise<{
+    action: 'cancelled' | 'published' | 'already-published'
+    id: CloudAgentId
+    revision: number
+    releaseId?: CloudAgentReleaseId
+    visibility?: 'public' | 'private'
+    version?: number
+  }> {
+    await this.initialized
+    signal.throwIfAborted()
+    const authorize = await this.requireAuthoring(agent.id, id)
+    const record = await this.requireRecord({ id, expectedRevision: revision }, this.ownerId())
+    const current = record.releases.find(release => release.id === record.publishedReleaseId)
+    if (current !== undefined && digest({ definition: current.definition, mcp: current.mcpBindings ?? [],
+      skills: current.skillSnapshots ?? [], knowledge: current.knowledgeBindings ?? [], preset: current.capabilityPreset })
+      === digest({ definition: record.draft, mcp: record.draftMcpBindings ?? [],
+        skills: record.draftSkillSnapshots ?? [], knowledge: record.draftKnowledgeBindings ?? [], preset: record.draftCapabilityPreset })
+      && (requestedVisibility === undefined || requestedVisibility === (current.visibility ?? 'public'))) {
+      authorize()
+      return { action: 'already-published', id, revision: record.revision, releaseId: current.id,
+        visibility: current.visibility ?? 'public', version: current.version }
+    }
+    const questions = this.owner.get('userQuestions')
+    if (questions === undefined) throw new RemoteError('cloud-agent/unavailable', 'Publication confirmation is unavailable; reconnect and try again', {})
+    const question = publicationQuestion(record, language)
+    const answer = await questions.ask({ agent, signal, questions: [question] })
+    signal.throwIfAborted()
+    const item = answer.answers.find(value => value.id === question.id)
+    const visibility = item?.custom === undefined ? publicationVisibility(item?.selected ?? [], language) : undefined
+    if (visibility === undefined) return { action: 'cancelled', id, revision: record.revision }
+    authorize()
+    const saved = await this.publish({ id, expectedRevision: revision, authoringSessionId: agent.id, visibility })
+    const release = saved.releases.find(value => value.id === saved.publishedReleaseId)
+    if (release === undefined) throw new Error('Publication committed without its release')
+    return { action: 'published', id, revision: saved.revision, releaseId: release.id, visibility, version: release.version }
   }
 
   /** Withdraw publication while preserving existing private Sessions and releases.
@@ -913,10 +962,11 @@ export class CloudAgentService extends TypertRemoteService {
       effectiveDigest: digest({ release: release.digest ?? digest(release.definition), runPreset, provider, model, permission: 'read-only' }) }
     let handle: AgentHandle | undefined
     let workspace: Workspace | undefined
+    const sharedWorkspace = true
     try {
       await this.validateCapabilities(release.id)
-      const cwd = await this.workspaces.workspace(sessionId)
-      await this.workspaces.materializeSkills(sessionId, release.skillSnapshots ?? [])
+      const cwd = await this.workspaces.agentWorkspace(String(request.id), String(ownerId))
+      await this.workspaces.materializeSkillsAt(cwd, release.skillSnapshots ?? [])
       workspace = await this.owner.workspaceRegistry.create(cwd, release.definition.name)
       handle = await this.owner.agents.create({ sessionId, signal, meta: { cwd, agentPreset: presetId(release.id) },
         agentOptions: { provider, model }, setup: async (agentCtx, agent) => {
@@ -929,7 +979,7 @@ export class CloudAgentService extends TypertRemoteService {
         } })
       await workspace.attachSession(sessionId)
       await (await this.ready).table('conversations').put(sessionId, binding)
-    } catch (error) { return this.rollbackSession(error, sessionId, workspace, handle) }
+    } catch (error) { return this.rollbackSession(error, sessionId, workspace, handle, !sharedWorkspace, !sharedWorkspace) }
     this.handles.add(handle)
     return { sessionId, releaseId: release.id }
   }
@@ -942,26 +992,30 @@ export class CloudAgentService extends TypertRemoteService {
     const release = binding.releaseId === undefined ? undefined : this.releases.get(binding.releaseId)
     if (binding.role === 'usage' && release === undefined) throw unavailableCapability(binding.releaseId ?? source.id)
     let workspace: Workspace | undefined
+    const sharedWorkspace = binding.role === 'usage' && binding.agentId !== null
     try {
-      const cwd = await this.workspaces.workspace(childId)
-      if (release !== undefined) await this.workspaces.materializeSkills(childId, release.skillSnapshots ?? [])
+      const cwd = sharedWorkspace
+        ? await this.workspaces.agentWorkspace(String(binding.agentId), String(binding.ownerId ?? 'local-owner'))
+        : await this.workspaces.workspace(childId)
+      if (release !== undefined) await this.workspaces.materializeSkillsAt(cwd, release.skillSnapshots ?? [])
       workspace = await this.owner.workspaceRegistry.create(cwd, release?.definition.name ?? 'Cloud Agent')
       const ownedWorkspace = workspace
       return { cwd, workspace, rollback: async () => {
-        await this.rollbackSession(new Error('Fork creation failed'), childId, ownedWorkspace).catch((error: unknown) => {
+        await this.rollbackSession(new Error('Fork creation failed'), childId, ownedWorkspace, undefined, !sharedWorkspace, !sharedWorkspace).catch((error: unknown) => {
           if (error instanceof AggregateError) throw error
         })
       } }
-    } catch (error) { return this.rollbackSession(error, childId, workspace) }
+    } catch (error) { return this.rollbackSession(error, childId, workspace, undefined, !sharedWorkspace, !sharedWorkspace) }
   }
-  private async rollbackSession(error: unknown, sessionId: SessionId, workspace?: Workspace, handle?: AgentHandle): Promise<never> {
+  private async rollbackSession(error: unknown, sessionId: SessionId, workspace?: Workspace, handle?: AgentHandle,
+    discardFiles = true, deleteWorkspace = true): Promise<never> {
     const failures: unknown[] = [error]
     try { await (await this.ready).table('conversations').delete(sessionId) } catch (cleanupError) { failures.push(cleanupError) }
     try { await handle?.dispose() } catch (cleanupError) { failures.push(cleanupError) }
-    if (workspace !== undefined) {
+    if (deleteWorkspace && workspace !== undefined) {
       try { await this.owner.workspaceRegistry.delete(workspace.id) } catch (cleanupError) { failures.push(cleanupError) }
     }
-    try { await this.workspaces.discardWorkspace(sessionId) } catch (cleanupError) { failures.push(cleanupError) }
+    if (discardFiles) try { await this.workspaces.discardWorkspace(sessionId) } catch (cleanupError) { failures.push(cleanupError) }
     if (failures.length > 1) throw new AggregateError(failures, 'Session creation and rollback failed', { cause: error })
     throw error
   }

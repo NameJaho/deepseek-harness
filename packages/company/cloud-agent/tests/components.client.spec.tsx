@@ -193,7 +193,8 @@ describe('scoped Agent capabilities and information', () => {
     const { t, sessionId, useCloudAgent, refresh, openConversation } = agentProps(viewOf(catalog))
     const props = { t, sessionId, useCloudAgent, useProjection, refresh, openConversation }
     render(<CloudAgentInfo {...props as ComponentProps<typeof CloudAgentInfo>} />)
-    for (const label of ['owner', 'Version 4', 'creation-mode', 'run-mode', 'runtime-provider', 'runtime-model', en.statusDisabled, 'release-digest', 'effective-digest']) expect(screen.getByText(label)).toBeTruthy()
+    for (const label of ['owner', 'Version 4', 'creation-mode', 'run-mode', 'runtime-provider', en.statusDisabled, 'release-digest', 'effective-digest']) expect(screen.getByText(label)).toBeTruthy()
+    expect(screen.getAllByText('runtime-model')).toHaveLength(2)
     fireEvent.click(screen.getByRole('button', { name: en.sourceSession }))
     expect(props.openConversation).toHaveBeenCalledWith('source')
   })

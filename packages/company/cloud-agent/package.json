@@ -73,6 +73,7 @@
   "devDependencies": {
     "@deepseek-ai/dsh-company-wecom-auth": "workspace:*",
     "@deepseek-ai/dsh-commands": "workspace:*",
+    "@deepseek-ai/dsh-user-questions": "workspace:*",
     "@deepseek-ai/dsh-attachment": "workspace:*",
     "@deepseek-ai/dsh-client-ui-plugin-manager": "workspace:*",
     "@deepseek-ai/dsh-api-gateway": "workspace:*",

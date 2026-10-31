@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-A scoped preset plugin consumed by the [Cloud Agent Host](../cloud-agent/README.md). The Host compiles trusted configuration from a saved release; this plugin is not an independent execution provider and does not accept connection settings, credentials or executable YAML.
+A scoped preset plugin consumed by the [Cloud Agent Host](../cloud-agent/README.md). The Host compiles trusted configuration from a saved release; this plugin is not an independent execution provider and does not accept connection settings, credentials or executable YAML. Publication confirmation is owned by the Host and asks the user for public, private or cancel; this runtime never publishes by itself.
 
 ## Table of Contents
 

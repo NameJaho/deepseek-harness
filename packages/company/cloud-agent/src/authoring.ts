@@ -1,4 +1,4 @@
-/** Model-facing reusable requirements extraction; publication is an explicit human command. */
+/** Model-facing reusable requirements and publication with a human visibility choice. */
 import type { Context } from '@deepseek-ai/cordis'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { defineTool } from '@deepseek-ai/dsh-tools'
@@ -17,10 +17,12 @@ export function registerAuthoringTool(ctx: Context, service: CloudAgentService):
       + 'Preserve confirmed rules and omit credentials, endpoints, temporary paths and one-off results. '
       + 'Use discover for a selected MCP server; select exact catalog or discovered tool and skill names. '
       + 'Knowledge uses a separate direct retrieval service: select knowledgeSources from catalog even when no MCP servers exist. '
-      + 'Saving does not publish. Show the saved name, description and revision; the user publishes with '
-      + '/publish-agent confirm <revision> <public|private>. Preview opens a separate private test conversation.',
+      + 'Saving does not publish. When the user asks to publish, call publish for the saved draft; the system asks the human to choose public space, private use, or cancel. '
+      + 'Do not ask the user to type a revision or slash command. Preview opens a separate private test conversation.',
     parameters: {
-      action: { type: 'string', required: true, enum: ['catalog', 'discover', 'save', 'preview', 'clone'] },
+      action: { type: 'string', required: true, enum: ['catalog', 'discover', 'save', 'publish', 'preview', 'clone'] },
+      language: { type: 'string', enum: ['zh', 'en'], description: 'Human publication question language; defaults to Chinese.' },
+      visibility: { type: 'string', enum: ['public', 'private'], description: 'Requested publication audience; the human still confirms the actual audience.' },
       agentId: { type: 'string', description: 'Exact draft or published Agent id; omission uses this conversation’s draft.' },
       expectedRevision: { type: 'number', description: 'Exact saved revision required for replacing or testing a draft.' },
       releaseId: { type: 'string', description: 'Exact accessible published release id, required for clone.' },
@@ -87,11 +89,16 @@ export function registerAuthoringTool(ctx: Context, service: CloudAgentService):
         const saved = await service.saveFromConversation(agent, String(execution.callId), draft,
           args.agentId === undefined ? undefined : brandString<CloudAgentId>(args.agentId), args.expectedRevision)
         return JSON.stringify({ action: 'saved', id: saved.id, revision: saved.revision, draft: saved.draft,
-          confirmation: `/publish-agent confirm ${saved.revision} <public|private>` })
+          nextAction: 'If the user requests publication, call publish; the system asks the human to choose visibility.' })
       }
       const targetId = args.agentId ?? current?.id
       if (targetId === undefined) throw new Error('Supply agentId from catalog')
       const id = brandString<CloudAgentId>(targetId)
+      if (args.action === 'publish') {
+        if (current === undefined) throw new Error('Save this Agent draft before requesting publication')
+        return JSON.stringify(await service.requestPublication(agent, id, args.expectedRevision ?? current.revision,
+          execution.signal, args.language ?? 'zh', args.visibility))
+      }
       if (args.action === 'clone') {
         if (args.releaseId === undefined) throw new Error('clone requires releaseId from catalog')
         const saved = await service.clone({ id, releaseId: brandString<CloudAgentReleaseId>(args.releaseId), authoringSessionId: agent.id })

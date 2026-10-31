@@ -28,6 +28,7 @@
     { "path": "../../session/session-projection" },
     { "path": "../../workspace/workspace" },
     { "path": "../../interaction/permission-presets" },
-    { "path": "../../interaction/commands" }
+    { "path": "../../interaction/commands" },
+    { "path": "../../interaction/user-questions" }
   ]
 }

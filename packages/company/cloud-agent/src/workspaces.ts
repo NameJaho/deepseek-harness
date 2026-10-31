@@ -15,7 +15,16 @@ export class SessionWorkspaces {
    * @returns its private persistent directory.
    */
   async workspace(sessionId: SessionId): Promise<string> {
-    const path = join(this.root, createHash('sha256').update(sessionId).digest('hex'))
+    return this.workspaceKey(String(sessionId))
+  }
+
+  /** Prepare one stable directory shared by one owner and one Agent across usage Sessions. */
+  async agentWorkspace(agentId: string, ownerId: string): Promise<string> {
+    return this.workspaceKey(`agent:${ownerId}:${agentId}`)
+  }
+
+  private async workspaceKey(key: string): Promise<string> {
+    const path = join(this.root, createHash('sha256').update(key).digest('hex'))
     await mkdir(path, { recursive: true, mode: 0o700 })
     return path
   }
@@ -33,10 +42,16 @@ export class SessionWorkspaces {
    */
   async materializeSkills(sessionId: SessionId, skills: readonly CloudAgentSkillSnapshot[]): Promise<void> {
     const root = await this.workspace(sessionId)
+    await this.materializeSkillsAt(root, skills)
+  }
+
+  /** Write pinned skill files into an already selected Agent workspace. */
+  async materializeSkillsAt(root: string, skills: readonly CloudAgentSkillSnapshot[]): Promise<void> {
+    await rm(join(root, '.skills'), { recursive: true, force: true })
     for (const skill of skills) for (const resource of [{ path: 'SKILL.md', base64: Buffer.from(skill.content).toString('base64') }, ...skill.resources]) {
       const path = join(root, '.skills', skill.name, resource.path)
       await mkdir(dirname(path), { recursive: true, mode: 0o755 })
-      await writeFile(path, Buffer.from(resource.base64, 'base64'), { flag: 'wx', mode: 0o644 })
+      await writeFile(path, Buffer.from(resource.base64, 'base64'), { flag: 'w', mode: 0o644 })
     }
   }
 }

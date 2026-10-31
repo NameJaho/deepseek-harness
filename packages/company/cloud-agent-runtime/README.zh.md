@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-由 [Cloud Agent Host](../cloud-agent/README.zh.md) 消费的作用域 preset 插件。Host 从已保存 release 编译可信配置；本插件不是独立执行提供方，不接受连接设置、凭据或可执行 YAML。
+由 [Cloud Agent Host](../cloud-agent/README.zh.md) 消费的作用域 preset 插件。Host 从已保存 release 编译可信配置；本插件不是独立执行提供方，不接受连接设置、凭据或可执行 YAML。发布确认由 Host 负责，在会话中询问公共、私有或取消；运行时不会自行发布。
 
 ## 目录
 

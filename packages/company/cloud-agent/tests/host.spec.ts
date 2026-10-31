@@ -88,6 +88,11 @@ async function fixture(
     presetForSession: (session: Session) => session.header.agentPreset,
     mount: async () => {}, mountRetained: async () => {},
   } as never)
+  ctx.provide('userQuestions', {
+    ask: async (request: { questions: readonly { id: string }[] }) => ({
+      answers: [{ id: request.questions[0]!.id, selected: ['仅自己使用'] }],
+    }),
+  } as never)
   const queued = vi.fn(async () => {})
   ctx.provide('sessionController', { resolveAgent: async (id: SessionId) => ({ agent: agents.get(id) }),
     modelCatalog: async () => ({ default: { provider: 'fixture', model: 'fixture' }, routableProviders: ['fixture'], groups: [], failures: [] }),
@@ -284,35 +289,26 @@ it('reports updated, disabled, withdrawn and deleted usage without redirecting o
   expect(f.declared.size).toBe(0)
 })
 
-it('queues an ordinary-session draft, shows its revision, and publishes directly only on explicit confirmation', async (test) => {
+it('queues an ordinary-session draft and asks for visibility in natural language', async (test) => {
   const f = await fixture(test)
   const sessionId = await f.editor()
   const agent = f.agents.get(sessionId)!
   expect(agent.session.header.agentPreset).toBe('standard')
   expect(f.ctx.commands.list(agent).map(command => command.name)).toEqual(['create-agent', 'publish-agent'])
   const run = (line: string) => f.ctx.commands.execute(agent, line, [], new AbortController().signal)
-  expect((await run('/publish-agent confirm 1 public'))?.result.kind).toBe('error')
-  expect(f.queued).not.toHaveBeenCalled()
   expect((await run('/publish-agent'))?.result.kind).toBe('success')
   expect(f.queued).toHaveBeenCalledWith(expect.objectContaining({ sessionId, mode: 'queue', content: [expect.objectContaining({
-    type: 'text', text: expect.stringContaining('Do not publish.') as string,
+    type: 'text', text: expect.stringContaining('Do not ask me to type a revision') as string,
   })] }), expect.any(AbortSignal))
   const saved = await f.ctx.cloudAgents.saveFromConversation(agent, 'confirmed-draft', f.draft)
-  const review = await run('/publish-agent')
-  expect(review?.result.text).toContain(saved.draft.name)
-  expect(review?.result.text).toContain(saved.draft.description)
-  expect(review?.result.text).toContain(`/publish-agent confirm ${saved.revision} <public|private>`)
-  expect((await f.ctx.cloudAgents.catalog()).mine[0]?.releases).toEqual([])
-  const confirm = `/publish-agent confirm ${saved.revision} private`
-  const result = await run(confirm)
+  const result = await run('/publish-agent')
   expect(result?.result.kind).toBe('success')
-  expect((await run(confirm))?.result.kind).toBe('success')
+  expect((await run('/publish-agent'))?.result.kind).toBe('success')
   expect(f.queued).toHaveBeenCalledOnce()
   const published = (await f.ctx.cloudAgents.catalog()).mine[0]!
   expect(published.releases).toHaveLength(1)
   expect(published.releases[0]?.visibility).toBe('private')
   expect(published.releases[0]?.source?.throughSeq).toBeGreaterThan(saved.sourceThroughSeq!)
-  await expect(run(`/publish-agent confirm ${saved.revision} public`)).rejects.toMatchObject({ code: 'cloud-agent/conflict' })
   f.ctx.permissionPresets.set(agent.session, 'read-only')
   expect((await run('/create-agent more requirements'))?.result.kind).toBe('error')
   expect((await run('/publish-agent'))?.result.kind).toBe('error')

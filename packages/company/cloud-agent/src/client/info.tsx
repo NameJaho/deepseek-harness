@@ -63,6 +63,20 @@ export function CloudAgentInfo(props: PropsRuntime<'sidebar.right.pane.tab'> & S
       <div><dt>{props.t('digest')}</dt><dd>{release.digest ?? props.t('notRecorded')}</dd></div>
       <div><dt>{props.t('effectiveDigest')}</dt><dd>{conversation.effectiveDigest ?? props.t('notRecorded')}</dd></div>
     </dl>
+    <section className={css.capabilitySection}>
+      <h3>{props.t('executionChain')}</h3>
+      <p className={css.metadata}>{props.t('executionChainHint')}</p>
+      <ol className={css.infoList}>
+        <li>{actual?.model ?? props.t('model')}</li>
+        {(release.definition.knowledgeSources ?? []).length > 0 && <li><code>cloud_knowledge</code></li>}
+        {(release.mcpBindings ?? release.definition.mcpTools ?? []).map((name) => {
+          const toolName = typeof name === 'string' ? name : name.name
+          return <li key={toolName}><code>{toolName}</code></li>
+        })}
+        {(release.skillSnapshots ?? []).length > 0 && <li><code>cloud_skill</code></li>}
+        <li>{props.t('executionResponse')}</li>
+      </ol>
+    </section>
     {release.source !== undefined && connected.record !== undefined && <Button variant="outline" onClick={() => {
       if (release.source !== undefined) props.openConversation(release.source.sessionId)
     }}>{props.t('sourceSession')}</Button>}

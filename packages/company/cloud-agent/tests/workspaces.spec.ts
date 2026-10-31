@@ -22,3 +22,14 @@ it('prepares distinct private directories and removes only a failed workspace', 
   await expect(stat(two)).rejects.toMatchObject({ code: 'ENOENT' })
   expect(await readFile(join(one, '.skills/skill/SKILL.md'), 'utf8')).toBe('Instructions')
 })
+
+it('reuses one workspace for one Agent and owner across usage Sessions', async (test) => {
+  const root = await mkdtemp(join(tmpdir(), 'cloud-agent-workspaces-'))
+  test.onTestFinished(() => rm(root, { recursive: true, force: true }))
+  const files = new SessionWorkspaces(root)
+  const first = await files.agentWorkspace('agent-a', 'wecom:corp:alice')
+  const second = await files.agentWorkspace('agent-a', 'wecom:corp:alice')
+  const otherOwner = await files.agentWorkspace('agent-a', 'wecom:corp:bob')
+  expect(second).toBe(first)
+  expect(otherOwner).not.toBe(first)
+})

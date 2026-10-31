@@ -50,7 +50,7 @@ export interface CloudAgentInjected {
   readonly saveCapabilities: (
     id: CloudAgentId,
     revision: number,
-    capabilities: Pick<CloudAgentDraft, 'mcpTools' | 'mcpServers' | 'skills'>,
+    capabilities: Pick<CloudAgentDraft, 'mcpTools' | 'mcpServers' | 'skills' | 'knowledgeSources'>,
     authoringSessionId: SessionId,
   ) => Promise<CloudAgentSaveResult>
   readonly publish: (record: CloudAgentRecord, authoringSessionId?: SessionId, visibility?: CloudAgentVisibility) => Promise<boolean>

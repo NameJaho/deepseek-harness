@@ -25,7 +25,7 @@ kind: "package-bundle"
 
 将 [cordis.patch.yml](cordis.patch.yml) 应用到已提供注入的 Host 服务和 MCP 提供方的 profile。该 patch 只挂载目录服务并设置绝对路径的私有 `workspaceRoot`，不会安装或配置提供方。[Config](src/config.ts) 定义发布、技能、附件分页和报告的上限。`capabilityPreset` 指定部署的技能目录作用域，与创建及运行 preset 分离。
 
-在本人拥有的 selectable/default 对话中，权限为 `workspace-write` 或 `danger-full-access` 时，可使用 `/create-agent [requirements]` 或 `/publish-agent`。尚无已保存草稿时，命令将根据已确认对话提取需求的请求入队，不会发布。检查保存后的名称、描述和 revision，再显式执行 `/publish-agent confirm <revision> <public|private>`。确认直接调用发布，无需另一次模型回合。完全相同的重放返回已有 release；过期或冲突确认失败，不新增 release。结果未知时，重试前先查询目录。
+在本人拥有的 selectable/default 对话中，权限为 `workspace-write` 或 `danger-full-access` 时，可使用 `/create-agent [requirements]` 或 `/publish-agent`。尚无已保存草稿时，命令将根据已确认对话提取需求的请求入队，不会发布。检查保存后的名称和描述后，直接用自然语言请求发布。模型会调用发布动作，系统在会话中询问发布到公共空间、仅自己使用或取消。用户不需要输入 revision 或确认命令。完全相同的重放返回已有 release；过期或冲突确认失败，不新增 release。结果未知时，重试前先查询目录。
 
 新编辑器会保留 profile 的 `danger-full-access` 默认权限；其他默认权限仍会请求 `workspace-write`。如果服务器没有可用沙箱，受控测试部署可在启动器的 `startup.env` 中显式设置 `DSH_PERMISSION_MODE=danger-full-access`；这会取消文件限制和审批提示。已有 Session 保留日志中的权限，因此修改默认值后应打开新编辑器。
 
@@ -34,7 +34,7 @@ kind: "package-bundle"
 <a id="ownership-and-execution"></a>
 ## 所有权与执行
 
-目录返回本人草稿、当前公开或本人拥有的 release，以及仅属于调用者的对话。公开条目不包含其他所有者的来源 Session 审计。新 usage Session 属于启动它的用户而非发布者，并绑定精确 release id。撤回、可见范围变化、新发布或删除后，已有 Session 保留原所有者与 release。使用条目显示 `available`、`updated`、`disabled`、`withdrawn`、`access-lost` 或 `deleted`；这些状态不会重定向已有 Session。
+目录返回本人草稿、当前公开或本人拥有的 release，以及仅属于调用者的对话。公开条目不包含其他所有者的来源 Session 审计。新 usage Session 属于启动它的用户而非发布者，并绑定精确 release id。同一用户使用同一 Agent 的新对话复用该 Agent 工作区；不同用户使用各自独立的工作区根目录。撤回、可见范围变化、新发布或删除后，已有 Session 保留原所有者与 release。使用条目显示 `available`、`updated`、`disabled`、`withdrawn`、`access-lost` 或 `deleted`；这些状态不会重定向已有 Session。
 
 `creationPreset` 和 `runPreset` 必须可选。创建在编辑器中挂载所选 preset。usage Session 只挂载其保留的 release preset：`runPreset` 仅验证并记录，不挂载，因此不能增加工具或权限。可选 provider/model 覆盖值会经过验证。绑定审计记录创建/运行 preset，以及包含 release、run preset、实际模型和强制 `read-only` 权限的生效摘要。运行时只提供批准的 MCP 工具、直连知识检索、固定技能、可下载文本报告和本对话文件读取；见[运行时](../cloud-agent-runtime/README.zh.md)。
 

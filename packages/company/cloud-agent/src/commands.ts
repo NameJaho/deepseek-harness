@@ -41,12 +41,14 @@ export function registerAuthoringCommands(ctx: Context, service: CloudAgentServi
         const permission = ctx.permissionPresets.current(agent.session)
         return permission === 'workspace-write' || permission === 'danger-full-access'
       }
-      const queueDraft = async (requirements: string, signal: AbortSignal): Promise<void> => {
+      const queueDraft = async (requirements: string, signal: AbortSignal, publish = false): Promise<void> => {
         await ctx.sessionController.prompt({ sessionId: agent.id,
           requestId: brandString<SessionPromptRequest['requestId']>(randomUUID()), mode: 'queue', content: [{ type: 'text', text:
             'Create or update an Agent draft from the confirmed reusable requirements and current configuration in this conversation. '
-            + 'Read cloud_agent catalog, then save a complete draft using only approved MCP tools and skills. '
-            + 'Do not publish. Show the saved name, description, revision and /publish-agent confirm <revision> <public|private> for me to confirm.'
+            + 'Read cloud_agent catalog, then save a complete draft using only approved MCP tools, knowledge sources and skills. '
+            + (publish ? 'Then call cloud_agent publish so the system asks me whether to publish to the public space, only for myself, or cancel. '
+              : 'Do not publish. Show the saved name and description; I can request publication in natural language. ')
+            + 'Do not ask me to type a revision or confirmation command.'
             + (requirements === '' ? '' : `\n\nAdditional requirements:\n${requirements}`) }] }, signal)
       }
       entry.stops.push(scoped.commands.register({
@@ -62,31 +64,22 @@ export function registerAuthoringCommands(ctx: Context, service: CloudAgentServi
       }))
       entry.stops.push(scoped.commands.register({
         definitionId: brandString<CommandDefinitionId>('@deepseek-ai/dsh-company-cloud-agent/publish-agent'),
-        name: 'publish-agent', description: 'Review and confirm publication of this conversation’s Agent', input: { hint: '[confirm <revision> <public|private>]' },
+        name: 'publish-agent', description: 'Publish this conversation’s Agent after asking for the audience', input: { hint: '[optional]' },
         handler: ({ rawInput, signal }) => ctx.agents.withInitiator(agent, async () => {
           signal.throwIfAborted()
           if (ctx.agents.get(agent.id) !== agent) return { kind: 'error', text: 'This conversation is no longer active.' }
           if (!writable()) return { kind: 'error', text: 'Select workspace-write before publishing. Your draft is preserved.' }
-          const input = rawInput.trim()
-          const confirm = /^confirm ([1-9][0-9]*) (public|private)$/u.exec(input)
-          if (input !== '' && confirm === null) return { kind: 'error', text: 'Use /publish-agent or /publish-agent confirm <revision> <public|private>.' }
           const catalog = await service.catalog()
           const binding = catalog.conversations.find(item => item.sessionId === agent.id && item.role === 'authoring')
           const record = catalog.mine.find(item => item.id === binding?.agentId)
           if (record === undefined) {
-            if (confirm !== null) return { kind: 'error', text: 'No saved draft matches this confirmation. Use /publish-agent to prepare one.' }
-            await queueDraft('', signal)
-            return { kind: 'success', text: 'Draft request queued. Confirm its saved name, description, revision and visibility before publication.' }
+            await queueDraft(rawInput.trim(), signal, true)
+            return { kind: 'success', text: '正在整理智能体，保存后将在会话中询问发布范围。' }
           }
-          if (confirm === null) return { kind: 'success', text:
-            `${record.draft.name}\n${record.draft.description}\nRevision ${record.revision}\n/publish-agent confirm ${record.revision} <public|private>` }
-          const expectedRevision = Number(confirm[1])
-          if (!Number.isSafeInteger(expectedRevision)) return { kind: 'error', text: 'Invalid revision. Review the saved draft with /publish-agent.' }
-          signal.throwIfAborted()
-          const visibility = confirm[2] === 'private' ? 'private' : 'public'
-          const saved = await service.publish({ id: record.id, expectedRevision, visibility, authoringSessionId: agent.id })
-          const release = saved.releases.find(item => item.id === saved.publishedReleaseId)
-          return { kind: 'success', text: `${saved.draft.name} published (${visibility}), version ${release?.version}, release ${saved.publishedReleaseId}.` }
+          const result = await service.requestPublication(agent, record.id, record.revision, signal, 'zh')
+          return { kind: 'success', text: result.action === 'cancelled' ? '已保留草稿，暂不发布。'
+            : result.action === 'already-published' ? `${record.draft.name} 已发布，无需重复发布。`
+              : `${record.draft.name} 已发布${result.visibility === 'public' ? '到公共空间' : '为私有智能体'}。` }
         }),
       }))
     }
