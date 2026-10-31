@@ -61,6 +61,7 @@ export class CompanyWecomAuthService extends Service {
   private readonly workspaceRoots = new Map<WecomIdentityId, string>()
   private readonly gatewayIdentities = new Map<WecomIdentityId, GatewayIdentity>()
   private readonly gatewayProvisioning = new Map<WecomIdentityId, Promise<void>>()
+  private readonly gatewayDiagnostics = new Set<string>()
   private timer: ReturnType<typeof setTimeout> | undefined
 
   /** @param owner - Host HTTP, cookie-key and domain providers.
@@ -85,6 +86,7 @@ export class CompanyWecomAuthService extends Service {
     if (this.config.gatewayIdentityEnabled && this.config.gatewayLogoutUrl === '') {
       throw new Error('wecom-auth: gatewayLogoutUrl is required when gatewayIdentityEnabled is enabled')
     }
+    if (this.config.gatewayIdentityEnabled) this.owner.logger.info('wecom-auth: gateway identity diagnostics enabled')
     const secret = process.env.DSH_WECOM_APP_SECRET
     if ((secret === undefined || secret.trim() === '') && !this.config.gatewayIdentityEnabled) {
       throw new Error('wecom-auth: set DSH_WECOM_APP_SECRET in the server environment')
@@ -170,20 +172,42 @@ export class CompanyWecomAuthService extends Service {
   private gatewayPrincipal(request: ConnectionTrustRequest): GatewayUserPrincipal | undefined {
     if (!this.config.gatewayIdentityEnabled) return undefined
     const encoded = header(request, 'x-user-info')
-    if (encoded === undefined || encoded.length > 16_384) return undefined
+    if (encoded === undefined) {
+      this.gatewayDiagnostic('missing-header', 'gateway X-User-Info header missing')
+      return undefined
+    }
+    if (encoded.length > 16_384) {
+      this.gatewayDiagnostic('header-too-large', 'gateway X-User-Info header exceeds 16 KiB')
+      return undefined
+    }
     let input: unknown
     try { input = JSON.parse(decodeURIComponent(encoded)) }
-    catch (_invalidGatewayIdentity) { return undefined }
+    catch (_invalidGatewayIdentity) {
+      this.gatewayDiagnostic('invalid-json', 'gateway X-User-Info header is not URL-encoded JSON')
+      return undefined
+    }
     const parsed = z.object({ userId: z.string().trim().min(1).max(256), userName: z.string().trim().min(1).max(256) })
       .passthrough().safeParse(input)
-    if (!parsed.success) return undefined
+    if (!parsed.success) {
+      this.gatewayDiagnostic('invalid-fields', 'gateway X-User-Info is missing a valid userId or userName')
+      return undefined
+    }
     const identityId = brandString<WecomIdentityId>(`i-${createHash('sha256').update(`gateway:${parsed.data.userId}`).digest('hex')}`)
     const principal: GatewayUserPrincipal = { kind: 'gateway-user', identityId,
       userId: brandString<WecomUserId>(parsed.data.userId), displayName: parsed.data.userName, role: DEFAULT_WECOM_ROLE }
     const current = this.gatewayIdentities.get(identityId)
     this.gatewayIdentities.set(identityId, { principal, ...(current?.workspace === undefined ? {} : { workspace: current.workspace }) })
-    if (current === undefined) this.provisionGatewayIdentity(identityId)
+    if (current === undefined) {
+      this.owner.logger.info(`wecom-auth: gateway identity received userId=${parsed.data.userId} userName=${parsed.data.userName}`)
+      this.provisionGatewayIdentity(identityId)
+    }
     return principal
+  }
+
+  private gatewayDiagnostic(key: string, message: string): void {
+    if (this.gatewayDiagnostics.has(key)) return
+    this.gatewayDiagnostics.add(key)
+    this.owner.logger.info(`wecom-auth: ${message}`)
   }
 
   private provisionGatewayIdentity(identityId: WecomIdentityId): void {
