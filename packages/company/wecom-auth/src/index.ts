@@ -86,7 +86,7 @@ export class CompanyWecomAuthService extends Service {
     if (this.config.gatewayIdentityEnabled && this.config.gatewayLogoutUrl === '') {
       throw new Error('wecom-auth: gatewayLogoutUrl is required when gatewayIdentityEnabled is enabled')
     }
-    if (this.config.gatewayIdentityEnabled) this.owner.logger.info('wecom-auth: gateway identity diagnostics enabled')
+    this.diagnostic('gateway identity diagnostics enabled')
     const secret = process.env.DSH_WECOM_APP_SECRET
     if (secret === undefined || secret.trim() === '') throw new Error('wecom-auth: set DSH_WECOM_APP_SECRET in the server environment')
     this.upstream = new WecomOfficial(this.config, secret, this.lifetime.signal)
@@ -196,7 +196,7 @@ export class CompanyWecomAuthService extends Service {
     const current = this.gatewayIdentities.get(identityId)
     this.gatewayIdentities.set(identityId, { principal, ...(current?.workspace === undefined ? {} : { workspace: current.workspace }) })
     if (current === undefined) {
-      this.owner.logger.info(`wecom-auth: gateway identity received userId=${parsed.data.userId} userName=${parsed.data.userName}`)
+      this.diagnostic(`gateway identity received userId=${parsed.data.userId} userName=${parsed.data.userName}`)
       this.provisionGatewayIdentity(identityId)
     }
     return principal
@@ -205,7 +205,14 @@ export class CompanyWecomAuthService extends Service {
   private gatewayDiagnostic(key: string, message: string): void {
     if (this.gatewayDiagnostics.has(key)) return
     this.gatewayDiagnostics.add(key)
+    this.diagnostic(message)
+  }
+
+  /** Web profiles mount no logger exporter, so diagnostics also go to stdout, which the launcher writes to dsh.log. */
+  private diagnostic(message: string): void {
+    if (!this.config.gatewayIdentityEnabled) return
     this.owner.logger.info(`wecom-auth: ${message}`)
+    process.stdout.write(`wecom-auth: ${message}\n`)
   }
 
   private provisionGatewayIdentity(identityId: WecomIdentityId): void {
@@ -292,6 +299,7 @@ export class CompanyWecomAuthService extends Service {
     await state.domain.table('sessions').put(id, session)
     this.owner.get('remoteAccess')?.invalidate()
     this.scheduleExpiry()
+    this.diagnostic(`WeCom login received userId=${login.userId} userName=${login.displayName ?? '<missing>'}`)
     return { session: { identityId, ...login, role: DEFAULT_WECOM_ROLE, expiresAt: session.expiresAt }, redirect,
       cookie: cookieHeader(SESSION_COOKIE, signCookie({ version: 1, sessionId: id, authority: this.config.publicOrigin,
         issuedAt: now, expiresAt: session.expiresAt }, state.secret), true, this.config.sessionTtlMs, '/') }

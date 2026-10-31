@@ -20,7 +20,11 @@ export const inject = ['connection', 'slots', 'locale']
  */
 export function apply(ctx: Context): void {
   const parsed = z.object({ userId: z.string(), displayName: z.string().optional(), role: z.enum(['admin', 'user']).default('user') }).safeParse(Reflect.get(globalThis, '__DSH_WECOM_SESSION__'))
-  if (!parsed.success) return
+  if (!parsed.success) {
+    console.warn('[wecom-auth] page has no valid __DSH_WECOM_SESSION__ identity; account controls are hidden')
+    return
+  }
+  console.info('[wecom-auth] browser identity', parsed.data)
   const connection = ctx.get('connection') as ConnectionHandle
   ctx.effect(() => ctx.locale.register('company.wecomAuth', { en: { account: 'WeCom account', admin: 'Administrator', user: 'Standard user' }, zh: { account: '企业微信账号', admin: '管理员', user: '普通用户' } }))
   const loginUrl = (account: boolean): URL => {

@@ -120,10 +120,13 @@ it('admits a trusted gateway identity and exposes its configured logout destinat
 })
 
 it('falls back to WeCom OAuth when gateway identity is enabled but the request has no gateway header', async () => {
+  const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+  onTestFinished(() => { stdout.mockRestore() })
   const f = await fixture({ gatewayIdentityEnabled: true, gatewayLogoutUrl: 'https://portal.example/logout' })
   const { attempt } = await f.begin()
   expect(attempt.state).toEqual(expect.any(String))
   expect((await f.request('/auth/me')).status).toBe(401)
+  expect(stdout).toHaveBeenCalledWith('wecom-auth: gateway X-User-Info header missing\n')
 })
 
 it('redirects protected root, offers desktop QR and automatically authorizes a WeCom browser', async () => {
