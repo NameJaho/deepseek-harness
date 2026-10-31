@@ -281,6 +281,7 @@
       "@deepseek-ai/dsh-client-ui-session/client": ["./packages/client/ui-session/src/client"],
       "@deepseek-ai/dsh-company-wecom-auth": ["./packages/company/wecom-auth/src"],
       "@deepseek-ai/dsh-company-wecom-auth/types": ["./packages/company/wecom-auth/src/types.ts"],
+      "@deepseek-ai/dsh-company-wecom-auth/client": ["./packages/company/wecom-auth/src/client/index.ts"],
       "@deepseek-ai/dsh-client-connection": ["./packages/client/connection/src"],
       "@deepseek-ai/dsh-client-file-upload": ["./packages/client/file-upload/src"],
       "@deepseek-ai/dsh-client-file-upload/client": ["./packages/client/file-upload/src/client/index.ts"],

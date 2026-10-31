@@ -105,6 +105,8 @@ async function fixture(overrides: Partial<{ gatewayIdentityEnabled: boolean; gat
 }
 
 it('admits a trusted gateway identity and exposes its configured logout destination', async () => {
+  const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+  onTestFinished(() => { stdout.mockRestore() })
   const f = await fixture({ gatewayIdentityEnabled: true, gatewayLogoutUrl: 'https://portal.example/logout' })
   const gatewayHeaders = { host: 'login.example', 'x-user-info': encodeURIComponent(JSON.stringify({ userId: 'portal-user', userName: 'Portal User', department: 'ops' })) }
   const admitted = f.ctx.connection.admit({ headers: gatewayHeaders })

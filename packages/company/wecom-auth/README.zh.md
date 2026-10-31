@@ -30,7 +30,7 @@ kind: "package-bundle"
 
 将 `test-hmwork.busyming.com` 配置为自建应用的 OAuth 可信域名及 Web 登录域名，配置应用可见范围，并在企业微信可信 IP 设置中允许服务端出口 IP。TLS 反向代理必须保留公网 `Host`，转发根路径及 `/auth/` 路由，并支持常规 Web API 和 WebSocket 路由。回调为 `https://test-hmwork.busyming.com/auth/wecom/callback`。不得记录回调查询参数。配置轮换后的 Secret 后，部署管理员必须验证真实扫码及 OAuth 登录；自动测试不使用真实企业微信凭据。
 
-`GET /login?redirect=/path` 开始登录。`GET /auth/me` 返回当前成员或 401。`POST /auth/wecom/logout` 要求公网 `Origin` 和 `X-DSH-Auth: 1`，撤销本地会话并清除 cookie。外部重定向值变为 `/`；合法路径和查询参数在登录后保留，凭据参数除外。
+`GET /login?redirect=/path` 开始登录。`GET /auth/me` 返回当前成员或 401；首页可能按 Owner 共享的浏览器 Peer 渲染，因此首页没有 `__DSH_WECOM_SESSION__` 身份时，侧栏账号入口会读取该接口。`POST /auth/wecom/logout` 要求公网 `Origin` 和 `X-DSH-Auth: 1`，撤销本地会话并清除 cookie。外部重定向值变为 `/`；合法路径和查询参数在登录后保留，凭据参数除外。
 
 当 `gatewayIdentityEnabled` 为 true 时，部署可以位于可信门户网关后面，由网关清除外部身份头并注入包含 `userId` 和 `userName` 的 URL 编码 `X-User-Info` JSON。DSH 会校验这两个字段，使用同一套私有 Workspace 权限策略，并通过 `/auth/me` 和账号页面提供用户名称。没有合法 `X-User-Info` 的请求继续走 WeCom OAuth，因此开启该模式不会阻断直接登录。此时必须将 `gatewayLogoutUrl` 设置为门户退出地址。不要在没有网关保护的监听地址上启用此模式：`X-User-Info` 是可信代理的断言，不是浏览器凭据，应用无法分辨直接请求伪造的 header。
 
