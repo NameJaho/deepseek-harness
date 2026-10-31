@@ -23,7 +23,7 @@ The company MCP page shows the signed-in user's published, visible MCPs with cur
 
 The Host obtains a `CompanyMarketSubject` from the verified Remote caller or retained Session owner through `companyWecomAuth.marketSubject()`. Official WeCom subjects carry `corpId/sub`; trusted portal subjects carry their portal user id. The browser cannot supply another member's identity.
 
-The adapter resolves official subjects with `admin/user/list`, using the WeCom id as a search keyword and accepting only an exact `thirdUid` match. Portal subjects match the exact numeric `userId` in the paginated HR records. Both require one active record with a positive portal user id and nonempty WeCom id. Missing or ambiguous mappings produce a structured failure instead of guessing from names or treating the WeCom id as a portal id.
+The adapter sends official WeCom subjects directly with the verified `sub`; it does not require the member to have Market administrator permission. Trusted portal subjects match the exact numeric `userId` in the paginated HR records through `admin/user/list`, then use the mapped WeCom id. Missing or ambiguous portal mappings produce a structured failure instead of guessing from names or treating a WeCom id as a portal id.
 
 Market list, detail and tool reads carry URL-encoded `X-User-Info` containing the resolved portal `userId/userName`. This is a trusted-backend identity assertion, not a login credential. Permission checks use the resolved WeCom `sub`. Raw HR records, identity headers and connection settings remain on the Host.
 
@@ -34,7 +34,7 @@ All routes below are existing `POST` endpoints relative to the configured Market
 
 | Route | Request fields | Purpose |
 |---|---|---|
-| `/api/mcp/admin/user/list` | `keyword` for WeCom subjects, `activeOnly: true`, `pageNum/pageSize` | Resolve exact portal and WeCom identities from HR records |
+| `/api/mcp/admin/user/list` | `activeOnly: true`, `pageNum/pageSize` for trusted portal subjects | Resolve an exact portal-to-WeCom mapping; official WeCom subjects do not call this administrator route |
 | `/api/mcp/list` | `accessFilter: "all"`, `pageNum/pageSize` | Read published candidates visible to the mapped portal user |
 | `/api/internal/mcp/permission/check` | `sub`, `path` | Check the actual member's current usage permission |
 | `/api/mcp/query/by/id` | numeric `id` | Recheck one selected server before explicit tool discovery |

@@ -60,7 +60,7 @@ const toolsSchema = schema.array(schema.object({ toolName: text(200), descriptio
 const envelope = schema.object({ success: schema.boolean(), code: schema.string(), data: schema.unknown().optional() })
 type MarketSummary = schema.infer<typeof summarySchema>
 interface Budget { remaining: number }
-interface Viewer { sub: string; userId: number; name: string }
+interface Viewer { sub: string; userId?: number | undefined; name: string }
 interface Directory { servers: CompanyMcpServer[]; summaries: MarketSummary[]; viewer: Viewer }
 type Route = 'api/mcp/admin/user/list' | 'api/mcp/list' | 'api/mcp/query/by/id'
   | 'api/mcp/tool/list' | 'api/internal/mcp/permission/check'
@@ -191,14 +191,16 @@ export class HttpCompanyMcpProvider extends CompanyMcpProvider {
     if ('sub' in subject) {
       if (subject.corpId !== this.config.corpId || subject.sub.trim() === '' || subject.sub.length > 64
         || subject.scope !== `wecom:${subject.corpId}:${subject.sub}`) throw forbidden()
-    } else if (subject.scope !== `gateway:${subject.portalUserId}` || !/^[1-9][0-9]*$/.test(subject.portalUserId)
+      return { sub: subject.sub, name: subject.sub }
+    }
+    if (subject.scope !== `gateway:${subject.portalUserId}` || !/^[1-9][0-9]*$/.test(subject.portalUserId)
       || !Number.isSafeInteger(Number(subject.portalUserId))) throw forbidden()
     const matches: Viewer[] = []
     let total: number | undefined
     let count = 0
     for (let pageNum = 1; ; pageNum++) {
       const input = await this.post('api/mcp/admin/user/list', {
-        ...'sub' in subject ? { keyword: subject.sub } : {}, activeOnly: true, pageNum, pageSize: this.config.pageSize,
+        activeOnly: true, pageNum, pageSize: this.config.pageSize,
       }, undefined, signal, budget)
       const parsed = membersPage.safeParse(input)
       if (!parsed.success) throw invalid()
@@ -207,7 +209,7 @@ export class HttpCompanyMcpProvider extends CompanyMcpProvider {
       total = page.total
       count += page.records.length
       for (const member of page.records) {
-        if ('sub' in subject ? member.thirdUid !== subject.sub : String(member.userId) !== subject.portalUserId) continue
+        if (String(member.userId) !== subject.portalUserId) continue
         if (member.userId <= 0 || member.thirdUid.trim() === '' || member.userStatus !== '3') throw unresolved()
         matches.push({ sub: member.thirdUid, userId: member.userId, name: member.name || member.thirdUid })
       }
@@ -245,7 +247,7 @@ export class HttpCompanyMcpProvider extends CompanyMcpProvider {
           { sub: viewer.sub, path: item.name }, undefined, signal, budget))
         if (!permission.success || permission.data.sub !== viewer.sub || permission.data.path !== item.name
           || permission.data.mcpServiceId !== item.id
-          || permission.data.userId !== null && permission.data.userId !== viewer.userId) throw invalid()
+          || permission.data.userId !== null && viewer.userId !== undefined && permission.data.userId !== viewer.userId) throw invalid()
         if (!permission.data.allowed || item.accessStatus?.trim().toLowerCase() === 'refactoring') continue
         summaries.push(item)
         servers.push({ id: brandString<CompanyMcpId>(String(item.id)), name: item.displayName || item.name,
@@ -280,7 +282,7 @@ export class HttpCompanyMcpProvider extends CompanyMcpProvider {
     try {
       response = await fetch(new URL(route, this.baseUrl), { method: 'POST', redirect: 'error', signal,
         headers: { 'content-type': 'application/json', accept: 'application/json', ...viewer === undefined ? {}
-          : { 'x-user-info': encodeURIComponent(JSON.stringify({ userId: viewer.userId, userName: viewer.name })) } },
+          : { 'x-user-info': encodeURIComponent(JSON.stringify({ userId: viewer.userId ?? viewer.sub, userName: viewer.name })) } },
         body: JSON.stringify(fields) })
     } catch (_networkFailure) { throw new RemoteError('company-mcp/catalog-unavailable', 'MCP Market is unavailable; refresh to try again', {}) }
     if (!response.ok || response.body === null) {

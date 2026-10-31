@@ -47,11 +47,11 @@ async function fixture(options: { loader?: boolean; config?: Partial<Config> } =
     let data: unknown
     switch (path) {
       case 'api/mcp/admin/user/list':
-        data = page(state.members.filter(member => typeof body.keyword !== 'string' || member.thirdUid.includes(body.keyword)), body)
+        data = page(state.members, body)
         break
       case 'api/mcp/list': {
-        const viewer = JSON.parse(decodeURIComponent(headers.get('x-user-info') ?? '')) as { userId: number }
-        if (![101, 102].includes(viewer.userId)) throw new Error('Expected mapped portal identity')
+        const viewer = JSON.parse(decodeURIComponent(headers.get('x-user-info') ?? '')) as { userId: string | number }
+        if (!['alice', 'bob', 101, 102].includes(viewer.userId)) throw new Error('Expected mapped portal identity')
         data = page(state.queries, body)
         break
       }
@@ -106,9 +106,8 @@ it('maps the official WeCom id to the portal account and uses only existing read
   expect(await provider.catalog(subject)).toMatchObject({ loaded: true, servers: [
     { id: '10001', name: 'CRM', toolCount: 1, tools: [] }, { id: '10003', name: 'Shared', toolCount: 3 },
   ] })
-  expect(requests[0]?.body).toMatchObject({ keyword: 'alice', activeOnly: true })
   const list = requests.find(request => request.path === 'api/mcp/list')!
-  expect(JSON.parse(decodeURIComponent(list.headers.get('x-user-info')!))).toEqual({ userId: 101, userName: 'Alice' })
+  expect(JSON.parse(decodeURIComponent(list.headers.get('x-user-info')!))).toEqual({ userId: 'alice', userName: 'alice' })
   expect(list.body).toMatchObject({ accessFilter: 'all' })
   expect(list.body).not.toHaveProperty('adminPermissionCode')
   expect(requests.filter(request => request.path === 'api/internal/mcp/permission/check').every(request => request.body.sub === 'alice')).toBe(true)
@@ -132,12 +131,10 @@ it('maps a trusted portal login to its exact HR account and WeCom subject', asyn
   expect(requests.filter(request => request.path.endsWith('permission/check')).every(request => request.body.sub === 'bob')).toBe(true)
 })
 
-it('matches thirdUid exactly instead of accepting fuzzy names or reusing the WeCom id as portal userId', async () => {
+it('uses the verified WeCom subject directly without an administrator HR lookup', async () => {
   const { provider, state } = await fixture()
-  state.members = [{ userId: 999, thirdUid: 'alice-other', name: 'alice', userStatus: '3' }]
-  expect(await provider.catalog(subject)).toMatchObject({ loaded: false, servers: [], failure: { code: 'company-mcp/member-unresolved' } })
-  state.members = [members[0]!, { ...members[0]!, userId: 999 }]
-  expect(await provider.catalog(subject)).toMatchObject({ loaded: false, failure: { code: 'company-mcp/member-unresolved' } })
+  state.members = []
+  expect((await provider.catalog(subject)).servers.map(server => server.id)).toEqual(['10001', '10003'])
 })
 
 it('paginates the member directory and MCP catalog without truncating authorized results', async () => {

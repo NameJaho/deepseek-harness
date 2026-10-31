@@ -23,7 +23,7 @@ description: "使用市场已有接口展示当前登录成员有权限的 MCP �
 
 Host 通过 `companyWecomAuth.marketSubject()` 从已验证的 Remote 调用者或 Session 持久化所有者取得 `CompanyMarketSubject`。官方企微身份提供 `corpId/sub`，可信门户身份提供门户用户 id。浏览器不能指定其他成员身份。
 
-适配器用企微 id 作为 `admin/user/list` 的搜索关键词，仅接受 `thirdUid` 精确相等的记录。门户身份在分页 HR 记录中按数字 `userId` 精确匹配。两者都要求唯一在职记录、正数门户用户 id 和非空企微 id。缺少或存在歧义的映射会返回结构化失败，不按姓名猜测，也不把企微 id 当成门户 id。
+适配器直接使用已验证的官方企微 `sub`，不要求成员具备市场管理员权限。可信门户身份才通过 `admin/user/list` 按数字 `userId` 精确匹配，再使用映射出的企微 id。门户映射缺失或有歧义时返回结构化失败，不按姓名猜测，也不把企微 id 当作门户 id。
 
 市场列表、详情和工具查询携带 URL 编码的 `X-User-Info`，包含解析后的门户 `userId/userName`。这是可信后端身份断言，不是登录凭据。权限检查使用解析后的企微 `sub`。原始 HR 记录、身份头和连接配置均保留在 Host。
 
@@ -34,7 +34,7 @@ Host 通过 `companyWecomAuth.marketSubject()` 从已验证的 Remote 调用者�
 
 | 路由 | 请求字段 | 用途 |
 |---|---|---|
-| `/api/mcp/admin/user/list` | 企微身份传 `keyword`，以及 `activeOnly: true`、`pageNum/pageSize` | 从 HR 记录精确解析门户和企微身份 |
+| `/api/mcp/admin/user/list` | 可信门户身份传 `activeOnly: true`、`pageNum/pageSize` | 精确解析门户到企微的身份映射；官方企微身份不调用此管理接口 |
 | `/api/mcp/list` | `accessFilter: "all"`、`pageNum/pageSize` | 查询映射门户用户可见的已上架候选服务 |
 | `/api/internal/mcp/permission/check` | `sub`、`path` | 校验实际成员当前的使用权限 |
 | `/api/mcp/query/by/id` | 数字 `id` | 显式发现工具前复核所选服务 |
