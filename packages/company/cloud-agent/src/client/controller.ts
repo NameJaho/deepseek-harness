@@ -50,7 +50,7 @@ export interface CloudAgentInjected {
   readonly saveCapabilities: (
     id: CloudAgentId,
     revision: number,
-    capabilities: Pick<CloudAgentDraft, 'mcpTools' | 'mcpServers' | 'skills'>,
+    capabilities: Pick<CloudAgentDraft, 'mcpTools' | 'mcpServers' | 'skills' | 'knowledgeSources'>,
     authoringSessionId: SessionId,
   ) => Promise<CloudAgentSaveResult>
   readonly publish: (record: CloudAgentRecord, authoringSessionId?: SessionId, visibility?: CloudAgentVisibility) => Promise<boolean>
@@ -77,7 +77,9 @@ function errorKey(error: unknown): CloudAgentLocaleKey {
     case 'cloud-agent/owner-required': return 'denied'
     case 'cloud-agent/preset-unavailable': return 'presetUnavailable'
     case 'session/model-unavailable': return 'modelUnavailable'
-    case 'cloud-agent/capability-unavailable': return 'capabilityUnavailable'
+    case 'cloud-agent/capability-unavailable':
+    case 'company-knowledge/binding-changed':
+    case 'company-knowledge/not-found': return 'capabilityUnavailable'
     default: return 'failed'
   }
 }

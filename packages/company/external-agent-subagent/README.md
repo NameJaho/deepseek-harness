@@ -24,11 +24,12 @@ English | [中文](README.zh.md)
 <a id="private-configuration"></a>
 ## Private configuration
 
-The service injects `subagents`, `credentials` and `agents`. Every agent field is required; `agents: []` registers nothing. The optional [bundle patch](cordis.patch.yml) is not enabled globally and leaves its delegation tool disabled. An explicit Host overlay supplies private configuration and mounts the normal delegation tool in the desired scope.
+The service injects `subagents`, `credentials` and `agents`. Every agent field is required; `agents: []` registers nothing. Set `registerTools: true` when the same Host composition should mount one model-facing delegation tool per configured logical agent; each tool name is derived from that agent's logical id. The optional [bundle patch](cordis.patch.yml) is not enabled globally; it enables this mode only when `DSH_COMPANY_EXTERNAL_AGENTS` contains a nonempty JSON configuration.
 
 ```yaml
 - name: '@deepseek-ai/dsh-company-external-agent-subagent'
   config:
+    registerTools: true
     agents:
       - platform: dify
         id: research

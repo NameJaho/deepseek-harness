@@ -151,16 +151,17 @@ registerResourceProvider(provider: WecomResourceProvider): () => Promise<void>
 sessionBindings(ids: readonly SessionId[]): RemoteAccessBinding[]
 
 /** Resolve the current Remote caller or trusted tool initiator's company ownership scope.
+ * @param member - authenticated company principal from an access-policy dispatch; omission resolves the caller.
  * @returns stable enterprise scope, or `local-owner` outside an enterprise call or initiating Session.
  * @throws WecomAuthError for unsupported non-owner principals.
  */
-ownerScope(): CompanyOwnerScope
+ownerScope(member?: CompanyUserPrincipal): CompanyOwnerScope
 
 /** Read the current member's default Workspace Session identities for business grants.
  * @param principal - authenticated member supplied by the access-policy dispatcher.
  * @returns owned Session identities; unknown or mismatched identities return an empty list.
  */
-defaultWorkspaceSessions(principal: WecomUserPrincipal): readonly SessionId[]
+defaultWorkspaceSessions(principal: CompanyUserPrincipal): readonly SessionId[]
 
 /** Resolve retained ownership for a member default Workspace or business-owned Session.
  * @param sessionId - tool-initiating or source Session identity.

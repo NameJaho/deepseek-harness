@@ -80,6 +80,7 @@ export type CompanyMcpErrorCode =
   | 'company-mcp/tool-changed'
   | 'company-mcp/call-failed'
   | 'company-mcp/stopping'
+  | 'company-mcp/owner-required'
 
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface RemoteErrorDetailsMap {
@@ -91,5 +92,6 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'company-mcp/tool-changed': { readonly name: string }
     'company-mcp/call-failed': { readonly name: string; readonly reason: string }
     'company-mcp/stopping': Record<string, never>
+    'company-mcp/owner-required': Record<string, never>
   }
 }

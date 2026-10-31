@@ -43,6 +43,7 @@ DSH_WECOM_WORKSPACE_ROOT="${DSH_WECOM_WORKSPACE_ROOT:-$DSH_BASE/workspaces}"
 DSH_PROFILE="${DSH_PROFILE:-test-web}"
 export DSH_PUBLIC_URL
 export DSH_WECOM_WORKSPACE_ROOT
+export DSH_CLIENT_TITLE="${DSH_CLIENT_TITLE:-HMWORK}"
 export DSH_WECOM_CORP_ID="${DSH_WECOM_CORP_ID:-ww2ec793812513c257}"
 export DSH_WECOM_AGENT_ID="${DSH_WECOM_AGENT_ID:-1000239}"
 if [[ -z "${DSH_WECOM_APP_SECRET:-}" ]]; then
@@ -50,6 +51,12 @@ if [[ -z "${DSH_WECOM_APP_SECRET:-}" ]]; then
   exit 1
 fi
 export DSH_WECOM_APP_SECRET
+if [[ -n "${DSH_COMPANY_MCP_CATALOG_URL:-}" || -n "${DSH_COMPANY_MCP_INVOKE_URL:-}" ]]; then
+  if [[ -z "${DSH_COMPANY_MCP_CATALOG_URL:-}" || -z "${DSH_COMPANY_MCP_INVOKE_URL:-}" ]]; then
+    printf 'MCP 必须同时配置 DSH_COMPANY_MCP_CATALOG_URL 和 DSH_COMPANY_MCP_INVOKE_URL\n' >&2
+    exit 1
+  fi
+fi
 DSH_PID_FILE="${DSH_PID_FILE:-$DSH_BASE/dsh.pid}"
 DSH_STOP_TIMEOUT_SECONDS="${DSH_STOP_TIMEOUT_SECONDS:-90}"
 # 独立的 harness home，避免继承公司 profile 的插件与会话数据。
@@ -253,10 +260,16 @@ if [[ "$DSH_PROFILE_INIT" == "1" ]]; then
 fi
 # Profile overlays are outer CLI options and must precede runtime arguments.
 DSH_COMMAND+=(--patch "$DSH_REPO/packages/company/wecom-auth/cordis.patch.yml")
-# Cloud Agent 依赖外部 MCP 网关；未配置网关地址时不挂载这两个 patch，避免启动时因空 URL 失败。
+# MCP 和知识库按配置独立挂载；Cloud Agent 不要求空的 MCP 网关占位配置。
 if [[ -n "${DSH_COMPANY_MCP_CATALOG_URL:-}" ]]; then
   DSH_COMMAND+=(--patch "$DSH_REPO/packages/company/mcp-provider/cordis.patch.yml")
-  DSH_COMMAND+=(--patch "$DSH_REPO/packages/company/cloud-agent/cordis.patch.yml")
+fi
+if [[ -n "${DSH_COMPANY_KNOWLEDGE_SOURCES:-}" ]]; then
+  DSH_COMMAND+=(--patch "$DSH_REPO/packages/company/knowledge/cordis.patch.yml")
+fi
+DSH_COMMAND+=(--patch "$DSH_REPO/packages/company/cloud-agent/cordis.patch.yml")
+if [[ -n "${DSH_COMPANY_EXTERNAL_AGENTS:-}" ]]; then
+  DSH_COMMAND+=(--patch "$DSH_REPO/packages/company/external-agent-subagent/cordis.patch.yml")
 fi
 DSH_COMMAND+=(--no-open --host "$DSH_HOST" --port "$DSH_PORT")
 if [[ -n "$DSH_PUBLIC_URL" ]]; then

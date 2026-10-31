@@ -80,7 +80,7 @@ describe('immutable release capability resolution', () => {
   })
 })
 
-describe('bilingual Phase 2 copy', () => {
+describe('bilingual copy', () => {
   it('covers exactly the same nonempty keys and interpolation fields', () => {
     expect(Object.keys(en).sort()).toEqual(Object.keys(zh).sort())
     for (const key of Object.keys(zh) as (keyof typeof zh)[]) {
@@ -88,6 +88,6 @@ describe('bilingual Phase 2 copy', () => {
       expect(zh[key].trim()).not.toBe('')
       expect(en[key].match(/\{\w+\}/g)?.sort() ?? []).toEqual(zh[key].match(/\{\w+\}/g)?.sort() ?? [])
     }
-    expect(Object.keys(en).join(' ')).not.toMatch(/credential|endpoint|token|knowledge|codeExecution|html/i)
+    expect(Object.keys(en).join(' ')).not.toMatch(/credential|endpoint|token|codeExecution|html/i)
   })
 })

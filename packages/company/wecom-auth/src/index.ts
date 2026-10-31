@@ -291,8 +291,8 @@ export class CompanyWecomAuthService extends Service {
       this.gatewayDiagnostic('invalid-json', 'gateway X-User-Info header is not URL-encoded JSON')
       return undefined
     }
-    const parsed = z.object({ userId: z.string().trim().min(1).max(256), userName: z.string().trim().min(1).max(256) })
-      .passthrough().safeParse(input)
+    const parsed = z.looseObject({ userId: z.string().trim().min(1).max(256),
+      userName: z.string().trim().min(1).max(256) }).safeParse(input)
     if (!parsed.success) {
       this.gatewayDiagnostic('invalid-fields', 'gateway X-User-Info is missing a valid userId or userName')
       return undefined

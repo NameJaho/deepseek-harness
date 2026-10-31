@@ -56,6 +56,7 @@
   "dependencies": {
     "@deepseek-ai/dsh-brand": "workspace:*",
     "@deepseek-ai/dsh-company-cloud-agent-runtime": "workspace:*",
+    "@deepseek-ai/dsh-company-knowledge": "workspace:*",
     "@deepseek-ai/dsh-company-mcp-provider": "workspace:*",
     "@deepseek-ai/dsh-compaction-basic": "workspace:*",
     "@deepseek-ai/dsh-compaction-tool-result-pruner": "workspace:*",

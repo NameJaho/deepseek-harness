@@ -8,6 +8,7 @@ import type { SubagentActivation, SubagentActivationSpec } from '@deepseek-ai/ds
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { snapshotJsonValue, type JsonValue } from '@deepseek-ai/dsh-util-values'
+import * as DelegationTool from '@deepseek-ai/dsh-tool-subagent'
 import { DifyAdapter, validUnicode } from './dify.ts'
 import { failure } from './error.ts'
 import { ExternalPlatformProvider } from './provider.ts'
@@ -52,6 +53,8 @@ export interface ExternalAgentConfig {
 export interface Config {
   /** Logical external agents; each registers one subagent provider. */
   readonly agents: ExternalAgentConfig[]
+  /** Mount one ordinary delegation tool per logical agent; explicit scoped mounts may leave this disabled. */
+  readonly registerTools?: boolean
 }
 
 const text = (): z<string> => z.string().min(1).max(128).required()
@@ -69,6 +72,7 @@ function validInputStrings(value: JsonValue): boolean {
 function resolve(config: Config): ExternalAgentConfig[] {
   const ids = new Set<string>()
   const providers = new Set<string>()
+  const toolNames = new Set<string>()
   return config.agents.map((agent) => {
     for (const field of ['id', 'name', 'version', 'environment', 'providerName'] as const) {
       if (!validUnicode(agent[field]) || agent[field].trim().length === 0 || agent[field].length > 128) throw failure('configuration', 'not-sent')
@@ -77,6 +81,9 @@ function resolve(config: Config): ExternalAgentConfig[] {
       || ids.has(agent.id) || providers.has(agent.providerName)) throw failure('configuration', 'not-sent')
     ids.add(agent.id)
     providers.add(agent.providerName)
+    const toolName = `subagent_external_${agent.id.replace(/[.-]/g, '_')}`
+    if (config.registerTools === true && toolNames.has(toolName)) throw failure('configuration', 'not-sent')
+    toolNames.add(toolName)
     for (const value of [agent.timeoutMs, agent.maxInputBytes, agent.maxOutputBytes, agent.maxRetainedRuns]) {
       if (!Number.isSafeInteger(value) || value <= 0) throw failure('configuration', 'not-sent')
     }
@@ -110,6 +117,7 @@ declare module '@deepseek-ai/cordis' {
 export class ExternalAgentSubagentProvider extends Service {
   static inject = ['subagents', 'credentials', 'agents']
   static Config: z<Config> = z.object({
+    registerTools: z.boolean().default(false),
     agents: z.array(z.object({
       platform: z.const('dify').required(), id: text(), name: text(), version: text(), environment: text(), providerName: text(),
       endpoint: z.string().required(), credentialRef: z.string().required(),
@@ -140,9 +148,14 @@ export class ExternalAgentSubagentProvider extends Service {
         maxInputBytes: agent.maxInputBytes, maxOutputBytes: agent.maxOutputBytes, maxRetainedRuns: agent.maxRetainedRuns,
       }, new DifyAdapter(agent))
       this.providers.set(id, provider)
-      this.ctx.subagents.registerProvider(provider)
-      // Installed after registration, so HTTP drains before the provider contribution disappears.
-      this.ctx.effect(() => () => provider.dispose(), 'externalAgentSubagents.dispose()')
+      this.ctx.effect(function* () {
+        yield ctx.subagents.registerProvider(provider)
+        yield () => provider.dispose()
+      }, 'externalAgentSubagents: provider and transport')
+      if (config.registerTools === true) ctx.plugin(DelegationTool, {
+        provider: agent.providerName, toolName: `subagent_external_${agent.id.replace(/[.-]/g, '_')}`,
+        maxDepth: 'provider-managed',
+      })
     }
   }
 

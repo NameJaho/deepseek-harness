@@ -3,20 +3,20 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/company/README.md
 /:
-  en: 1e5f9761072885eb
-  zh: 3ce06a5eb2c0bf6f
+  en: 8da00b0ab068aa3b
+  zh: 183c3d8a74f02c16
 /company-company-deployment-integrations:
   en: 8d61b024c9fcf95f
   zh: 9154fb9f3087d43d
 /company-company-deployment-integrations/summary:
-  en: 4e8b8261ead64e73
-  zh: 696d0dcaa109b771
+  en: 14793aa9b19382c4
+  zh: abbcb0e4af7e12c9
 /company-company-deployment-integrations/table-of-contents:
   en: 09848f4d056e4fc1
   zh: 8df6139cff0288f6
 /company-company-deployment-integrations/packages:
-  en: 82ff062a02f0d814
-  zh: 1a5ed66e57cedb49
+  en: 4fb6ceee13fbce9b
+  zh: d39f87c14235b495
 /company-company-deployment-integrations/related-documentation:
   en: c6ce268265764b41
   zh: cfd130675b48357c

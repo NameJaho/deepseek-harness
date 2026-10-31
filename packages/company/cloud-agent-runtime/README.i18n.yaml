@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/company/cloud-agent-runtime/README.md
 /:
-  en: b608fe77fce9d747
-  zh: 5e96a3293edbd2cb
+  en: 532321d0c799fd43
+  zh: 536ce637fe4fd1cf
 /deepseek-ai-dsh-company-cloud-agent-runtime:
   en: 1a40f124207afb7b
   zh: d13ce9dfb7fdbe98
@@ -15,8 +15,8 @@
   en: 62dbba223af8880e
   zh: 15ccadd74f7b3042
 /deepseek-ai-dsh-company-cloud-agent-runtime/configuration-and-enforcement:
-  en: 956a8ede02cc0366
-  zh: 95e4189fcfd3adaa
+  en: 63def4ea73adf4e0
+  zh: e9df6ab5ddc38454
 /deepseek-ai-dsh-company-cloud-agent-runtime/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -36,8 +36,8 @@
   en: ceb0d9833d9a7940
   zh: fbb64483d5a703c0
 /deepseek-ai-dsh-company-cloud-agent-runtime/model-experience/scoped-tools-and-results/what-the-model-sees:
-  en: 0c5c5fb09d33859f
-  zh: 318c14a6087ff500
+  en: 8aba6f97ae3ef316
+  zh: 955ef98f267d90b8
 /deepseek-ai-dsh-company-cloud-agent-runtime/model-experience/scoped-tools-and-results/token-effect:
   en: 1ba629132f4ca645
   zh: ac79ddb18b026df4
@@ -45,8 +45,8 @@
   en: b4362522f3e88be8
   zh: f80f4ccf68517124
 /deepseek-ai-dsh-company-cloud-agent-runtime/known-limitations-and-deferred-work:
-  en: 47e71b2361bd821b
-  zh: 8236004b272e9588
+  en: 0e2e5c7f90ecfe55
+  zh: 8dcafb183ec3ca50
 /deepseek-ai-dsh-company-cloud-agent-runtime/known-limitations-and-deferred-work/dev-note:
   en: 6c0c85e0f1ae71ea
   zh: 0b4aec2d005cbdd3

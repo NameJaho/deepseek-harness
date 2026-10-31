@@ -3,11 +3,5 @@
     - id: company-external-agent-subagent
       name: '@deepseek-ai/dsh-company-external-agent-subagent'
       config:
-        agents: []
-    - id: tool-external-agent
-      name: '@deepseek-ai/dsh-tool-subagent'
-      disabled: true
-      config:
-        provider: external-research
-        toolName: subagent_external_research
-        maxDepth: provider-managed
+        agents: !!js JSON.parse(process.env.DSH_COMPANY_EXTERNAL_AGENTS ?? '[]')
+        registerTools: true

@@ -15,6 +15,8 @@ import Storage, { storageBackendServiceKey } from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import ToolRegistry, { defineTool, projectToolSchema, type ToolRunContext } from '@deepseek-ai/dsh-tools'
 import Commands from '@deepseek-ai/dsh-commands'
+import Knowledge, { Config as KnowledgeConfig } from '@deepseek-ai/dsh-company-knowledge'
+import { MemoryCredentials } from '../../../credentials/credentials/tests/memory.ts'
 import { expect, it, vi, type TestContext } from 'vitest'
 import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 import CloudAgents, { type Config } from '../src/index.ts'
@@ -30,7 +32,7 @@ interface FixtureWorkspace {
   attachSession(id: SessionId): Promise<void>
 }
 
-async function fixture(test: TestContext, pool = new MemoryMediaPool(), storedSessions: Session[] = []) {
+async function fixture(test: TestContext, pool = new MemoryMediaPool(), storedSessions: Session[] = [], withMcp = true) {
   const root = await mkdtemp(join(tmpdir(), 'cloud-host-'))
   test.onTestFinished(() => rm(root, { recursive: true, force: true }))
   const ctx = new Context()
@@ -141,7 +143,7 @@ async function fixture(test: TestContext, pool = new MemoryMediaPool(), storedSe
     return { tool: definition, schema, fingerprint: toolFingerprint(schema) }
   }
   const summary = () => ({ name: 'mcp__sales__ping', rawName: 'ping', description, parametersJson: '{}', fingerprint: resolved().fingerprint })
-  ctx.provide('companyMcpProvider', { resolveTool: async () => enabled ? resolved() : undefined,
+  if (withMcp) ctx.provide('companyMcpProvider', { resolveTool: async () => enabled ? resolved() : undefined,
     discoverTools: async () => { if (!enabled) throw new Error('Disabled provider'); return [summary()] },
     capabilityCatalog: async () => [{ id: 'sales', name: 'Sales', description: '', namespace: 'sales', enabled, status: 'available', toolNames: ['mcp__sales__ping'] }],
     catalog: async () => ({ loaded: true, servers: [{ id: 'sales', name: 'Sales', description: '', enabled, status: 'available', tools: [summary()] }] }),
@@ -303,7 +305,8 @@ for (const kind of ['wecom-user', 'gateway-user'] as const) {
     const record = await f.ctx.cloudAgents.publish({ id: saved.id, expectedRevision: saved.revision, authoringSessionId: editor })
     if (kind === 'wecom-user') f.setOwner('bob')
     else f.setGatewayOwner('bob')
-    const usage = await f.ctx.cloudAgents.startSession({ id: record.id, releaseId: record.publishedReleaseId! }, new AbortController().signal)
+    const usage = await f.ctx.cloudAgents.startSession({ id: record.id, releaseId: record.publishedReleaseId! },
+      new AbortController().signal)
     const member = { userId: brandString<WecomUserPrincipal['userId']>('bob'),
       identityId: brandString<WecomUserPrincipal['identityId']>('bob'), role: 'user' as const }
     const principal: CompanyUserPrincipal = kind === 'wecom-user'
@@ -409,4 +412,39 @@ it('reads each Remote editor or source from its actual positional parameter', as
   }
   expect(reader('startAuthoring')?.({ sourceSessionId: editor, authoringSessionId: decoy })).toBe(editor)
   expect(reader('deleteUnboundAuthoringSessions')?.({ sessionIds: [editor, decoy] })).toEqual([editor, decoy])
+})
+
+it('publishes knowledge-only releases without an MCP provider and rejects foreign sources or changed permissions', async (test) => {
+  const f = await fixture(test, undefined, [], false)
+  new MemoryCredentials(f.ctx)
+  const sources = [{ id: 'operations', name: 'Operations', description: 'Approved evidence',
+    searchUrl: 'https://knowledge.example/search', spaceIds: ['approved'] }]
+  const knowledgeFiber = await f.ctx.plugin(Knowledge, KnowledgeConfig({ sources }))
+  const editor = await f.editor()
+  const draft = { ...f.draft, mcpTools: [], knowledgeSources: ['operations'] }
+  const saved = await f.ctx.cloudAgents.create(draft, editor)
+  const record = await f.ctx.cloudAgents.publish({ id: saved.id, expectedRevision: saved.revision, authoringSessionId: editor })
+  const releaseId = record.publishedReleaseId!
+  expect(record.releases[0]?.knowledgeBindings).toEqual([f.ctx.companyKnowledge.binding('operations')])
+  expect((await f.ctx.cloudAgents.catalog()).capabilities).toMatchObject({ mcpTools: [], mcpServers: [],
+    knowledgeSources: [{ id: 'operations', name: 'Operations', description: 'Approved evidence' }] })
+  const usage = await f.ctx.cloudAgents.startSession({ id: record.id, releaseId }, new AbortController().signal)
+  const agent = f.agents.get(usage.sessionId)!
+  const evidence = { sourceId: 'operations', returned: 0, totalHits: 0, belowThreshold: 0, hits: [] }
+  const search = vi.spyOn(f.ctx.companyKnowledge, 'search').mockResolvedValue(evidence)
+  expect(await f.ctx.cloudAgents.searchKnowledge(agent, releaseId, 'operations', 'Question', new AbortController().signal)).toEqual(evidence)
+  await expect(f.ctx.cloudAgents.searchKnowledge(agent, releaseId, 'foreign', 'Question', new AbortController().signal))
+    .rejects.toMatchObject({ code: 'cloud-agent/capability-unavailable' })
+  expect(search).toHaveBeenCalledOnce()
+  await knowledgeFiber.dispose()
+  await f.ctx.plugin(Knowledge, KnowledgeConfig({ sources: [{ ...sources[0]!, spaceIds: ['changed'] }] }))
+  await expect(f.ctx.cloudAgents.validateCapabilities(releaseId)).rejects.toMatchObject({ code: 'company-knowledge/binding-changed' })
+  await expect(f.ctx.cloudAgents.searchKnowledge(agent, releaseId, 'operations', 'Question', new AbortController().signal))
+    .rejects.toMatchObject({ code: 'company-knowledge/binding-changed' })
+})
+
+it('refuses selected MCP tools when no MCP provider is mounted', async (test) => {
+  const f = await fixture(test, undefined, [], false)
+  const editor = await f.editor()
+  await expect(f.ctx.cloudAgents.create(f.draft, editor)).rejects.toMatchObject({ code: 'cloud-agent/capability-unavailable' })
 })

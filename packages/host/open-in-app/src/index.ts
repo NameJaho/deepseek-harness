@@ -205,7 +205,7 @@ export function apply(ctx: Context, config: Config): void {
     kind: 'exact',
     path: OPEN_IN_APP_APPS_PATH,
     handler: async (req, res) => {
-      if (rejected(req, res, () => sendJson(res, 200, { apps: [] }))) return
+      if (rejected(req, res, () => { sendJson(res, 200, { apps: [] }) })) { return }
       if (req.method !== 'GET') {
         sendMethodNotAllowed(res, 'GET')
         return

@@ -991,6 +991,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Publishes the provider catalog and enablement to the browser without gateway URLs, headers or upstream error bodies.',
   },
   {
+    key: 'companyKnowledge',
+    pkg: 'company-knowledge',
+    title: 'Company knowledge retrieval',
+    mode: 'service',
+    consumers: ['company-cloud-agent'],
+    note: 'Owns approved knowledge sources and validated HTTP retrieval; Cloud Agent releases retain a space fingerprint and search only through it.',
+  },
+  {
     key: 'cloudAgents',
     pkg: 'company-cloud-agent',
     title: 'Cloud Agent catalog and releases',

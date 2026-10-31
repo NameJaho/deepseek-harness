@@ -16,6 +16,7 @@ export const draftSchema: z.ZodType<CloudAgentDraft> = z.object({
   mcpTools: z.array(z.string().regex(/^mcp__[A-Za-z0-9_-]+__[A-Za-z0-9_.-]+$/)).max(100).optional(),
   mcpServers: z.array(z.string().trim().min(1).max(200).transform(value => brandString<CompanyMcpId>(value))).max(100).optional(),
   skills: z.array(z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)).max(20).optional(),
+  knowledgeSources: z.array(z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/)).max(20).optional(),
 }).strict()
 
 const sha256 = z.string().regex(/^[a-f0-9]{64}$/)
@@ -38,6 +39,7 @@ const releaseSchema = z.object({
   definition: draftSchema,
   createdAt: z.number().int().nonnegative(),
   mcpBindings: mcpBindingsSchema.optional(),
+  knowledgeBindings: z.array(z.object({ id: z.string().min(1), fingerprint: sha256 }).strict()).optional(),
   capabilityPreset: z.string().min(1).optional(),
   visibility: z.enum(['public', 'private']).optional(),
   source: z.object({ sessionId, throughSeq: z.number().int().nonnegative(),
@@ -68,10 +70,12 @@ const recordSchema: z.ZodType<CloudAgentRecord> = z.object({
   const invalidRelease = record.releases.some((release) => {
     const tools = (release.mcpBindings ?? []).map(item => item.name).toSorted()
     const skills = (release.skillSnapshots ?? []).map(item => item.name).toSorted()
+    const knowledge = (release.knowledgeBindings ?? []).map(item => item.id).toSorted()
     return release.draftRevision > record.revision
       || (release.kind === 'published' ? release.version < 1 : release.version !== 0)
       || JSON.stringify(tools) !== JSON.stringify([...(release.definition.mcpTools ?? [])].sort())
       || JSON.stringify(skills) !== JSON.stringify([...(release.definition.skills ?? [])].sort())
+      || JSON.stringify(knowledge) !== JSON.stringify([...(release.definition.knowledgeSources ?? [])].sort())
   })
   const invalidDraft = (record.draftMcpBindings !== undefined
     && JSON.stringify(record.draftMcpBindings.map(item => item.name).sort()) !== JSON.stringify([...(record.draft.mcpTools ?? [])].sort()))

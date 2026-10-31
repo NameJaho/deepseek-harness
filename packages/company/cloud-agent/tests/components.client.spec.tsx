@@ -25,7 +25,7 @@ const server: CompanyMcpServer = { id: 'search-service' as CompanyMcpId, name: '
 const maintenance: CompanyMcpServer = { ...server, id: 'maintenance' as CompanyMcpId, name: 'Maintenance service', description: 'Temporarily unavailable', status: 'maintenance', tools: [] }
 function mcpProps(view: McpView): ComponentProps<typeof CompanyMcpPage> {
   return { t, view: 'page', useCompanyMcp: <T,>(select: (value: McpView) => T): T => select(view),
-    refreshMcp: vi.fn(async () => {}), retryMcp: vi.fn(async () => {}), configureMcp: vi.fn(async () => {}),
+    useRemoteAccess: () => true, refreshMcp: vi.fn(async () => {}), retryMcp: vi.fn(async () => {}), configureMcp: vi.fn(async () => {}),
     discoverMcp: vi.fn(async () => {}) } as ComponentProps<typeof CompanyMcpPage>
 }
 const record: CloudAgentRecord = { id: 'agent' as CloudAgentRecord['id'], ownerId: 'owner' as CloudAgentRecord['ownerId'], revision: 1,

@@ -52,6 +52,7 @@ export { REGION_BEGIN, REGION_END }
 export const SERVICE_PAGE: Record<string, string> = {
   headlessStartup: 'boot.md',
   cloudAgents: 'core.md',
+  companyKnowledge: 'core.md',
   companyMcp: 'mcp.md',
   companyMcpProvider: 'mcp.md',
   companyWecomAuth: 'credentials.md',
@@ -997,7 +998,13 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   CompanyMcpResolvedTool: 'packages/company/mcp-provider/README.md',
   CompanyMcpToolRoute: 'packages/company/mcp-provider/README.md',
   CompanyMcpCapability: 'packages/company/mcp-provider/README.md',
+  CompanyKnowledgeCatalog: 'packages/company/knowledge/README.md',
+  CompanyKnowledgeSource: 'packages/company/knowledge/README.md',
+  CompanyKnowledgeBinding: 'packages/company/knowledge/README.md',
+  CompanyKnowledgeSearchRequest: 'packages/company/knowledge/README.md',
+  CompanyKnowledgeSearchResult: 'packages/company/knowledge/README.md',
   WecomResourceProvider: 'packages/company/wecom-auth/README.md',
+  CompanyUserPrincipal: 'packages/company/wecom-auth/README.md',
   CompanyOwnerScope: 'packages/company/wecom-auth/README.md',
   WecomUserPrincipal: 'packages/company/wecom-auth/README.md',
   WecomLoginConfig: 'packages/company/wecom-auth/README.md',
@@ -1131,7 +1138,7 @@ export const CORDIS_CATALOG_POLICY: CordisCatalogPolicy = {
   typeLinkExemptions: TYPE_LINK_EXEMPTIONS,
   // Company authority and gateway services are deployment-owned, not dynamic Plugin APIs.
   runtimeServiceExclusions: new Set(['cordisInspect', 'dynamicCordisRunner',
-    'cloudAgents', 'companyMcp', 'companyMcpProvider', 'companyWecomAuth', 'externalAgentSubagents']),
+    'cloudAgents', 'companyKnowledge', 'companyMcp', 'companyMcpProvider', 'companyWecomAuth', 'externalAgentSubagents']),
   runtimeServices: [{
     key: 'timer',
     type: 'TimerService',

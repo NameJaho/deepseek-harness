@@ -1,4 +1,4 @@
-/** Session-scoped MCP and skill editing; usage sessions display immutable release selections. */
+/** Session-scoped MCP, skill and knowledge editing; usage sessions display immutable release selections. */
 import { useState } from 'react'
 import { Button, Checkbox, IconCordisPluginOutlineRegular, Input, StateDot, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -16,14 +16,14 @@ type CapabilityProps = PropsRuntime<'sidebar.right.pane.tab'> & PropsLocale<'com
 type NavigationProps = PropsRuntime<'conversation.input.right'> & PropsLocale<'company.cloudAgent'>
   & InjectFace<Pick<CloudAgentInjected, 'hooks' | 'refresh'>> & { readonly revealCapabilities: (sessionId: SessionId) => void }
 /** Editable capability fields, excluding executable plugins and connection settings. */
-export type CapabilitySelection = Pick<CloudAgentDraft, 'mcpTools' | 'mcpServers' | 'skills'>
+export type CapabilitySelection = Pick<CloudAgentDraft, 'mcpTools' | 'mcpServers' | 'skills' | 'knowledgeSources'>
 function toggle<T extends string>(values: readonly T[] | undefined, value: T, checked: boolean): T[] {
   return checked ? [...new Set([...(values ?? []), value])] : (values ?? []).filter(item => item !== value)
 }
 
 /** Reusable local form fields for the draft form and scoped sidebar.
  * @param props - authorized catalog, explicit selections and change callback.
- * @returns server/tool/skill choices retaining selected missing names.
+ * @returns server/tool/skill/knowledge choices retaining selected missing names.
  */
 export function CapabilityChoices({ catalog, selection, busy, t, onChange }: {
   readonly catalog: CloudAgentCapabilities
@@ -77,6 +77,18 @@ export function CapabilityChoices({ catalog, selection, busy, t, onChange }: {
           <p>{catalog.skills.find(skill => skill.name === name)?.description ?? t('mcpListMissingDescription')}</p>
         </div>)}
     </fieldset>
+    {(catalog.knowledgeSources !== undefined || (selection.knowledgeSources?.length ?? 0) > 0)
+      && <fieldset className={css.capabilityPicker}><legend>{t('knowledgeSources')}</legend>
+        {(catalog.knowledgeSources?.length ?? 0) === 0 && <p>{t('noKnowledge')}</p>}
+        {[...new Set([...(catalog.knowledgeSources ?? []).map(source => source.id), ...(selection.knowledgeSources ?? [])])].map((id) => {
+          const source = catalog.knowledgeSources?.find(item => item.id === id)
+          return <div key={id} className={css.capabilityOption}>
+            <Checkbox label={source?.name ?? id} checked={selection.knowledgeSources?.includes(id) === true} disabled={busy}
+              onChange={(checked) => { onChange({ ...selection, knowledgeSources: toggle(selection.knowledgeSources, id, checked) }) }} />
+            <p>{source === undefined ? t('knowledgeMissing') : source.description || t('mcpListNoDescription')}</p>
+          </div>
+        })}
+      </fieldset>}
   </>
 }
 
@@ -114,7 +126,7 @@ function CapabilityEditor({ catalog, record, sessionId, busy, t, saveCapabilitie
   </>
 }
 
-/** Render only this session's MCP and skills, never global plugin data.
+/** Render only this session's MCP, skills and knowledge sources, never global plugin data.
  * @param props - scoped session, framework catalog hooks and controlled mutation actions.
  * @returns authoring choices or a read-only release.
  */
@@ -150,6 +162,13 @@ export function CloudAgentCapabilitiesPanel(props: CapabilityProps) {
               ?? selection.release.definition.skills?.map(name => ({ name, description: '' })) ?? []).map(skill =>
               <li key={skill.name}>{skill.name}<p>{skill.description}</p></li>)}
           </ul></section>
+          <section className={css.capabilitySection}><h3>{props.t('knowledgeSources')}</h3>
+            {(selection.release.knowledgeBindings?.length ?? 0) === 0 ? <p>{props.t('infoNoKnowledge')}</p> : <ul className={css.infoList}>
+              {selection.release.knowledgeBindings?.map(({ id }) => {
+                const source = view.catalog?.capabilities.knowledgeSources?.find(item => item.id === id)
+                return <li key={id}>{source?.name ?? id}<p>{source?.description ?? props.t('knowledgeMissing')}</p></li>
+              })}</ul>}
+          </section>
           <Button variant="outline" disabled={view.busy} onClick={() => { void edit() }}>{props.t(selection.record === undefined ? 'clone' : 'editAgent')}</Button>
         </> : <p>{props.t(selection.kind === 'new' ? 'capabilityNewHint' : 'capabilityUnavailableHint')}</p>}
   </section>

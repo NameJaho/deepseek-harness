@@ -9,7 +9,7 @@ kind: "package-bundle"
 
 ## 概述
 
-用于保存可复用对话需求并发布精确 MCP 与技能选择的可选 Host 和 Web bundle。执行只依赖 `ctx.companyMcpProvider` 一个提供方。包内不包含 MCP 目录实现、凭据编辑器、shell 执行、Docker、HTML 发布、知识检索或外部 Agent 执行。
+用于保存可复用对话需求并发布精确 MCP、知识库和技能选择的可选 Host 和 Web bundle。执行依赖企业 MCP 和知识库提供方。包内不包含 MCP 目录实现、凭据编辑器、shell 执行、Docker、HTML 发布、文档导入、知识空间管理或外部 Agent 执行。
 
 ## 目录
 
@@ -34,7 +34,7 @@ kind: "package-bundle"
 
 目录返回本人草稿、当前公开或本人拥有的 release，以及仅属于调用者的对话。公开条目不包含其他所有者的来源 Session 审计。新 usage Session 属于启动它的用户而非发布者，并绑定精确 release id。撤回、可见范围变化、新发布或删除后，已有 Session 保留原所有者与 release。使用条目显示 `available`、`updated`、`disabled`、`withdrawn`、`access-lost` 或 `deleted`；这些状态不会重定向已有 Session。
 
-`creationPreset` 和 `runPreset` 必须可选。创建在编辑器中挂载所选 preset。usage Session 只挂载其保留的 release preset：`runPreset` 仅验证并记录，不挂载，因此不能增加工具或权限。可选 provider/model 覆盖值会经过验证。绑定审计记录创建/运行 preset，以及包含 release、run preset、实际模型和强制 `read-only` 权限的生效摘要。运行时只提供批准的 MCP 工具、固定技能、可下载文本报告和本对话文件读取；见[运行时](../cloud-agent-runtime/README.zh.md)。
+`creationPreset` 和 `runPreset` 必须可选。创建在编辑器中挂载所选 preset。usage Session 只挂载其保留的 release preset：`runPreset` 仅验证并记录，不挂载，因此不能增加工具或权限。可选 provider/model 覆盖值会经过验证。绑定审计记录创建/运行 preset，以及包含 release、run preset、实际模型和强制 `read-only` 权限的生效摘要。运行时只提供批准的 MCP 工具、批准的知识库检索、固定技能、可下载文本报告和本对话文件读取；见[运行时](../cloud-agent-runtime/README.zh.md)。
 
 可选企微资源提供方授予本包的 Remote 操作，以及成员 default Workspace 中精确的 `/create-agent` 和 `/publish-agent` 命令。目录变更提交后会使访问快照失效。Session 所有者从持久化绑定或成员 default Workspace 解析，不从发布所有权推断。创建提供方路由处理当前保留 release；fork 放置负责分配私有文件，保留的绑定事件维持所有权。
 
@@ -86,7 +86,7 @@ Help the user refine reusable Agent requirements. Use cloud_agent catalog and sa
 ## 已知限制与后续工作
 
 - 不应用 run preset 中超出验证与审计的行为；reasoning 和展示变化需要独立的能力安全组合设计。
-- 知识检索、外部 Agent subagent、可执行插件和 shell 访问不属于这个 MCP 与技能 bundle。
+- 文档导入、索引构建和知识空间管理、外部 Agent subagent、可执行插件和 shell 访问不属于这个 MCP、知识库与技能 bundle。
 - 不能根据已入队的提取请求推断发布成功。用户必须等待已保存 revision 并显式确认；不确定结果需要查询目录。
 - 部署/profile 配置、生成目录、持久化确认记录和 Loader 驱动的录制 Session 属于集成职责；定向 Host fixture 不能证明生产连通性。
 

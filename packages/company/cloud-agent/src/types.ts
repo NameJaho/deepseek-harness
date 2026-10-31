@@ -3,6 +3,7 @@ import type { Branded } from '@deepseek-ai/dsh-brand'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ModelCatalog } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { CompanyMcpCapability, CompanyMcpId } from '@deepseek-ai/dsh-company-mcp-provider/types'
+import type { CompanyKnowledgeBinding, CompanyKnowledgeSource } from '@deepseek-ai/dsh-company-knowledge/types'
 
 /** Platform-assigned identity of an editable agent. */
 export type CloudAgentId = Branded<'cloud-agent-id'>
@@ -24,6 +25,8 @@ export interface CloudAgentDraft {
   readonly mcpServers?: readonly CompanyMcpId[] | undefined
   /** Installed skill names captured at draft save. Omission selects none. */
   readonly skills?: readonly string[] | undefined
+  /** Logical knowledge sources explicitly approved for this Agent. Omission grants none. */
+  readonly knowledgeSources?: readonly string[] | undefined
 }
 
 /** One pinned skill resource, copied into the release Session's private workspace. */
@@ -55,6 +58,8 @@ export interface CloudAgentCapabilities {
   /** Configured company MCP servers; tool schemas remain hidden from the selector. */
   readonly mcpServers: readonly CloudAgentMcpServer[]
   readonly skills: readonly { readonly name: string; readonly description: string }[]
+  /** Configured knowledge sources; omitted when the deployment has no knowledge service. */
+  readonly knowledgeSources?: readonly CompanyKnowledgeSource[] | undefined
 }
 
 /** Who may start a published release: every signed-in member or only its owner. */
@@ -81,6 +86,8 @@ export interface CloudAgentRelease {
   readonly createdAt: number
   readonly skillSnapshots?: readonly CloudAgentSkillSnapshot[] | undefined
   readonly mcpBindings?: readonly CloudAgentMcpBinding[] | undefined
+  /** Space-permission fingerprints captured at publication; a changed source rejects new runs. */
+  readonly knowledgeBindings?: readonly CompanyKnowledgeBinding[] | undefined
   readonly capabilityPreset?: string | undefined
   /** Omission on legacy published releases means public. */
   readonly visibility?: CloudAgentVisibility | undefined

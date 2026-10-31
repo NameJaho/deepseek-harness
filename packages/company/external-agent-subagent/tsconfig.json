@@ -9,6 +9,7 @@
     { "path": "../../core/session" },
     { "path": "../../credentials/credentials" },
     { "path": "../../subagent/subagent" },
+    { "path": "../../subagent/tool-subagent" },
     { "path": "../../util/brand" },
     { "path": "../../util/timeout" },
     { "path": "../../util/values" }

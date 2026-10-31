@@ -10,7 +10,11 @@ import type { CloudAgentLocaleKey } from './locales.ts'
 import css from './page.module.css'
 
 type PageProps = PropsRuntime<'plugins.item'> & PropsLocale<'company.cloudAgent'> & InjectFace<McpInjected>
-type EntryProps = Pick<PageProps, 't' | 'configureMcp' | 'discoverMcp'> & { readonly entry: CompanyMcpServer; readonly busy: boolean }
+type EntryProps = Pick<PageProps, 't' | 'configureMcp' | 'discoverMcp'> & {
+  readonly entry: CompanyMcpServer
+  readonly busy: boolean
+  readonly canConfigure: boolean
+}
 
 /** Every provider state is expressed through text and a semantic color. */
 export const mcpStatuses: Record<CompanyMcpStatus, CloudAgentLocaleKey> = {
@@ -76,15 +80,15 @@ export function ToolDisclosure({ tool, t }: { readonly tool: CompanyMcpTool; rea
   </details>
 }
 
-function McpEntry({ entry, busy, configureMcp, discoverMcp, t }: EntryProps) {
+function McpEntry({ entry, busy, canConfigure, configureMcp, discoverMcp, t }: EntryProps) {
   return <article className={`${css.card} ${css.mcpCard}`} data-company-mcp={entry.id}>
     <div className={css.cardHeading}><h2>{entry.name}</h2><Tag tone={mcpStatusTones[entry.status]}>{t(mcpStatuses[entry.status])}</Tag>
       {!entry.enabled && <Tag>{t('mcpDisabled')}</Tag>}</div>
     <p className={css.description}>{entry.description || t('mcpListNoDescription')}</p>
     <p className={css.metadata}>{t('mcpToolsCount', { count: String(entry.tools.length) })}</p>
     {entry.updatedAt !== undefined && <p className={css.metadata}>{t('mcpUpdated', { time: new Date(entry.updatedAt).toISOString() })}</p>}
-    <Checkbox label={t('mcpEnabled')} checked={entry.enabled} disabled={busy}
-      onChange={(enabled) => { void configureMcp(entry.id, enabled) }} />
+    {canConfigure && <Checkbox label={t('mcpEnabled')} checked={entry.enabled} disabled={busy}
+      onChange={(enabled) => { void configureMcp(entry.id, enabled) }} />}
     <Button variant="outline" disabled={busy || !entry.enabled || entry.status === 'maintenance'}
       onClick={() => { void discoverMcp(entry.id) }}>{t('mcpInspect')}</Button>
     <details className={css.mcpTools}><summary>{t('mcpToolsCount', { count: String(entry.tools.length) })}</summary>
@@ -99,6 +103,7 @@ function McpEntry({ entry, busy, configureMcp, discoverMcp, t }: EntryProps) {
  */
 export function CompanyMcpPage(props: PageProps) {
   const view = props.useCompanyMcp(state => state)
+  const canConfigure = props.useRemoteAccess('companyMcp/configure')
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'all' | 'enabled' | CompanyMcpStatus>('all')
   if (props.view === 'summary') return props.t('mcpSummary')
@@ -125,6 +130,7 @@ export function CompanyMcpPage(props: PageProps) {
       {['a', 'b', 'c'].map(key => <div key={key} className={css.skeleton} />)}</div>
       : entries.length === 0 ? <p className={css.empty}>{props.t('mcpEmpty')}</p>
         : <div className={`${css.grid} ${css.mcpGrid}`}>{entries.map(entry => <McpEntry key={entry.id} entry={entry}
-          busy={view.busy} configureMcp={props.configureMcp} discoverMcp={props.discoverMcp} t={props.t} />)}</div>}
+          busy={view.busy} canConfigure={canConfigure} configureMcp={props.configureMcp}
+          discoverMcp={props.discoverMcp} t={props.t} />)}</div>}
   </section>
 }

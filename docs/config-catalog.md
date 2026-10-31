@@ -802,7 +802,7 @@ export interface ToolResultPruneConfig {
 
 ## `@deepseek-ai/dsh-company-cloud-agent`
 
-- `inject`: `storageDomain` · `agentPresets` · `agents` · `llm` · `sessionController` · `tools` · `workspaceRegistry` · `companyMcpProvider` · `sessionProjections` · `permissionPresets` · `sessionPersistence`
+- `inject`: `storageDomain` · `agentPresets` · `agents` · `llm` · `sessionController` · `tools` · `workspaceRegistry` · `sessionProjections` · `permissionPresets` · `sessionPersistence`
 - `source`: [`packages/company/cloud-agent/src/config.ts:5`](../packages/company/cloud-agent/src/config.ts)
 
 ```ts config-catalog
@@ -845,6 +845,8 @@ export interface Config {
   mcpTools?: string[]
   /** Published skill instructions and resources. */
   skills?: CloudAgentRuntimeSkill[]
+  /** Logical knowledge source ids approved by the retained release. */
+  knowledgeSources?: string[]
   /** Authoring or ordinary retained release behavior. */
   mode?: 'authoring' | 'release'
 }
@@ -878,13 +880,15 @@ export interface CloudAgentRuntimeSkillResource {
 
 - `inject`: `subagents` · `credentials` · `agents`
 - `refs`: [`JsonValue`](../packages/util/values/src/index.ts)
-- `source`: [`packages/company/external-agent-subagent/src/index.ts:52`](../packages/company/external-agent-subagent/src/index.ts)
+- `source`: [`packages/company/external-agent-subagent/src/index.ts:53`](../packages/company/external-agent-subagent/src/index.ts)
 
 ```ts config-catalog
 /** All agents are explicitly configured on the Host; an empty list enables no providers. */
 export interface Config {
   /** Logical external agents; each registers one subagent provider. */
   readonly agents: ExternalAgentConfig[]
+  /** Mount one ordinary delegation tool per logical agent; explicit scoped mounts may leave this disabled. */
+  readonly registerTools?: boolean
 }
 
 /** Private deployment configuration for one separately registered logical agent. */
@@ -921,12 +925,55 @@ export interface ExternalAgentConfig {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-company-external-agent-subagent -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-company-knowledge -->
+<a id="deepseek-aidsh-company-knowledge"></a>
+
+## `@deepseek-ai/dsh-company-knowledge`
+
+- `inject`: `credentials`
+- `source`: [`packages/company/knowledge/src/config.ts:21`](../packages/company/knowledge/src/config.ts)
+
+```ts config-catalog
+/** Retrieval policy and deployment source list. */
+export interface Config {
+  /** Configured knowledge sources; an empty list leaves the page in its unconfigured state. */
+  sources: KnowledgeSourceConfig[]
+  /** Largest requested hit count; upstream accepts at most 50. */
+  topK: number
+  /** Minimum rerank score accepted as evidence. Every request enables rerank. */
+  minimumScore: number
+  /** Deadline for one read-only upstream request. */
+  timeoutMs: number
+  /** Maximum characters in one natural-language query. */
+  maxQueryChars: number
+  /** Maximum complete upstream response bytes. */
+  maxResponseBytes: number
+}
+
+/** Deployment-owned knowledge source. Models and browsers cannot submit or read these endpoint or space fields. */
+export interface KnowledgeSourceConfig {
+  /** Logical identifier selected by Agent authors. */
+  id: string
+  /** Display name in capability lists. */
+  name: string
+  /** Public-safe description of this source. */
+  description: string
+  /** HTTP search endpoint used only by the Host. */
+  searchUrl: string
+  /** Credential reference for the bearer token; an unset credential sends no `Authorization` header. */
+  tokenRef?: string
+  /** Exact nonempty upstream space allowlist injected into every request. */
+  spaceIds: string[]
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-company-knowledge -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-company-wecom-auth -->
 <a id="deepseek-aidsh-company-wecom-auth"></a>
 
 ## `@deepseek-ai/dsh-company-wecom-auth`
 
-- `inject`: `credentials` · `storageDomain` · `connection` · `webServer`
+- `inject`: `credentials` · `storageDomain` · `connection` · `webServer` · `remoteAccess` · `workspaceRegistry`
 - `source`: [`packages/company/wecom-auth/src/config.ts:5`](../packages/company/wecom-auth/src/config.ts)
 
 ```ts config-catalog
@@ -950,6 +997,10 @@ export interface Config {
   maxResponseBytes: number
   /** Root directory under which each member receives one private default Workspace. */
   workspaceRoot?: string
+  /** Accept URL-encoded X-User-Info identity data from a trusted upstream gateway. */
+  gatewayIdentityEnabled: boolean
+  /** Optional upstream logout URL used by gateway-authenticated account pages. */
+  gatewayLogoutUrl: string
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-company-wecom-auth -->

@@ -10,6 +10,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-api-remote-access/client'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry/remote'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -36,7 +37,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 /** Transport readiness and existing shell extension services. */
-export const inject = ['slots', 'locale', 'remote', 'connection', 'uiWorkspace', 'layout', 'sidebarRight', 'sidebarRightTabs', 'pluginNavigation']
+export const inject = ['slots', 'locale', 'remote', 'remoteAccess', 'connection', 'uiWorkspace', 'layout', 'sidebarRight', 'sidebarRightTabs', 'pluginNavigation']
 
 function registerUi(ctx: Context): void {
   const id = 'company-cloud-agent' as MainPanelId
@@ -88,14 +89,16 @@ function registerUi(ctx: Context): void {
     inject: () => ({ hooks: face.hooks, refresh: face.refresh,
       revealCapabilities: (sessionId: SessionId) => { ctx.sidebarRight.openTabIn(sessionId, 'cloud-agent-capabilities') } }),
   }, CloudAgentCapabilitiesNavigation))
-  const mcp = new McpController(ctx.remote.companyMcp, () => ctx.remote.$stream({ name: 'company-mcp.catalog',
-    open: signal => ctx.remote.companyMcp.follow(signal), ended: () => new Error('Company MCP stream ended'),
-  }), controller.reportNotice)
-  ctx.effect(() => { mcp.start(); return () => mcp.dispose() }, 'company-mcp: management lifecycle')
-  const mcpFace = mcp.face()
-  ctx.slots.inject('plugins.item', () => ctx.slots.register({
-    name: 'plugins.item', id: 'company-mcp', order: 25, locale: 'company.cloudAgent', label: () => t('mcpTitle'), inject: () => mcpFace,
-  }, CompanyMcpPage))
+  ctx.remoteAccess.whenAccess('companyMcp/catalog', () => {
+    const mcp = new McpController(ctx.remote.companyMcp, () => ctx.remote.$stream({ name: 'company-mcp.catalog',
+      open: signal => ctx.remote.companyMcp.follow(signal), ended: () => new Error('Company MCP stream ended'),
+    }), controller.reportNotice)
+    ctx.effect(() => { mcp.start(); return () => mcp.dispose() }, 'company-mcp: management lifecycle')
+    const mcpFace = mcp.face()
+    return ctx.slots.inject('plugins.item', () => ctx.slots.register({
+      name: 'plugins.item', id: 'company-mcp', order: 25, locale: 'company.cloudAgent', label: () => t('mcpTitle'), inject: () => mcpFace,
+    }, CompanyMcpPage))
+  })
   ctx.slots.inject('main', () => ctx.slots.register({
     name: 'main', key: id, locale: 'company.cloudAgent', inject: () => face,
     children: { 'company.cloudAgent.page.actions': { kind: 'list', scope: 'root' } },

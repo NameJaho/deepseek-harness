@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-An opt-in Host and Web bundle for saving reusable conversation requirements and publishing exact MCP and skill selections. It depends on one execution provider, `ctx.companyMcpProvider`. It contains no MCP directory implementation, credentials editor, shell execution, Docker, HTML publishing, knowledge retrieval or external Agent execution.
+An opt-in Host and Web bundle for saving reusable conversation requirements and publishing exact MCP, knowledge and skill selections. It depends on the company MCP and knowledge providers for execution. It contains no MCP directory implementation, credentials editor, shell execution, Docker, HTML publishing, document import or knowledge-space management, or external Agent execution.
 
 ## Table of Contents
 
@@ -32,7 +32,7 @@ Authors may also open a private editor with `startAuthoring`, save through `clou
 
 The catalog exposes owned drafts, current public-or-owned releases and only the caller's conversations. Public entries omit another owner's source Session audit. New usage Sessions belong to the user starting them, not the publisher, and pin an exact release id. Existing Sessions retain their original owner and release after withdrawal, visibility changes, new publication or deletion. Usage entries report `available`, `updated`, `disabled`, `withdrawn`, `access-lost` or `deleted`; these states never redirect an existing Session.
 
-`creationPreset` and `runPreset` must be selectable. Creation mounts its preset in the editor. A usage Session mounts only its retained release preset: `runPreset` is validated and recorded, not mounted, so it cannot add tools or permissions. Optional provider/model overrides are validated. Binding audit records creation/run presets and an effective digest including the release, run preset, actual model and enforced `read-only` permission. The runtime supplies only approved MCP tools, pinned skills, downloadable text reports and conversation-owned file reads; see [runtime](../cloud-agent-runtime/README.md).
+`creationPreset` and `runPreset` must be selectable. Creation mounts its preset in the editor. A usage Session mounts only its retained release preset: `runPreset` is validated and recorded, not mounted, so it cannot add tools or permissions. Optional provider/model overrides are validated. Binding audit records creation/run presets and an effective digest including the release, run preset, actual model and enforced `read-only` permission. The runtime supplies only approved MCP tools, approved knowledge searches, pinned skills, downloadable text reports and conversation-owned file reads; see [runtime](../cloud-agent-runtime/README.md).
 
 The optional WeCom resource provider grants the package's Remote actions and exactly `/create-agent` and `/publish-agent` in member default Workspaces. It invalidates access snapshots after committed catalog changes. Session owners are resolved from durable bindings or the member default Workspace, never from publication ownership. Creation-provider routing handles current retained releases; fork placement allocates private files while retained binding events preserve ownership.
 
@@ -81,7 +81,7 @@ The repeated guidance is prefix-stable within that preset; switching to another 
 ## Known Limitations and Deferred Work
 
 - Run preset behavior beyond validation and audit is not applied; reasoning and presentation changes require a separate capability-safe composition design.
-- Knowledge retrieval, external Agent subagents, executable plugins and shell access are outside this MCP-and-skills bundle.
+- Document import, index construction and space management, external Agent subagents, executable plugins and shell access are outside this MCP, knowledge and skills bundle.
 - Publication cannot be inferred from a queued extraction request. Users must wait for a saved revision and explicitly confirm it; an uncertain result requires catalog inspection.
 - Deployment/profile wiring, generated catalogs, persistence acknowledgements and a Loader-driven recorded Session are integration responsibilities; focused Host fixtures do not establish production connectivity.
 

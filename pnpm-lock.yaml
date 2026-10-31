@@ -342,6 +342,9 @@ importers:
       '@deepseek-ai/dsh-company-external-agent-subagent':
         specifier: workspace:*
         version: link:../../packages/company/external-agent-subagent
+      '@deepseek-ai/dsh-company-knowledge':
+        specifier: workspace:*
+        version: link:../../packages/company/knowledge
       '@deepseek-ai/dsh-company-mcp-provider':
         specifier: workspace:*
         version: link:../../packages/company/mcp-provider
@@ -3828,6 +3831,9 @@ importers:
       '@deepseek-ai/cordis':
         specifier: workspace:~
         version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-client-ui-conversation':
+        specifier: workspace:*
+        version: link:../ui-conversation
       '@deepseek-ai/dsh-client-ui-primitives':
         specifier: workspace:*
         version: link:../ui-primitives
@@ -7205,6 +7211,9 @@ importers:
       '@deepseek-ai/dsh-company-cloud-agent-runtime':
         specifier: workspace:*
         version: link:../cloud-agent-runtime
+      '@deepseek-ai/dsh-company-knowledge':
+        specifier: workspace:*
+        version: link:../knowledge
       '@deepseek-ai/dsh-company-mcp-provider':
         specifier: workspace:*
         version: link:../mcp-provider
@@ -7437,6 +7446,64 @@ importers:
         specifier: workspace:*
         version: link:../../session/working-directory
 
+  packages/company/knowledge:
+    dependencies:
+      '@deepseek-ai/dsh-brand':
+        specifier: workspace:*
+        version: link:../../util/brand
+      '@deepseek-ai/dsh-timeout':
+        specifier: workspace:*
+        version: link:../../util/timeout
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-api-remotes':
+        specifier: workspace:*
+        version: link:../../api/remotes
+      '@deepseek-ai/dsh-client-locale':
+        specifier: workspace:*
+        version: link:../../client/locale
+      '@deepseek-ai/dsh-client-store':
+        specifier: workspace:*
+        version: link:../../client/store
+      '@deepseek-ai/dsh-client-ui-plugin-manager':
+        specifier: workspace:*
+        version: link:../../client/ui-plugin-manager
+      '@deepseek-ai/dsh-client-ui-primitives':
+        specifier: workspace:*
+        version: link:../../client/ui-primitives
+      '@deepseek-ai/dsh-client-ui-renderer':
+        specifier: workspace:*
+        version: link:../../client/ui-renderer
+      '@deepseek-ai/dsh-client-ui-slots':
+        specifier: workspace:*
+        version: link:../../client/ui-slots
+      '@deepseek-ai/dsh-company-wecom-auth':
+        specifier: workspace:*
+        version: link:../wecom-auth
+      '@deepseek-ai/dsh-credentials':
+        specifier: workspace:*
+        version: link:../../credentials/credentials
+      '@deepseek-ai/dsh-typert-protocol':
+        specifier: workspace:*
+        version: link:../../typert/protocol
+      '@testing-library/react':
+        specifier: ^16.3.3
+        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.2.0
+        version: 18.3.1(react@18.3.1)
+
   packages/company/mcp-provider:
     dependencies:
       '@deepseek-ai/dsh-brand':
@@ -7452,6 +7519,9 @@ importers:
       '@deepseek-ai/cordis':
         specifier: workspace:~
         version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-company-wecom-auth':
+        specifier: workspace:*
+        version: link:../wecom-auth
       '@deepseek-ai/dsh-credentials':
         specifier: workspace:*
         version: link:../../credentials/credentials

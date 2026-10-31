@@ -1,6 +1,7 @@
 /** Company MCP provider seam and its browser management Remote (`ctx.companyMcp`). */
 import type { Context } from '@deepseek-ai/cordis'
-import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
+import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
+import type {} from '@deepseek-ai/dsh-company-wecom-auth'
 import type {} from './provider.ts'
 import type { CompanyMcpCatalog, CompanyMcpId, CompanyMcpTool } from './types.ts'
 
@@ -19,7 +20,17 @@ declare module '@deepseek-ai/cordis' {
 export class CompanyMcpRemote extends TypertRemoteService {
   static inject = ['companyMcpProvider']
   /** @param ctx - Host with a company MCP provider. */
-  constructor(ctx: Context) { super(ctx, 'companyMcp', { namespace: 'companyMcp' }) }
+  constructor(ctx: Context) {
+    super(ctx, 'companyMcp', { namespace: 'companyMcp' })
+    ctx.inject(['companyWecomAuth'], (memberCtx) => {
+      memberCtx.companyWecomAuth.registerResourceProvider({
+        bindings: principal => [{ resource: { kind: 'global' }, role: { name: 'company:mcp', resource: 'global',
+          actions: ['companyMcp/catalog', 'companyMcp/follow', 'companyMcp/refresh', 'companyMcp/discover',
+            ...principal.role === 'admin' ? ['companyMcp/configure' as const] : []] } }],
+        sessionOwner: () => undefined,
+      })
+    })
+  }
 
   /** Read the current catalog.
    * @returns servers, tools and the latest refresh failure; never endpoints or headers.
@@ -47,6 +58,11 @@ export class CompanyMcpRemote extends TypertRemoteService {
    */
   @Remote
   configure(request: { readonly id: CompanyMcpId; readonly enabled: boolean }): Promise<CompanyMcpCatalog> {
+    const principal = this.ctx.invocation?.peer.principal
+    if (principal?.kind === 'owner') return this.ctx.companyMcpProvider.configure({ id: request.id, enabled: request.enabled })
+    if ((principal?.kind !== 'wecom-user' && principal?.kind !== 'gateway-user') || principal.role !== 'admin') {
+      return Promise.reject(new RemoteError('company-mcp/owner-required', 'Only the deployment owner or an administrator can change MCP enablement', {}))
+    }
     return this.ctx.companyMcpProvider.configure({ id: request.id, enabled: request.enabled })
   }
 

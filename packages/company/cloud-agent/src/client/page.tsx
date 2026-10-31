@@ -123,6 +123,8 @@ export function CloudAgentPage(props: PageProps) {
           <div className={css.capabilities}>{[...new Set([
             ...(entry.release.mcpBindings?.map(binding => binding.name) ?? entry.release.definition.mcpTools ?? []),
             ...(entry.release.definition.skills ?? []),
+            ...(entry.release.knowledgeBindings ?? []).map(({ id }) =>
+              catalog.capabilities.knowledgeSources?.find(source => source.id === id)?.name ?? id),
           ])].map(name => <Tag key={name}>{name}</Tag>)}</div>
           <div className={css.actions}><Button variant="primary" disabled={view.busy} onClick={() => { setRunTarget(entry); setRunPreset(''); setRunModel('') }}>{t('start')}</Button>
             <Button variant="outline" disabled={view.busy} onClick={() => { void props.clone(entry.id, entry.release.id) }}>{t('clone')}</Button></div>

@@ -9,6 +9,7 @@
   "references": [
     { "path": "../wecom-auth" },
     { "path": "../mcp-provider" },
+    { "path": "../knowledge/tsconfig.host.json" },
     { "path": "../../../vendor/cordis" },
     { "path": "../../../vendor/schemastery" },
     { "path": "../../util/brand" },

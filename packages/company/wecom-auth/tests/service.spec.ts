@@ -69,7 +69,7 @@ async function fixture(overrides: Partial<{ gatewayIdentityEnabled: boolean; gat
   await ctx.plugin(WebServer, { host: '127.0.0.1', port: 0 })
   new RemoteAccessService(ctx)
   await ctx.plugin(Connection, { trustedHosts: ['login.example'], requireBrowserLogin: true })
-  const resolved = Config({ ...config, workspaceRoot, ...overrides } as Config)
+  const resolved = Config({ ...config, workspaceRoot, ...overrides })
   const fiber = ctx.plugin(Auth, resolved)
   await fiber
   ctx.effect(() => ctx.webServer.registerFallback((req, res) => {

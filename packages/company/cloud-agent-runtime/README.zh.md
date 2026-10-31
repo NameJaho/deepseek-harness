@@ -1,5 +1,5 @@
 ---
-description: "字面 release 提示词，以及 Agent 所属的 MCP、技能、报告和附件策略。"
+description: "字面 release 提示词，以及 Agent 所属的 MCP、知识库、技能、报告和附件策略。"
 kind: "package-reference"
 ---
 
@@ -21,9 +21,9 @@ kind: "package-reference"
 <a id="configuration-and-enforcement"></a>
 ## 配置与强制限制
 
-[Config](src/index.ts) 要求字面 `instructions` 和 `releaseId`，可选字段为精确 `mcpTools`、固定 `skills` 及 `mode`（默认 `release`）。技能资源包含精确相对路径和 base64 字节。Host 负责持久化验证、快照上限和私有文件写入；运行时调用者必须提供已经 Host 验证的 release 数据。
+[Config](src/index.ts) 要求字面 `instructions` 和 `releaseId`，可选字段为精确 `mcpTools`、批准的 `knowledgeSources`、固定 `skills` 及 `mode`（默认 `release`）。技能资源包含精确相对路径和 base64 字节。Host 负责持久化验证、能力绑定、快照上限和私有文件写入；运行时调用者必须提供已经 Host 验证的 release 数据。
 
-release 模式在作用域内替换 persona，不插值，并抑制部署运行时上下文。Agent 创建时通过 Host 解析批准的 MCP 包装工具，隐藏全局工具并安装执行 guard。它添加 `cloud_report` 以生成有上限的可下载 UTF-8 报告；仅选择了技能时提供 `cloud_skill`。只有本对话已记录或入队上传，或随后收到文件时，才注册 `cloud_file`；其参数是已记录 attachment id，而非文件系统路径。报告与文件执行检查接收 Agent 身份。每次模型步骤前，Host 重新验证 MCP 签名；失败会停止后续步骤。
+release 模式在作用域内替换 persona，不插值，并抑制部署运行时上下文。Agent 创建时通过 Host 解析批准的 MCP 包装工具，只为 release 批准的来源注册 `cloud_knowledge`，隐藏全局工具并安装执行 guard。它添加 `cloud_report` 以生成有上限的可下载 UTF-8 报告；仅选择了技能时提供 `cloud_skill`。只有本对话已记录或入队上传，或随后收到文件时，才注册 `cloud_file`；其参数是已记录 attachment id，而非文件系统路径。报告、知识库和文件执行检查接收 Agent 身份。每次模型步骤前，Host 重新验证 MCP 和知识库绑定；失败会停止后续步骤。
 
 authoring 模式只暴露 `cloud_agent`，不能执行 MCP 工具、报告或附件读取。其字面提示词可包含固定技能指令。工具限制与执行 guard 属于 Agent，因此卸载运行时不会在 Agent 仍存活时暴露全局工具；Agent 清理时移除这些策略。运行时不改变部署的工具展示模式。
 
@@ -48,7 +48,7 @@ persona 大小取决于经过验证的已保存指令和所选技能。release �
 
 #### 模型看到什么
 
-只看到批准的 MCP schema，以及 [index.ts](src/index.ts) 中适用的 `cloud_skill`、`cloud_report` 和 `cloud_file` 定义。MCP 描述与参数来自经过签名检查的提供方。技能结果包含固定指令或 UTF-8/base64 资源数据；文件结果包含本对话引用或经过验证的分页；报告结果包含可下载报告元数据。不暴露全局 shell 或任意文件访问。
+只看到批准的 MCP schema，以及 [index.ts](src/index.ts) 中适用的 `cloud_knowledge`、`cloud_skill`、`cloud_report` 和 `cloud_file` 定义。MCP 描述与参数来自经过签名检查的提供方。知识库结果包含经过验证的段落、文档标题和章节；技能结果包含固定指令或 UTF-8/base64 资源数据；文件结果包含本对话引用或经过验证的分页；报告结果包含可下载报告元数据。不暴露全局 shell 或任意文件访问。
 
 #### Token 影响
 
@@ -61,7 +61,7 @@ persona 大小取决于经过验证的已保存指令和所选技能。release �
 <a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与后续工作
 
-- 不提供 shell、Docker、可执行插件、知识检索或外部 Agent 执行。
+- 不提供 shell、Docker、可执行插件或外部 Agent 执行。知识检索仅限保留 release 批准的来源。
 - 资源读取返回固定文本或 base64，不授予文件系统访问。附件仅支持经过验证的 UTF-8 分页，不解释二进制内容。
 - 本插件信任 Host 编译的 release 配置。直接部署配置不得绕过 Host 的持久化解析器或 release 授权。
 

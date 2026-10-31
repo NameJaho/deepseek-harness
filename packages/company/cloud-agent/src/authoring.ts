@@ -32,6 +32,7 @@ export function registerAuthoringTool(ctx: Context, service: CloudAgentService):
       mcpTools: { type: 'array', items: { type: 'string' }, description: 'Exact MCP tools; omission retains current choices, [] removes them.' },
       mcpServers: { type: 'array', items: { type: 'string' }, description: 'Selected server ids; their current tools are pinned when saving the draft. Omission retains choices.' },
       skills: { type: 'array', items: { type: 'string' }, description: 'Installed skill names to snapshot; omission retains choices, [] removes them.' },
+      knowledgeSources: { type: 'array', items: { type: 'string' }, description: 'Exact knowledge source ids from catalog; omission retains choices, [] removes them.' },
     },
     output: {
       schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }],
@@ -68,11 +69,16 @@ export function registerAuthoringTool(ctx: Context, service: CloudAgentService):
           model: args.model ?? base?.model ?? selection?.model ?? catalog.models.default.model,
           mcpTools: args.mcpTools ?? base?.mcpTools ?? [],
           mcpServers: args.mcpServers?.map(id => brandString<CompanyMcpId>(id)) ?? base?.mcpServers ?? [],
-          skills: args.skills ?? base?.skills ?? [] }
+          skills: args.skills ?? base?.skills ?? [],
+          ...args.knowledgeSources === undefined && base?.knowledgeSources === undefined ? {}
+            : { knowledgeSources: args.knowledgeSources ?? base?.knowledgeSources ?? [] } }
         for (const name of draft.mcpTools ?? []) if (await ctx.companyMcpProvider.resolveTool(name) === undefined) {
           throw new Error('Select an available MCP tool from catalog or discovery')
         }
         if (draft.skills?.some(name => !catalog.capabilities.skills.some(skill => skill.name === name))) throw new Error('Select installed skills from catalog')
+        if (draft.knowledgeSources?.some(id => catalog.capabilities.knowledgeSources?.some(source => source.id === id) !== true) === true) {
+          throw new Error('Select knowledge source ids from catalog')
+        }
         for (const id of draft.mcpServers ?? []) await ctx.companyMcpProvider.discoverTools(id)
         const saved = await service.saveFromConversation(agent, String(execution.callId), draft,
           args.agentId === undefined ? undefined : brandString<CloudAgentId>(args.agentId), args.expectedRevision)

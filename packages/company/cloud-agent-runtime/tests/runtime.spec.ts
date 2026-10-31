@@ -9,7 +9,8 @@ import { ToolExecutionPipeline } from '@deepseek-ai/dsh-tools/pipeline'
 import { expect, it, vi, type TestContext } from 'vitest'
 import * as Runtime from '../src/index.ts'
 
-async function fixture(test: TestContext, mode: 'authoring' | 'release', skills: Runtime.CloudAgentRuntimeSkill[] = []) {
+async function fixture(test: TestContext, mode: 'authoring' | 'release', skills: Runtime.CloudAgentRuntimeSkill[] = [],
+  knowledgeSources: string[] = []) {
   const ctx = new Context()
   test.onTestFinished(() => ctx.fiber.dispose())
   await ctx.plugin(SystemPrompt, { personaPrefix: 'GLOBAL_PERSONA' })
@@ -23,10 +24,11 @@ async function fixture(test: TestContext, mode: 'authoring' | 'release', skills:
   const pinned = vi.fn(async () => 'PINNED_EXECUTION')
   const validate = vi.fn(async () => {})
   const files = vi.fn(() => [])
+  const search = vi.fn(async () => ({ sourceId: 'hr', returned: 1, totalHits: 1, belowThreshold: 0, hits: [] }))
   ctx.provide('cloudAgents', {
     releaseMcpTools: async () => [tool('mcp__approved__ping', pinned)], validateCapabilities: validate,
     conversationFiles: files, conversationReport: () => ({ name: 'report.txt', content: 'ok', bytes: 2, mediaType: 'text/plain' }),
-    readConversationFile: async () => ({ text: 'uploaded text' }),
+    readConversationFile: async () => ({ text: 'uploaded text' }), searchKnowledge: search,
   } as never)
   // The runtime only needs a scoped identity and the two pending inbox queues.
   const agent = { id: brandString<Agent['id']>('runtime-session') } as Agent
@@ -35,7 +37,7 @@ async function fixture(test: TestContext, mode: 'authoring' | 'release', skills:
     { inject: ['tools', 'systemPrompt'] }))
   Object.assign(agent, { ctx: scope.ctx, inbox: { nextTurn: [], nextStep: [] } })
   const fiber = scope.ctx.plugin(Runtime, Runtime.Config({ mode, releaseId: 'release-1',
-    instructions: 'Literal {{not_an_expression}}', mcpTools: ['mcp__approved__ping'], skills }))
+    instructions: 'Literal {{not_an_expression}}', mcpTools: ['mcp__approved__ping'], skills, knowledgeSources }))
   await fiber
   await ctx.serial('agent/created', { agent, source: 'startup' })
   const execute = async (name: string, args: object = {}) => {
@@ -46,7 +48,7 @@ async function fixture(test: TestContext, mode: 'authoring' | 'release', skills:
     const outcome = prepared.kind === 'dispatch' ? await pipeline.dispatch(prepared.exec) : prepared
     return pipeline.complete(prepared.exec, outcome)
   }
-  return { ctx, agent, scope, fiber, external, pinned, validate, files, execute }
+  return { ctx, agent, scope, fiber, external, pinned, validate, files, search, execute }
 }
 
 it('exposes pinned MCP, reports and selected skills, rejects global execution and retains Agent policy through runtime unload', async (test) => {
@@ -58,6 +60,7 @@ it('exposes pinned MCP, reports and selected skills, rejects global execution an
   expect(prompt).toContain('- sales: Approved analysis')
   expect(prompt).not.toContain('GLOBAL_PERSONA')
   expect(prompt).not.toContain('PINNED_SKILL')
+  expect(prompt).not.toContain('cloud_knowledge')
   expect((await f.execute('mcp__approved__ping')).content).toEqual([{ type: 'text', text: 'PINNED_EXECUTION' }])
   expect((await f.execute('bash')).isError).toBe(true)
   expect((await f.execute('mcp__unapproved__ping')).isError).toBe(true)
@@ -93,4 +96,31 @@ it('restricts retained authoring to cloud_agent and never resolves release execu
   expect((await f.execute('cloud_report')).isError).toBe(true)
   expect(f.pinned).not.toHaveBeenCalled()
   expect(renderPrompt(await f.ctx.systemPrompt.assemble({ scope: f.agent }))).toContain('Literal {{not_an_expression}}')
+})
+
+it('exposes cloud_knowledge for approved sources and forwards only the source id and question', async (test) => {
+  const f = await fixture(test, 'release', [], ['hr', 'operations'])
+  expect(f.ctx.tools.schemas(f.agent).map(schema => schema.name).sort()).toEqual(['cloud_knowledge', 'cloud_report', 'mcp__approved__ping'])
+  const schema = f.ctx.tools.schemas(f.agent).find(item => item.name === 'cloud_knowledge')
+  expect(JSON.stringify(schema)).toContain('"enum":["hr","operations"]')
+  expect(renderPrompt(await f.ctx.systemPrompt.assemble({ scope: f.agent }))).toContain('Approved knowledge sources: hr, operations.')
+  const result = await f.execute('cloud_knowledge', { sourceId: 'hr', query: 'Leave policy' })
+  expect(result.content).toEqual([{ type: 'text', text: expect.stringContaining('"sourceId":"hr"') as string }])
+  expect(f.search).toHaveBeenCalledWith(f.agent, 'release-1', 'hr', 'Leave policy', expect.any(AbortSignal))
+  expect((await f.execute('cloud_knowledge', { sourceId: 'finance', query: 'Budget' })).isError).toBe(true)
+  expect(f.search).toHaveBeenCalledOnce()
+})
+
+it('never exposes knowledge search to retained authoring', async (test) => {
+  const f = await fixture(test, 'authoring', [], ['hr'])
+  expect(f.ctx.tools.schemas(f.agent).map(schema => schema.name)).toEqual(['cloud_agent'])
+  expect(renderPrompt(await f.ctx.systemPrompt.assemble({ scope: f.agent }))).not.toContain('cloud_knowledge')
+})
+
+it('pins the keyless knowledge tool and prompt surface', async (test) => {
+  const f = await fixture(test, 'release', [], ['hr', 'operations'])
+  expect({
+    prompt: renderPrompt(await f.ctx.systemPrompt.assemble({ scope: f.agent })),
+    tools: f.ctx.tools.schemas(f.agent).filter(schema => schema.name === 'cloud_knowledge'),
+  }).toMatchSnapshot()
 })

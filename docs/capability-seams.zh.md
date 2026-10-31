@@ -322,6 +322,8 @@ flowchart LR
   pkg_company_mcp_provider["company-mcp-provider"]
   svc_companyMcpProvider["ctx.companyMcpProvider<br/>Company MCP provider"]
   svc_companyMcp["ctx.companyMcp<br/>Company MCP catalog Remote"]
+  pkg_company_knowledge["company-knowledge"]
+  svc_companyKnowledge["ctx.companyKnowledge<br/>Company knowledge retrieval"]
   svc_cloudAgents["ctx.cloudAgents<br/>Cloud Agent catalog and releases"]
   pkg_company_cloud_agent_runtime["company-cloud-agent-runtime"]
   pkg_company_external_agent_subagent["company-external-agent-subagent"]
@@ -362,6 +364,7 @@ flowchart LR
   pkg_compaction_tool_result_pruner --> svc_toolResultPruner
   pkg_company_cloud_agent --> svc_cloudAgents
   pkg_company_external_agent_subagent --> svc_externalAgentSubagents
+  pkg_company_knowledge --> svc_companyKnowledge
   pkg_company_mcp_provider --> svc_companyMcp
   pkg_company_mcp_provider --> svc_companyMcpProvider
   pkg_company_wecom_auth --> svc_companyWecomAuth
@@ -521,6 +524,7 @@ flowchart LR
   svc_clientModules --> pkg_client_hmr
   svc_cloudAgents --> pkg_company_cloud_agent_runtime
   svc_compaction --> pkg_compaction_basic
+  svc_companyKnowledge --> pkg_company_cloud_agent
   svc_companyMcpProvider --> pkg_company_cloud_agent
   svc_companyMcpProvider --> pkg_company_mcp_provider
   svc_companyWecomAuth --> pkg_company_cloud_agent
@@ -779,6 +783,7 @@ flowchart LR
 | `ctx.companyWecomAuth` | `service` | [`company-wecom-auth`](../packages/company/wecom-auth) | - | [`company-cloud-agent`](../packages/company/cloud-agent) | - | 负责企业微信登录、成员 principal 与成员默认 Workspace；Cloud Agent 读取已登录成员来限定目录与群组范围。 |
 | `ctx.companyMcpProvider` | `seam` | [`company-mcp-provider`](../packages/company/mcp-provider) | [`company-mcp-provider`](../packages/company/mcp-provider) | [`company-mcp-provider`](../packages/company/mcp-provider), [`company-cloud-agent`](../packages/company/cloud-agent) | - | Host 列出、启用和执行公司 MCP 工具的唯一路径；HTTP 适配器与外部网关通信。 |
 | `ctx.companyMcp` | `service` | [`company-mcp-provider`](../packages/company/mcp-provider) | - | - | - | 向浏览器发布提供方目录与启用状态，不暴露网关 URL、请求头或上游错误正文。 |
+| `ctx.companyKnowledge` | `service` | [`company-knowledge`](../packages/company/knowledge) | - | [`company-cloud-agent`](../packages/company/cloud-agent) | - | 持有已批准知识来源并执行经过校验的 HTTP 检索；Cloud Agent release 保存空间指纹并只能通过该指纹检索。 |
 | `ctx.cloudAgents` | `service` | [`company-cloud-agent`](../packages/company/cloud-agent) | - | [`company-cloud-agent-runtime`](../packages/company/cloud-agent-runtime) | - | 负责 Cloud Agent 创作、不可变发布与共享使用群组；运行时把每个 Session 固定到其发布版本的工具与提示词。 |
 | `ctx.externalAgentSubagents` | `service` | [`company-external-agent-subagent`](../packages/company/external-agent-subagent) | - | - | - | 为每个已配置的外部应用注册一个 subagent 后端，并只保留存活期运行记录；常规委派工具选择后端。 |
 

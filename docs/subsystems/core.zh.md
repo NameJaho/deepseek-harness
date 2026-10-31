@@ -988,7 +988,7 @@ saveFromConversation(agent: Agent, requestId: string, draft: CloudAgentDraft, id
  */
 @Remote({ resources: { session: request => request.sessionIds } }) deleteUnboundAuthoringSessions(request: { readonly sessionIds: readonly SessionId[] }): Promise<void>
 
-/** Check selected server enablement and every pinned MCP signature before execution.
+/** Check knowledge permissions, selected server enablement and every pinned MCP signature before execution.
  * @param releaseId - trusted immutable release identity.
  */
 async validateCapabilities(releaseId: string): Promise<void>
@@ -998,6 +998,16 @@ async validateCapabilities(releaseId: string): Promise<void>
  * @returns release-only tools; every invocation rechecks authorization and current schema.
  */
 async releaseMcpTools(releaseId: string): Promise<readonly ToolDefinition[]>
+
+/** Search one knowledge source approved by the invoking live release Session.
+ * @param agent - trusted executor initiator.
+ * @param releaseId - release compiled into the invoking runtime.
+ * @param sourceId - logical source id; spaces and connection settings stay with the knowledge service.
+ * @param query - natural-language question.
+ * @param signal - tool cancellation.
+ * @returns validated relevant passages; a source outside the release or with changed permissions is refused.
+ */
+searchKnowledge(agent: Agent | undefined, releaseId: string, sourceId: string, query: string, signal: AbortSignal): Promise<CompanyKnowledgeSearchResult>
 
 /** List only attachments retained by the invoking live release Session.
  * @param agent - trusted executor initiator.
@@ -1025,6 +1035,52 @@ conversationReport(agent: Agent, name: string, content: string): CloudAgentRepor
 Types: [FileAttachmentRef](attachment.zh.md) · [ToolDefinition](tools.zh.md)
 
 Source: [`packages/company/cloud-agent/src/index.ts`](../../packages/company/cloud-agent/src/index.ts)
+
+<a id="ctxcompanyknowledge--companyknowledgeservice"></a>
+
+### `ctx.companyKnowledge` — `CompanyKnowledgeService`
+
+Approved retrieval registry; public results omit endpoints, credentials and upstream space identities.
+
+```ts cordis-catalog
+/** List configured public-safe sources for authenticated company members and the deployment owner.
+ * @returns source names and descriptions, excluding upstream connection settings, and the query length limit.
+ */
+@Remote catalog(): Promise<CompanyKnowledgeCatalog>
+
+/** Read source choices from trusted same-process capability consumers.
+ * @returns detached public-safe source metadata.
+ */
+sources(): CompanyKnowledgeSource[]
+
+/** Capture one permission fingerprint without exposing its allowed upstream spaces.
+ * @param id - configured logical source id.
+ * @returns the binding to retain with an Agent release.
+ */
+binding(id: string): CompanyKnowledgeBinding
+
+/** Refuse a release when the source's allowed upstream spaces changed.
+ * @param binding - immutable approved source and permission fingerprint.
+ */
+validate(binding: CompanyKnowledgeBinding): void
+
+/** Test one configured source from the authenticated retrieval page.
+ * @param request - logical source and natural-language query.
+ * @param signal - management request cancellation.
+ * @returns the retrieved evidence; an upstream failure remains a failure.
+ */
+@Remote async test(request: CompanyKnowledgeSearchRequest, signal: AbortSignal): Promise<CompanyKnowledgeSearchResult>
+
+/** Search only the spaces granted by a trusted release binding.
+ * @param binding - source authorization already checked by the calling Agent owner.
+ * @param query - untrusted question, validated before dispatch.
+ * @param signal - invoking operation cancellation.
+ * @returns verified evidence after complete bounded response validation.
+ */
+async search(binding: CompanyKnowledgeBinding, query: string, signal: AbortSignal): Promise<CompanyKnowledgeSearchResult>
+```
+
+Source: [`packages/company/knowledge/src/index.ts`](../../packages/company/knowledge/src/index.ts)
 
 <a id="agent-events"></a>
 

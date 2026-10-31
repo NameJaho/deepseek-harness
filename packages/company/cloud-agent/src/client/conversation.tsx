@@ -51,7 +51,9 @@ export function CloudAgentDraftCard(props: CardProps) {
     <header className={css.cardHeading}><h2>{record.draft.name}</h2><Tag>{props.t(record.publishedReleaseId === null ? 'draft' : 'published')}</Tag></header>
     <p className={css.description}>{record.draft.description}</p><p className={css.metadata}>{props.t('savedRevision', { revision: String(record.revision) })}</p>
     <div className={css.capabilities}>
-      {[...new Set([...(record.draft.mcpTools ?? []), ...(record.draft.skills ?? [])])].map(name => <Tag key={name}>{name}</Tag>)}
+      {[...new Set([...(record.draft.mcpTools ?? []), ...(record.draft.skills ?? []), ...(record.draft.knowledgeSources ?? []).map(id =>
+        view.catalog?.capabilities.knowledgeSources?.find(source => source.id === id)?.name ?? id)])]
+        .map(name => <Tag key={name}>{name}</Tag>)}
     </div>
     <details className={css.requirements}><summary>{props.t('requirements')}</summary><pre>{record.draft.instructions}</pre></details>
     <div className={css.actions}><Button variant="outline" disabled={view.busy} onClick={() => { void props.preview(record, props.sessionId) }}>{props.t('preview')}</Button>

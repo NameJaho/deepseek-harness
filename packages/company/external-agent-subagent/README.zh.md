@@ -24,11 +24,12 @@ kind: "package-bundle"
 <a id="private-configuration"></a>
 ## 私有配置
 
-服务注入 `subagents`、`credentials` 和 `agents`。每个 Agent 的所有字段均为必填；`agents: []` 不注册任何 Provider。可选的 [bundle 补丁](cordis.patch.yml) 不会在全局启用，并将其委派工具保持为禁用状态。显式 Host overlay 提供私有配置，并在所需作用域挂载标准委派工具。
+服务注入 `subagents`、`credentials` 和 `agents`。每个 Agent 的所有字段均为必填；`agents: []` 不注册任何 Provider。若同一个 Host 组合需要让模型使用委派能力，将 `registerTools: true` 设置为为每个逻辑 Agent 挂载一个模型工具；工具名由逻辑 id 派生。可选的 [bundle 补丁](cordis.patch.yml) 不会在全局启用；只有 `DSH_COMPANY_EXTERNAL_AGENTS` 提供非空 JSON 配置时才启用此模式。
 
 ```yaml
 - name: '@deepseek-ai/dsh-company-external-agent-subagent'
   config:
+    registerTools: true
     agents:
       - platform: dify
         id: research
