@@ -86,8 +86,10 @@ export class CompanyWecomAuthService extends Service {
       throw new Error('wecom-auth: gatewayLogoutUrl is required when gatewayIdentityEnabled is enabled')
     }
     const secret = process.env.DSH_WECOM_APP_SECRET
-    if (secret === undefined || secret.trim() === '') throw new Error('wecom-auth: set DSH_WECOM_APP_SECRET in the server environment')
-    this.upstream = new WecomOfficial(this.config, secret, this.lifetime.signal)
+    if ((secret === undefined || secret.trim() === '') && !this.config.gatewayIdentityEnabled) {
+      throw new Error('wecom-auth: set DSH_WECOM_APP_SECRET in the server environment')
+    }
+    this.upstream = new WecomOfficial(this.config, secret ?? '', this.lifetime.signal)
     owner.effect(() => async () => {
       this.lifetime.abort()
       clearTimeout(this.timer)
@@ -494,6 +496,7 @@ export class CompanyWecomAuthService extends Service {
           const redirect = safeRedirect(url.searchParams.get('redirect'), ['/'])
           res.writeHead(303, { ...headers, location: redirect }); res.end(); return
         }
+        if (this.config.gatewayIdentityEnabled) throw new WecomAuthError('wecom-auth/forbidden', 403)
         const existing = cookie(req, BROWSER_COOKIE)
         const binding = existing !== undefined && /^[A-Za-z0-9_-]{43}$/.test(existing) ? existing : randomBytes(32).toString('base64url')
         const attempt = await this.beginLogin(req, binding, url.searchParams.get('redirect'))
