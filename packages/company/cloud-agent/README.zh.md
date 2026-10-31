@@ -27,6 +27,8 @@ kind: "package-bundle"
 
 在本人拥有的 selectable/default 对话中，权限为 `workspace-write` 或 `danger-full-access` 时，可使用 `/create-agent [requirements]` 或 `/publish-agent`。尚无已保存草稿时，命令将根据已确认对话提取需求的请求入队，不会发布。检查保存后的名称、描述和 revision，再显式执行 `/publish-agent confirm <revision> <public|private>`。确认直接调用发布，无需另一次模型回合。完全相同的重放返回已有 release；过期或冲突确认失败，不新增 release。结果未知时，重试前先查询目录。
 
+新编辑器会保留 profile 的 `danger-full-access` 默认权限；其他默认权限仍会请求 `workspace-write`。如果服务器没有可用沙箱，受控测试部署可在启动器的 `startup.env` 中显式设置 `DSH_PERMISSION_MODE=danger-full-access`；这会取消文件限制和审批提示。已有 Session 保留日志中的权限，因此修改默认值后应打开新编辑器。
+
 作者也可以通过 `startAuthoring` 打开私有编辑器，通过 `cloud_agent` 保存，或在独立私有 Session 中预览精确草稿 revision。保存时固定 MCP 工具签名和技能指令/资源；选择服务器会在保存时展开其工具。发布使用这些已保存快照并验证当前签名，记录可见范围、来源 Session id/事件序号/preset/权限，并对生效定义与已捕获能力计算摘要。发现操作不能静默扩大已保存草稿或旧 release；签名变化必须再次显式保存并确认。
 
 <a id="ownership-and-execution"></a>

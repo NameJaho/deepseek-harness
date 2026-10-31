@@ -30,7 +30,12 @@ interface FixtureWorkspace {
   attachSession(id: SessionId): Promise<void>
 }
 
-async function fixture(test: TestContext, pool = new MemoryMediaPool(), storedSessions: Session[] = []) {
+async function fixture(
+  test: TestContext,
+  pool = new MemoryMediaPool(),
+  storedSessions: Session[] = [],
+  defaultPreset = 'workspace-write',
+) {
   const root = await mkdtemp(join(tmpdir(), 'cloud-host-'))
   test.onTestFinished(() => rm(root, { recursive: true, force: true }))
   const ctx = new Context()
@@ -95,7 +100,7 @@ async function fixture(test: TestContext, pool = new MemoryMediaPool(), storedSe
       return stop
     },
   } as never)
-  ctx.provide('permissionPresets', { current: (session: Session) => permissions.get(session) ?? 'workspace-write',
+  ctx.provide('permissionPresets', { defaultPreset, current: (session: Session) => permissions.get(session) ?? defaultPreset,
     set: (session: Session, name: string) => { for (const guard of guards) guard(session, name); permissions.set(session, name) },
     registerGuard: (guard: (session: Session, name: string) => void) => { guards.add(guard); return () => { guards.delete(guard) } },
   } as never)
@@ -169,6 +174,17 @@ async function fixture(test: TestContext, pool = new MemoryMediaPool(), storedSe
     revoke: (id: string) => { revokedMembers.add(id) },
     disable: () => { enabled = false }, fork: (header: Session['header'], id: SessionId) => forkPlacement?.(header, id) }
 }
+
+it('keeps an explicitly configured full-access default for authoring Sessions', async (test) => {
+  const f = await fixture(test, undefined, [], 'danger-full-access')
+  const sessionId = await f.editor()
+  const agent = f.agents.get(sessionId)!
+  expect(f.ctx.permissionPresets.current(agent.session)).toBe('danger-full-access')
+  const saved = await f.ctx.cloudAgents.saveFromConversation(agent, 'save-full-access', f.draft)
+  expect(saved.sourceThroughSeq).toBeGreaterThan(0)
+  const published = await f.ctx.cloudAgents.publish({ id: saved.id, expectedRevision: saved.revision, authoringSessionId: sessionId })
+  expect(published.releases[0]?.source?.permission).toBe('danger-full-access')
+})
 
 it('pins the saved revision, rejects changed schemas, and deduplicates explicit publication replays', async (test) => {
   const f = await fixture(test)

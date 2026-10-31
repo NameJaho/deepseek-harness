@@ -26,6 +26,8 @@ Apply [cordis.patch.yml](cordis.patch.yml) to a profile that supplies the inject
 
 In an owned, selectable/default conversation with `workspace-write` or `danger-full-access`, use `/create-agent [requirements]` or `/publish-agent`. Without a saved draft, the command queues extraction from the confirmed conversation; it does not publish. Review the saved name, description and revision, then explicitly run `/publish-agent confirm <revision> <public|private>`. Confirmation calls publication directly, without another model turn. An exact replay returns the existing release; a stale or conflicting confirmation fails without another release. After an unknown outcome, inspect the catalog before retrying.
 
+New editors keep a profile default of `danger-full-access`; otherwise they request `workspace-write`. On a host without a usable sandbox, a controlled test deployment can explicitly set `DSH_PERMISSION_MODE=danger-full-access` in the launcher's `startup.env`; this removes file restrictions and approval prompts. Existing Sessions retain their recorded permissions, so open a new editor after changing the default.
+
 Authors may also open a private editor with `startAuthoring`, save through `cloud_agent`, or preview an exact draft revision in a separate private Session. Saving snapshots MCP tool signatures and skill instructions/resources. Selecting a server expands its tools at save time. Publication uses those saved snapshots, verifies current signatures, records visibility and source Session id/event sequence/preset/permission, and hashes the effective definition and captured capabilities. Discovery cannot silently broaden a saved draft or old release; changed signatures require another explicit save and confirmation.
 
 ## Ownership and execution

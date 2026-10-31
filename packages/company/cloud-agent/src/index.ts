@@ -381,7 +381,8 @@ export class CloudAgentService extends TypertRemoteService {
         handle = await this.owner.agents.create({ sessionId, signal, meta: { cwd, agentPreset: creationPreset },
           agentOptions: { provider: model.provider, model: model.model }, setup: async (agentCtx, agent) => {
             await this.owner.agentPresets.mount(agentCtx, creationPreset)
-            this.owner.permissionPresets.set(agent.session, 'workspace-write')
+            const authoringPermission = this.owner.permissionPresets.defaultPreset === 'danger-full-access' ? 'danger-full-access' : 'workspace-write'
+            this.owner.permissionPresets.set(agent.session, authoringPermission)
             agent.model.select({ provider: model.provider, model: model.model })
             agent.session.append('cloud-agent/binding', binding)
           } })

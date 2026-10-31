@@ -41,6 +41,15 @@ DSH_PUBLIC_URL="${DSH_PUBLIC_URL:-https://test-hmwork.busyming.com/}"
 DSH_TRUSTED_HOST="${DSH_TRUSTED_HOST:-test-hmwork.busyming.com}"
 DSH_WECOM_WORKSPACE_ROOT="${DSH_WECOM_WORKSPACE_ROOT:-$DSH_BASE/workspaces}"
 DSH_PROFILE="${DSH_PROFILE:-test-web}"
+DSH_PERMISSION_MODE="${DSH_PERMISSION_MODE:-workspace-write}"
+case "${DSH_PERMISSION_MODE}" in
+  read-only|workspace-write|danger-full-access) ;;
+  *)
+    printf 'DSH_PERMISSION_MODE 必须是 read-only、workspace-write 或 danger-full-access\n' >&2
+    exit 1
+    ;;
+esac
+export DSH_PERMISSION_MODE
 export DSH_PUBLIC_URL
 export DSH_WECOM_WORKSPACE_ROOT
 export DSH_CLIENT_TITLE="${DSH_CLIENT_TITLE:-HMWORK}"
@@ -319,4 +328,5 @@ printf '服务监听地址：http://%s:%s\n' "$DSH_HOST" "$DSH_PORT"
 if [[ -n "$DSH_PUBLIC_URL" ]]; then
   printf '对外访问地址：%s\n' "$DSH_PUBLIC_URL"
 fi
+printf '权限模式：%s\n' "$DSH_PERMISSION_MODE"
 printf '企业微信登录已强制启用；应用可见成员验证成功后才签发本地会话\n'
