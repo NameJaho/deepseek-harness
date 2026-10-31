@@ -1,8 +1,8 @@
 # Agent Note: WeCom member-specific default Workspaces
 
-English | [中文](2026-10-30-wecom-member-workspace-isolation.zh.md)
-
 Status: implemented
+
+English | [中文](2026-10-30-wecom-member-workspace-isolation.zh.md)
 
 ## Problem
 

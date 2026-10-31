@@ -1,8 +1,8 @@
 # Agent Note: WeCom 成员专属默认 Workspace
 
-[English](2026-10-30-wecom-member-workspace-isolation.md) | 中文
-
 Status: implemented
+
+[English](2026-10-30-wecom-member-workspace-isolation.md) | 中文
 
 ## Problem
 

@@ -6,7 +6,8 @@
 import {
   type SessionListState, type SessionSearchResultItem, type SessionSummary,
 } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { NavigationWorkspaceView as WorkspaceView, WorkspaceNavigationGroupStatus } from './groups.ts'
 import type {
   SessionStatusSnapshot,
 } from '@deepseek-ai/dsh-client-ui-session/client'
@@ -68,6 +69,14 @@ export type SessionOrderBy = 'manual' | 'updated'
 
 /** One workspace group section: header row facts + visible top-level session rows. */
 export interface GroupNode {
+  /** Capability-owned logical group with independent Session directories. */
+  managed?: boolean
+  /** Capability-owned deletion for a managed group. */
+  delete?: () => Promise<void>
+  /** A managed group's availability; absent for physical Workspaces and the ungrouped bucket. */
+  status?: WorkspaceNavigationGroupStatus
+  /** Whether a managed group accepts a new conversation; absent for physical Workspaces. */
+  startable?: boolean
   /** Group key: the workspace id or {@link UNGROUPED_KEY}. */
   key: string
   /** Backing Workspace id; absent only for the ungrouped bucket. */
@@ -116,6 +125,10 @@ export interface TreeView {
 }
 
 interface Group {
+  managed?: boolean
+  delete?: () => Promise<void>
+  status?: WorkspaceNavigationGroupStatus
+  startable?: boolean
   key: string
   workspaceId: WorkspaceId | undefined
   cwd: string | undefined
@@ -344,10 +357,17 @@ function groupByWorkspace(
     // The archived-only view lists archives, not the Workspace inventory, so
     // a Workspace without archived Sessions contributes no group.
     if (archivedFilter === 'only' && members.length === 0) continue
-    groups.push(buildGroup(
-      workspace.workspaceId, workspace.workspaceId, workspace.path,
-      Date.parse(workspace.createdAt), workspace.title, members,
-    ))
+    const managed = workspace.navigationGroup !== undefined
+    groups.push({
+      ...buildGroup(
+        workspace.workspaceId, workspace.workspaceId, managed ? undefined : workspace.path,
+        Date.parse(workspace.createdAt), workspace.title, members,
+      ),
+      ...managed ? { managed } : {},
+      ...workspace.navigationDelete === undefined ? {} : { delete: workspace.navigationDelete },
+      ...workspace.navigationStatus === undefined ? {} : { status: workspace.navigationStatus },
+      ...workspace.navigationStartable === undefined ? {} : { startable: workspace.navigationStartable },
+    })
   }
   const stray = list.ids
     .map(id => list.byId[id])
@@ -443,6 +463,10 @@ export function deriveGroups(
   for (const g of groupByWorkspace(list, workspaces, archived, rowState.archivedFilter, view.ungroupedOrder)) {
     const expanded = expandedGroups.has(g.key)
     groups.push({
+      ...g.managed === undefined ? {} : { managed: g.managed },
+      ...g.delete === undefined ? {} : { delete: g.delete },
+      ...g.status === undefined ? {} : { status: g.status },
+      ...g.startable === undefined ? {} : { startable: g.startable },
       key: g.key,
       workspaceId: g.workspaceId,
       cwd: g.cwd,

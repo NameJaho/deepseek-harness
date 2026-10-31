@@ -1,0 +1,5 @@
+- insert:
+    - id: company-cloud-agent
+      name: '@deepseek-ai/dsh-company-cloud-agent'
+      config:
+        workspaceRoot: !!js dshHomePath('cloud-agent', 'workspaces')

@@ -26,7 +26,8 @@ import {
 import type {
   SessionListState, SessionSearchResultItem,
 } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { NavigationWorkspaceView as WorkspaceView } from '../groups.ts'
 import { workspaceDisplayTitle } from '@deepseek-ai/dsh-api-workspace-controller/default-workspace'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
@@ -360,10 +361,12 @@ function SessionTree({
   }, [current, currentGroup, setGroupExpanded, groupExpansion])
   const parents = useMemo(() => {
     if (!nestWorkspaces) return new Map<string, WorkspaceId | undefined>()
-    const keysByPath = new Map(workspaces.map(workspace => [workspace.path, workspace.workspaceId]))
+    // Logical groups own no directory: they neither nest under nor contain a folder.
+    const keysByPath = new Map(workspaces.filter(workspace => workspace.navigationGroup === undefined)
+      .map(workspace => [workspace.path, workspace.workspaceId]))
     const paths = [...keysByPath.keys()]
     return new Map<string, WorkspaceId | undefined>(workspaces.map((workspace) => {
-      const path = owningParentFolder(workspace.path, paths)
+      const path = workspace.navigationGroup === undefined ? owningParentFolder(workspace.path, paths) : undefined
       return [workspace.workspaceId, path === undefined ? undefined : keysByPath.get(path)]
     }))
   }, [nestWorkspaces, workspaces])
@@ -482,7 +485,8 @@ function SessionTree({
   const renderGroup = (group: GroupNode, depth: number): ReactNode => {
     const workspaceId = group.workspaceId
     const children = childrenByParent.get(group.key) ?? []
-    const compatibleDrag = workspaceDrag !== null && parents.get(workspaceDrag.workspaceId) === parents.get(group.key)
+    const compatibleDrag = group.managed !== true && workspaceDrag !== null
+      && parents.get(workspaceDrag.workspaceId) === parents.get(group.key)
     const watermark = sessionWatermarks[group.key] ?? SESSION_WATERMARK_BASE
     const collapsed = watermarkRows(group.sessions, baselines.get(group.key) ?? SESSION_WATERMARK_BASE)
     const visible = watermarkRows(group.sessions, watermark)
@@ -495,7 +499,8 @@ function SessionTree({
     const workspaceMarker = workspaceId !== undefined && workspaceDrag?.over?.id === workspaceId
       ? workspaceDrag.over.half
       : null
-    const workspaceDragProps = workspaceId === undefined ? undefined : {
+    // A logical group has no registry position to reorder.
+    const workspaceDragProps = workspaceId === undefined || group.managed === true ? undefined : {
       start: () => {
         workspaceDropCommitted.current = false
         setWorkspaceDrag({ workspaceId, over: null })
@@ -582,16 +587,24 @@ function SessionTree({
           drag={workspaceDragProps}
           actions={group.workspaceId === undefined
             ? undefined
-            : {
-              rename: () => {
-              /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
-                if (group.workspaceId !== undefined) onRenameRequest(group.workspaceId, group.label)
-              },
-              delete: () => {
-              /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
-                if (group.workspaceId !== undefined) onDeleteRequest(group.workspaceId, group.label)
-              },
-            }}
+            : group.managed === true
+              ? group.delete === undefined ? undefined : {
+                delete: () => {
+                  /* v8 ignore next -- narrowing guard: the actions object exists only for workspace groups. */
+                  if (group.workspaceId !== undefined) onDeleteRequest(group.workspaceId, group.label)
+                },
+                deleteLabel: workspaces.find(item => item.workspaceId === group.workspaceId)?.navigationDeleteConfirmation?.title,
+              }
+              : {
+                rename: () => {
+                  /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
+                  if (group.workspaceId !== undefined) onRenameRequest(group.workspaceId, group.label)
+                },
+                delete: () => {
+                  /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
+                  if (group.workspaceId !== undefined) onDeleteRequest(group.workspaceId, group.label)
+                },
+              }}
         />
         {childRows.length > 0 && (
           <div role="group">
@@ -922,6 +935,7 @@ export function WorkspaceBrowser({
   useSessionAccess,
   useWorkspaceAccess,
   useWorkspaces,
+  useNavigationWorkspaces,
   useStore,
   actions,
   startSession,
@@ -954,7 +968,8 @@ export function WorkspaceBrowser({
   const shortcutState = useWorkspaceShortcuts(state => state)
   // Ordering remains live while the rail or search replaces the list body.
   const list = useSessions(state => state)
-  const storedWorkspaces = useWorkspaces(state => state.items)
+  // The tree lists logical groups; the add flow below keeps the physical directories.
+  const storedWorkspaces = useNavigationWorkspaces(state => state.items)
   // The resolved name, not `t`, is the memo dependency: the bound seat keeps
   // its identity across a language switch.
   const defaultWorkspaceName = t('workspace.defaultName')
@@ -965,10 +980,10 @@ export function WorkspaceBrowser({
     })),
     [storedWorkspaces, defaultWorkspaceName],
   )
-  const workspacePhase = useWorkspaces(state => state.phase)
-  const workspaceStreamState = useWorkspaces(state => state.state)
-  const archivedSessionIds = useWorkspaces(state => state.archivedSessionIds)
-  const pinnedSessionIds = useWorkspaces(state => state.pinnedSessionIds)
+  const workspacePhase = useNavigationWorkspaces(state => state.phase)
+  const workspaceStreamState = useNavigationWorkspaces(state => state.state)
+  const archivedSessionIds = useNavigationWorkspaces(state => state.archivedSessionIds)
+  const pinnedSessionIds = useNavigationWorkspaces(state => state.pinnedSessionIds)
   // Live occupancy of this surface's directory-flow hole (the same source the
   // flow reads): a composition without a picking affordance can add nothing.
   const directoryFlowAvailable = useDirectoryFlow(occupied => occupied && !memberOnly)
@@ -1267,7 +1282,14 @@ export function WorkspaceBrowser({
 
   // Delete dialog is separate from the row so a successful removal can
   // unmount that row without tearing down the in-flight confirmation state.
-  const [deleteTarget, setDeleteTarget] = useState<{ workspaceId: WorkspaceId; title: string } | null>(null)
+  // A logical group's deletion and copy are captured at request time, so the
+  // confirmed operation is the one the dialog described.
+  const [deleteTarget, setDeleteTarget] = useState<{
+    workspaceId: WorkspaceId
+    title: string
+    deletion?: WorkspaceView['navigationDelete']
+    confirmation?: WorkspaceView['navigationDeleteConfirmation']
+  } | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteCommittedId, setDeleteCommittedId] = useState<WorkspaceId | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -1289,7 +1311,8 @@ export function WorkspaceBrowser({
     setDeleting(true)
     setDeleteCommittedId(null)
     setDeleteError(null)
-    deleteWorkspace(deleteTarget.workspaceId).then(() => {
+    const deletion = deleteTarget.deletion ?? (() => deleteWorkspace(deleteTarget.workspaceId))
+    deletion().then(() => {
       // Keep the confirmation pending until this component has rendered the
       // committed list projection without the deleted id. Closing earlier
       // exposes one stale React frame to the next Create Workspace gesture.
@@ -1514,7 +1537,14 @@ export function WorkspaceBrowser({
                   setRenameError(null)
                 }}
                 onDeleteRequest={(workspaceId, title) => {
-                  setDeleteTarget({ workspaceId, title })
+                  const workspace = workspaces.find(item => item.workspaceId === workspaceId)
+                  setDeleteTarget({
+                    workspaceId, title,
+                    ...workspace?.navigationDelete === undefined ? {} : { deletion: workspace.navigationDelete },
+                    ...workspace?.navigationDeleteConfirmation === undefined
+                      ? {}
+                      : { confirmation: workspace.navigationDeleteConfirmation },
+                  })
                   setDeleteError(null)
                 }}
               />
@@ -1560,10 +1590,10 @@ export function WorkspaceBrowser({
         open={deleteTarget !== null}
         onClose={closeDelete}
         closeLabel={t('close')}
-        title={t('delete.workspace')}
+        title={deleteTarget?.confirmation?.title ?? t('delete.workspace')}
         {...deleteTarget === null
           ? {}
-          : { description: t('delete.desc', { name: deleteTarget.title }) }}
+          : { description: deleteTarget.confirmation?.description ?? t('delete.desc', { name: deleteTarget.title }) }}
         footer={(
           <>
             <Button variant="outline" disabled={deleting} onClick={closeDelete}>{t('cancel')}</Button>
@@ -1573,7 +1603,7 @@ export function WorkspaceBrowser({
               disabled={deleting}
               onClick={confirmDelete}
             >
-              {t('delete.workspace')}
+              {deleteTarget?.confirmation?.title ?? t('delete.workspace')}
             </Button>
           </>
         )}

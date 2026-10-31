@@ -596,34 +596,53 @@ async register(definition: PresetDefinition): Promise<() => Promise<void>>
  */
 inspectCompositions(ctx?: Context): AgentPresetInspection[]
 
-/** Read every declared preset, including activation failures.
+/** Read selectable presets, including their activation failures.
  * @returns Display metadata and loading diagnostics.
  */
 async list(): Promise<AgentPreset[]>
 
 /** Read the selection roster.
- * @returns Current presets, each marked when it is the default.
+ * @returns Current selectable presets, each marked when it is the default.
  */
 @Remote('list') async remoteExportList(): Promise<AgentPresetRoster>
 
-/** Resolve an identity without starting an Agent.
+/** Read a declared identity's selection policy.
+ * @param id Preset identity.
+ * @returns Its normalized availability, or undefined when no definition is declared.
+ */
+availabilityOf(id: string): PresetAvailability | undefined
+
+/** Resolve a selectable identity without starting an Agent.
  * @param id Explicit preset or the current default.
  * @returns Current metadata, including failure when activation failed.
  */
 async resolve(id?: string): Promise<AgentPreset>
 
-/** Read one declaration's child plugin list as YAML, for viewing only.
+/** Resolve an identity retained for exact Session restoration.
+ * @param id Explicit durable preset identity.
+ * @returns Current metadata, including failure when activation failed.
+ */
+async resolveRetained(id: string): Promise<AgentPreset>
+
+/** Read one selectable declaration's child plugin list as YAML, for viewing only.
  * @param agentPreset Preset identity.
  * @returns The declared composition beside its published metadata.
  */
 @Remote('read') readDocument(agentPreset: string): Promise<AgentPresetDocument>
 
-/** Bind an unpublished Agent to the current preset revision.
+/** Bind an unpublished Agent to a selectable preset revision.
  * @param ctx Agent context from its setup callback.
  * @param id Requested preset, or the default.
  * @returns Bound preset identity.
  */
-async mount(ctx: Context, id?: string): Promise<AgentPreset>
+mount(ctx: Context, id?: string): Promise<AgentPreset>
+
+/** Bind an unpublished Agent while restoring an exact durable preset identity.
+ * @param ctx Agent context from its setup callback.
+ * @param id Durable preset identity.
+ * @returns Bound preset identity.
+ */
+mountRetained(ctx: Context, id: string): Promise<AgentPreset>
 
 /** Join a child to the exact revision retained by its parent.
  * @param ctx Child Agent context.
@@ -862,6 +881,138 @@ roots(): Agent[]
 Types: [Session](session.md)
 
 Source: [`packages/core/agent/src/index.ts`](../../packages/core/agent/src/index.ts)
+
+<a id="ctxcloudagents--cloudagentservice"></a>
+
+### `ctx.cloudAgents` — `CloudAgentService`
+
+Durable directory retaining exact releases and per-member Session ownership.
+
+```ts cordis-catalog
+/** Read owned drafts, public-or-owned releases and private usage groups.
+ * @returns authoritative credential-free directory and capability choices.
+ */
+@Remote async catalog(): Promise<CloudAgentCatalog>
+
+/** Follow committed directory and provider changes, coalescing slow readers.
+ * @param signal - subscriber cancellation.
+ * @returns initial and subsequent authoritative catalogs.
+ */
+@Remote({ mode: 'stream' }) async *follow(signal: AbortSignal): AsyncIterable<CloudAgentCatalog>
+
+/** Create a private draft from a live authorized conversation.
+ * @param draft - validated reusable fields.
+ * @param authoringSessionId - owning live editor; omission rejects creation.
+ * @returns committed record; no release is created.
+ */
+@Remote({ resources: { session: (_draft, authoringSessionId) => authoringSessionId } }) create(draft: CloudAgentDraft, authoringSessionId?: SessionId): Promise<CloudAgentRecord>
+
+/** Save one conversation's reusable requirements with executor-call deduplication.
+ * @param agent - live initiating Agent.
+ * @param requestId - tool executor call identity.
+ * @param draft - complete reusable definition.
+ * @param id - existing draft; omission uses this conversation's draft.
+ * @param expectedRevision - exact revision for replacing an existing draft.
+ * @param createNew - request a separate draft; a bound editor must use another Session.
+ * @returns committed record, including on an exact replay.
+ */
+saveFromConversation(agent: Agent, requestId: string, draft: CloudAgentDraft, id?: CloudAgentId, expectedRevision?: number, createNew: boolean = false): Promise<CloudAgentRecord>
+
+/** Open an owner-private editor with a selectable creation preset.
+ * @param request - optional owned draft, source Session, extraction prompt and selectable creation preset;
+ * reuse returns a live matching editor.
+ * @param signal - creation cancellation.
+ * @returns ready Session identity; failed preparation rolls back its resources.
+ */
+@Remote({ resources: { session: request => request.sourceSessionId } }) startAuthoring(request: { readonly id?: CloudAgentId readonly sourceSessionId?: SessionId readonly prompt?: string readonly reuse?: boolean readonly creationPreset?: string }, signal: AbortSignal): Promise<{ readonly sessionId: SessionId }>
+
+/** Replace a draft without modifying any retained release.
+ * @param request - owning editor, exact revision and complete new definition.
+ * @returns next revision; stale writes preserve the current record.
+ */
+@Remote({ resources: { session: request => request.authoringSessionId } }) update(request: CloudAgentUpdateRequest): Promise<CloudAgentRecord>
+
+/** Publish a confirmed revision and audience, deduplicating an exact publication replay.
+ * @param request - owning editor, confirmed draft revision and public/private visibility; omission means public.
+ * @returns the committed record; stale unrelated revisions fail without creating a release.
+ */
+@Remote({ resources: { session: request => request.authoringSessionId } }) publish(request: CloudAgentPublishRequest): Promise<CloudAgentRecord>
+
+/** Withdraw publication while preserving existing private Sessions and releases.
+ * @param request - owning editor and exact record revision.
+ * @returns updated record.
+ */
+@Remote({ resources: { session: request => request.authoringSessionId } }) unpublish(request: CloudAgentRevisionRequest): Promise<CloudAgentRecord>
+
+/** Start an exact current public-or-owned release with only its pinned capabilities.
+ * @param request - exact directory entry and optional selectable run preset and model override.
+ * @param signal - creation cancellation.
+ * @returns fresh owner-private ordinary Session.
+ */
+@Remote startSession(request: CloudAgentStartRequest, signal: AbortSignal): Promise<CloudAgentSession>
+
+/** Snapshot and test an owned draft without publishing it.
+ * @param request - exact draft revision and live editor.
+ * @param signal - creation cancellation.
+ * @returns independent private Session pinned to a preview release.
+ */
+@Remote({ resources: { session: request => request.authoringSessionId } }) preview(request: CloudAgentRevisionRequest, signal: AbortSignal): Promise<CloudAgentSession>
+
+/** Clone an accessible published release into a private editor-owned draft.
+ * @param request - current directory release and authorized editor.
+ * @returns independent record with no copied conversations.
+ */
+@Remote({ resources: { session: request => request.authoringSessionId } }) clone(request: CloudAgentStartRequest): Promise<CloudAgentRecord>
+
+/** Tombstone an owned definition; immutable releases and usage Sessions remain private and recoverable.
+ * @param request - owned Agent and exact revision.
+ * @returns after the durable tombstone is committed.
+ */
+@Remote delete(request: { readonly id: CloudAgentId; readonly expectedRevision: number }): Promise<void>
+
+/** Archive and remove only the caller's unsaved editors.
+ * @param request - exact unbound editor Session identities.
+ * @returns after archiving and removing private workspace registrations and files.
+ */
+@Remote({ resources: { session: request => request.sessionIds } }) deleteUnboundAuthoringSessions(request: { readonly sessionIds: readonly SessionId[] }): Promise<void>
+
+/** Check selected server enablement and every pinned MCP signature before execution.
+ * @param releaseId - trusted immutable release identity.
+ */
+async validateCapabilities(releaseId: string): Promise<void>
+
+/** Resolve signature-checked wrappers through the single execution provider.
+ * @param releaseId - trusted release selected by the scoped runtime.
+ * @returns release-only tools; every invocation rechecks authorization and current schema.
+ */
+async releaseMcpTools(releaseId: string): Promise<readonly ToolDefinition[]>
+
+/** List only attachments retained by the invoking live release Session.
+ * @param agent - trusted executor initiator.
+ * @returns recorded references, including compacted history.
+ */
+conversationFiles(agent: Agent): FileAttachmentRef[]
+
+/** Read a bounded verified page of this conversation's attachment.
+ * @param agent - trusted live initiator.
+ * @param request - attachment id and bounded text offset/limit.
+ * @param signal - read cancellation.
+ * @returns verified UTF-8 page; no arbitrary Host path is accepted.
+ */
+readConversationFile(agent: Agent, request: ConversationFileReadRequest, signal: AbortSignal): Promise<ConversationFilePage>
+
+/** Prepare a bounded report for persistence by the invoking tool pipeline.
+ * @param agent - live release initiator.
+ * @param name - plain filename.
+ * @param content - complete report text.
+ * @returns durable report metadata without a Host path.
+ */
+conversationReport(agent: Agent, name: string, content: string): CloudAgentReport
+```
+
+Types: [FileAttachmentRef](attachment.md) · [ToolDefinition](tools.md)
+
+Source: [`packages/company/cloud-agent/src/index.ts`](../../packages/company/cloud-agent/src/index.ts)
 
 <a id="agent-events"></a>
 

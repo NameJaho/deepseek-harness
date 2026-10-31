@@ -24,8 +24,18 @@ import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionPromptRequest, SessionRequestId } from '../src/types.ts'
 import { buildModelCatalog, hasProviderApiKey } from '../src/catalog.ts'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
+import { RemoteError, type PeerId, type Principal, type RemoteInvocation } from '@deepseek-ai/dsh-typert-protocol'
 import { createSessionTestController, createSessionTestRemote } from './test-remote.ts'
+
+declare module '@deepseek-ai/dsh-typert-protocol' {
+  interface PrincipalMap {
+    /** Test-only non-owner caller shared by the access specs. */
+    'test-guest': { readonly kind: 'test-guest'; readonly guest: string }
+  }
+}
+
+/** Non-owner Remote caller whose model selection stays local to the Session. */
+const GUEST: Principal = { kind: 'test-guest', guest: 'session-models' }
 
 function request<P>(payload: P): P {
   return payload
@@ -684,6 +694,40 @@ describe('Web session model selection', () => {
       'session-controller: model selection changed for the Session but the default was not saved: Error: read-only document',
     ])
     await ctx.fiber.dispose()
+  })
+
+  it('records a non-owner selection for the Session without saving it as the default', async () => {
+    const { ctx, sessionId } = await harness()
+    onTestFinished(() => ctx.fiber.dispose())
+    const saved: unknown[] = []
+    await createSessionTestController(ctx, {
+      defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }),
+      saveDefaultModelSelection: (selection) => { saved.push(selection) },
+      cwd: '/tmp',
+    })
+    const invocation: RemoteInvocation = {
+      request: { namespace: 'session', method: 'selectModel', args: {} },
+      service: 'sessionController',
+      peer: {
+        id: 'session-models-peer' as PeerId,
+        ctx,
+        principal: GUEST,
+        interactions: 'answer',
+        signal: new AbortController().signal,
+        dispose: async () => {},
+      },
+      signal: new AbortController().signal,
+      uplink: <In>(): AsyncIterable<In> => ({
+        [Symbol.asyncIterator]: () => ({ next: async () => ({ done: true, value: undefined }) }),
+      }),
+    }
+
+    await expect(ctx.extend({ invocation }).sessionController.selectModel({
+      sessionId, provider: 'deepseek-official', model: 'deepseek-reasoner',
+    })).resolves.toEqual({ selected: { provider: 'deepseek-official', model: 'deepseek-reasoner' } })
+    expect(currentSelection(ctx, sessionId))
+      .toMatchObject({ provider: 'deepseek-official', model: 'deepseek-reasoner' })
+    expect(saved).toEqual([])
   })
 
   it('admits saved selections without querying the advisory model catalog', async () => {

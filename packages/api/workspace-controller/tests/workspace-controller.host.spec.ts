@@ -89,10 +89,10 @@ const WORKSPACE_VIEWER: RemoteAccessRole<'workspace'> = { name: 'test:workspace-
 /** Shows one Session id in the follow stream. */
 const SESSION_VIEWER: RemoteAccessRole<'session'> = { name: 'test:session-viewer', resource: 'session', actions: ['workspace/follow'] }
 
-/** The Context a Gateway dispatch of `workspace/follow` binds for `principal`. */
-function followerContext(ctx: Context, principal: Principal): Context {
+/** The Context a Gateway dispatch of `workspace/<method>` binds for `principal`. */
+function followerContext(ctx: Context, principal: Principal, method = 'follow'): Context {
   const invocation: RemoteInvocation = {
-    request: { namespace: 'workspace', method: 'follow', args: {} },
+    request: { namespace: 'workspace', method, args: {} },
     service: 'workspaceController',
     peer: { id: 'workspace-access-peer' as PeerId, ctx, principal, interactions: 'answer', signal: new AbortController().signal, dispose: async () => {} },
     signal: new AbortController().signal,
@@ -328,6 +328,33 @@ describe('WorkspaceController commands', () => {
     // Unpin is idempotent: an id that is not pinned is not an error.
     await expect(controller.unpinSession({ sessionId: session.id }))
       .resolves.toEqual({ pinnedSessionIds: [] })
+  })
+  it('returns a non-owner only the archived and pinned Session ids its action admits', async () => {
+    const { controller, ctx, root } = await harness()
+    const created = await controller.create({ path: stageDir(root, 'filtered') })
+    const shared = ctx.sessions.create(SessionId('shared'), { meta: { cwd: created.workspace.path } })
+    const secret = ctx.sessions.create(SessionId('secret'), { meta: { cwd: created.workspace.path } })
+    const actions = ['workspace/archiveSession', 'workspace/unarchiveSession', 'workspace/pinSession', 'workspace/unpinSession'] as const
+    const editor: RemoteAccessRole<'session'> = { name: 'test:session-editor', resource: 'session', actions: [...actions] }
+    ctx.remoteAccess.registerPolicy('test-guest', {
+      bindings: () => [{ role: editor, resource: { kind: 'session', id: shared.id } }],
+    })
+    const guest = (method: string) =>
+      followerContext(ctx, { kind: 'test-guest', guest: 'commands' }, method).workspaceController
+    await controller.pinSession({ sessionId: secret.id })
+    await expect(guest('pinSession').pinSession({ sessionId: shared.id }))
+      .resolves.toEqual({ pinnedSessionIds: [shared.id] })
+    await expect(guest('unpinSession').unpinSession({ sessionId: shared.id }))
+      .resolves.toEqual({ pinnedSessionIds: [] })
+    await controller.unpinSession({ sessionId: secret.id })
+    await controller.archiveSession({ sessionId: secret.id })
+    await expect(guest('archiveSession').archiveSession({ sessionId: shared.id }))
+      .resolves.toEqual({ archivedSessionIds: [shared.id] })
+    await expect(guest('unarchiveSession').unarchiveSession({ sessionId: shared.id }))
+      .resolves.toEqual({ archivedSessionIds: [] })
+    // The owner still receives the complete set.
+    const owned = await controller.archiveSession({ sessionId: shared.id })
+    expect([...owned.archivedSessionIds].sort()).toEqual([shared.id, secret.id].sort())
   })
 })
 

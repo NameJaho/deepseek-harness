@@ -12,12 +12,17 @@ import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-api-remote-access'
 import type { RemoteAccessAction, RemoteAccessBinding, RemoteAccessCondition, RemoteAccessDecision } from '@deepseek-ai/dsh-api-remote-access/types'
 import type {} from '@deepseek-ai/dsh-workspace'
+import type {} from '@deepseek-ai/dsh-agent'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
 import { z } from 'zod'
 import { Config } from './config.ts'
 import { wecomAuthDomain, type WecomSessionRecord } from './storage.ts'
-import type { WecomIdentityId, WecomLoginAttemptId, WecomLoginConfig, WecomLoginResult, WecomSessionId, WecomSessionView, WecomUserRole } from './types.ts'
+import type {
+  CompanyOwnerScope, WecomIdentityId, WecomLoginAttemptId, WecomLoginConfig, WecomLoginResult, WecomResourceProvider, WecomSessionId,
+  WecomSessionView, WecomUserPrincipal, WecomUserRole,
+} from './types.ts'
 import { BROWSER_COOKIE, SESSION_COOKIE, cookie, cookieHeader, hash, hashMatches, header, readCookie, safeRedirect, signCookie } from './browser.ts'
 import { WecomAuthError } from './errors.ts'
 import { WecomOfficial, type WecomMemberLogin } from './upstream.ts'
@@ -37,6 +42,16 @@ declare module '@deepseek-ai/cordis' {
 interface State { readonly domain: Domain<typeof wecomAuthDomain>; readonly secret: Buffer }
 const SECRET = credentialKey('company-wecom-official-auth', 'cookie-secret')
 const DEFAULT_WECOM_ROLE: WecomUserRole = 'user'
+const SESSION_ACTIONS: readonly RemoteAccessAction[] = ['session/list', 'session/search', 'session/control', 'session/page',
+  'session/follow', 'session/projections', 'session/prompt', 'session/cancel', 'session/rename', 'session/selectModel',
+  'session/updateQueue', 'session/attachment', 'fileUploads/upload', 'skills/list', 'commands/list',
+  'workspace/follow', 'workspace/archiveSession', 'workspace/unarchiveSession', 'workspace/pinSession', 'workspace/unpinSession',
+  'workspace/insertSessionBefore', 'workspaceFiles/read', 'workspaceFiles/readBytes', 'workspaceFiles/stat', 'workspaceFiles/list',
+  'workspaceFiles/changes', 'event:api-session/added', 'event:api-session/removed', 'event:api-session/status',
+  'event:api-session/error', 'event:api-session/activity']
+const grantedCommand = ({ args }: Parameters<RemoteAccessCondition<'session'>>[0]): RemoteAccessDecision =>
+  args === undefined || (typeof args.line === 'string' && /^\/(?:permission|compact|goal|plan)(?:\s|$)/u.test(args.line))
+    ? { kind: 'allow' } : { kind: 'deny', reason: 'command-not-granted' }
 const exchangeSchema = z.object({
   state: z.string().max(200).regex(/^[a-f0-9-]{36}\.[A-Za-z0-9_-]{43}$/),
   code: z.string().min(1).max(4096),
@@ -58,6 +73,7 @@ export class CompanyWecomAuthService extends Service {
   private readonly revoked = new Set<WecomSessionId>()
   private readonly workspaces = new Map<WecomIdentityId, Workspace>()
   private readonly workspaceRoots = new Map<WecomIdentityId, string>()
+  private readonly resources = new Set<WecomResourceProvider>()
   private timer: ReturnType<typeof setTimeout> | undefined
 
   /** @param owner - Host HTTP, cookie-key and domain providers.
@@ -66,6 +82,7 @@ export class CompanyWecomAuthService extends Service {
    */
   constructor(private readonly owner: Context, config: Config) {
     super(owner, 'companyWecomAuth')
+    // oxlint-disable-next-line typescript/no-misused-spread -- Config is plain data; only its merged schema value is constructible.
     this.config = Config({ ...config, workspaceRoot: config.workspaceRoot ?? join(process.cwd(), '.dsh-wecom-workspaces') })
     if (this.config.workspaceRoot === undefined || !isAbsolute(this.config.workspaceRoot)) {
       throw new Error('wecom-auth: workspaceRoot must be an absolute path')
@@ -109,7 +126,7 @@ export class CompanyWecomAuthService extends Service {
       for (const [, identity] of this.state.domain.table('identities').entries()) {
         if (identity.enabled && identity.corpId === this.config.corpId) await this.ensureWorkspace(identity.id)
       }
-      remoteAccess.registerPolicy('wecom-user', { bindings: principal => this.bindings(principal.identityId) })
+      remoteAccess.registerPolicy('wecom-user', { bindings: principal => this.bindings(principal) })
       this.owner.on('domain/changed', (change) => {
         if (change.domain === 'workspace') remoteAccess.invalidate()
       })
@@ -139,6 +156,87 @@ export class CompanyWecomAuthService extends Service {
       }), `wecom-auth: ${path}`)
     }
     this.scheduleExpiry()
+  }
+
+  /** Register business grants in the calling plugin's lifecycle.
+   * @param provider - committed resource ownership and explicit action grants.
+   * @returns a disposer removing all grants contributed by this provider.
+   */
+  registerResourceProvider(provider: WecomResourceProvider): () => Promise<void> {
+    return this.ctx.effect(() => {
+      this.resources.add(provider)
+      this.owner.get('remoteAccess')?.invalidate()
+      return () => { this.resources.delete(provider); this.owner.get('remoteAccess')?.invalidate() }
+    }, 'wecom-auth: business resource grants')
+  }
+
+  /** Build ordinary conversation and Workspace grants for business-owned Sessions.
+   * @param ids - Session identities already authorized by the calling business provider.
+   * @returns explicit user operations; deployment settings, filesystem mutation and native openers are excluded.
+   */
+  sessionBindings(ids: readonly SessionId[]): RemoteAccessBinding[] {
+    const bindings: RemoteAccessBinding[] = [{ role: { name: 'company:browser', resource: 'global', actions: [
+      'session/list', 'session/search', 'session/control', 'session/modelCatalog', 'workspace/follow', 'permissionPresets/catalog',
+    ] }, resource: { kind: 'global' } }]
+    for (const id of ids) {
+      bindings.push({ role: { name: 'company:conversation', resource: 'session', actions: SESSION_ACTIONS }, resource: { kind: 'session', id } })
+      bindings.push({ role: { name: 'company:conversation-command', resource: 'session', actions: ['commands/execute'] },
+        resource: { kind: 'session', id }, condition: grantedCommand })
+    }
+    const owned = new Set(ids)
+    for (const workspace of this.owner.get('workspaceRegistry')?.list() ?? []) {
+      if (workspace.sessionIds.length > 0 && workspace.sessionIds.every(id => owned.has(id))) bindings.push({
+        role: { name: 'company:workspace', resource: 'workspace', actions: ['workspace/follow', 'workspace/insertSessionBefore'] },
+        resource: { kind: 'workspace', id: workspace.id },
+      })
+    }
+    return bindings
+  }
+
+  /** Resolve the current Remote caller or trusted tool initiator's company ownership scope.
+   * @returns stable enterprise scope, or `local-owner` outside an enterprise call or initiating Session.
+   * @throws WecomAuthError for unsupported non-owner principals.
+   */
+  ownerScope(): CompanyOwnerScope {
+    const principal = this.ctx.invocation?.peer.principal
+    if (principal?.kind === 'wecom-user') return brandString<CompanyOwnerScope>(`wecom:${principal.corpId}:${principal.userId}`)
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- other packages merge non-owner kinds into PrincipalMap.
+    if (principal !== undefined && principal.kind !== 'owner') throw new WecomAuthError('wecom-auth/forbidden', 403)
+    if (principal === undefined) {
+      const agent = this.owner.get('agents')?.currentInitiator()
+      const scope = agent === undefined ? undefined : this.sessionOwner(agent.id)
+      if (scope !== undefined) return scope
+    }
+    return brandString<CompanyOwnerScope>('local-owner')
+  }
+
+  /** Read the current member's default Workspace Session identities for business grants.
+   * @param principal - authenticated member supplied by the access-policy dispatcher.
+   * @returns owned Session identities; unknown or mismatched identities return an empty list.
+   */
+  defaultWorkspaceSessions(principal: WecomUserPrincipal): readonly SessionId[] {
+    const identity = this.state?.domain.table('identities').get(principal.identityId)
+    if (identity?.corpId !== principal.corpId || identity.userId !== principal.userId) return []
+    const workspace = this.workspaces.get(principal.identityId)
+    return workspace === undefined ? [] : [...this.owner.get('workspaceRegistry')?.get(workspace.id)?.sessionIds ?? []]
+  }
+
+  /** Resolve retained ownership for a member default Workspace or business-owned Session.
+   * @param sessionId - tool-initiating or source Session identity.
+   * @returns stable owner, or undefined when no provider retains ownership; logout does not transfer ownership.
+   */
+  sessionOwner(sessionId: SessionId): CompanyOwnerScope | undefined {
+    const registry = this.owner.get('workspaceRegistry')
+    for (const [identityId, workspace] of this.workspaces) {
+      if (registry?.get(workspace.id)?.sessionIds.includes(sessionId) !== true) continue
+      const identity = this.state?.domain.table('identities').get(identityId)
+      if (identity !== undefined) return brandString<CompanyOwnerScope>(`wecom:${identity.corpId}:${identity.userId}`)
+    }
+    for (const provider of this.resources) {
+      const scope = provider.sessionOwner(sessionId)
+      if (scope !== undefined) return scope
+    }
+    return undefined
   }
 
   /** Begin a durable, browser-bound, single-use login attempt.
@@ -272,7 +370,13 @@ export class CompanyWecomAuthService extends Service {
   }
 
   /** Compute all Remote grants for one authenticated member. */
-  private bindings(identityId: WecomIdentityId): readonly RemoteAccessBinding[] {
+  private bindings(principal: WecomUserPrincipal): readonly RemoteAccessBinding[] {
+    const own = this.workspaceBindings(principal.identityId)
+    if (own.length === 0) return own
+    return [...own, ...[...this.resources].flatMap(provider => provider.bindings(principal))]
+  }
+
+  private workspaceBindings(identityId: WecomIdentityId): readonly RemoteAccessBinding[] {
     const state = this.state
     const identity = state?.domain.table('identities').get(identityId)
     const registry = this.owner.get('workspaceRegistry')
@@ -328,9 +432,14 @@ export class CompanyWecomAuthService extends Service {
       bindings.push({
         role: { name: 'wecom:commands', resource: 'session', actions: ['commands/execute'] },
         resource: { kind: 'session', id },
-        condition: ({ args }: Parameters<RemoteAccessCondition<'session'>>[0]): RemoteAccessDecision =>
-          args === undefined || (typeof args.line === 'string' && /^\/(?:permission|compact|goal|plan)(?:\s|$)/u.test(args.line))
-            ? { kind: 'allow' } : { kind: 'deny', reason: 'command-not-granted' },
+        condition: (request: Parameters<RemoteAccessCondition<'session'>>[0]): RemoteAccessDecision => {
+          const base = grantedCommand(request)
+          if (base.kind === 'allow') return base
+          const line = request.args?.line
+          const command = typeof line === 'string' ? /^\/([a-z][a-z0-9-]*)(?:\s|$)/u.exec(line)?.[1] : undefined
+          return command !== undefined && [...this.resources].some(provider => provider.defaultWorkspaceCommands?.includes(command))
+            ? { kind: 'allow' } : base
+        },
       })
     }
     bindings.push({

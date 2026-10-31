@@ -235,6 +235,15 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+/* A logical group's unavailable state stays readable beside its title. */
+.groupStatus {
+  flex: none;
+  font-size: 12px;
+  line-height: 20px;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-tertiary);
+}
+
 .time {
   flex: none;
   font-size: 10px;

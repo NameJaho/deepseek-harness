@@ -123,6 +123,26 @@ Host `ctx.connection` members consumed by transport-independent adapters.
 
 ```ts cordis-catalog
 /**
+ * Register one browser identity provider in the caller's Context.
+ * @param provider - synchronous authentication and optional login route.
+ * @returns scoped registration; providers revoke Peers on logout, expiry, and account disablement.
+ */
+registerBrowserPrincipalProvider(provider: BrowserPrincipalProvider): BrowserPrincipalRegistration
+
+/** Expire the built-in Owner cookie after an external login replaces browser identity.
+ * @param request - trusted headers for the cookie authority.
+ * @returns deletion Set-Cookie header, or undefined when no authority can be resolved.
+ */
+clearOwnerCookie(request: ConnectionTrustRequest): string | undefined
+
+/**
+ * Apply the Host/Origin fence to a public route without requiring a credential.
+ * @param request - request headers from the HTTP carrier.
+ * @returns 403 for an untrusted authority or Origin; undefined otherwise.
+ */
+trustRejection(request: ConnectionTrustRequest): 403 | undefined
+
+/**
  * Compose exact Fetch routes and the shared-channel RPC interceptor.
  * @param channel - shared channel mounted by Connection.
  * @returns Fetch handler for trusted, authenticated requests.
@@ -131,7 +151,8 @@ createSharedFetchHandler(channel: '/api'): ConnectionFetchHandler
 
 /**
  * Apply Connection's Host/Origin checks and browser authentication to
- * another Web route.
+ * another Owner-only Web route. Non-owner Peers receive 403; business
+ * routes use admit() and their resource policy instead.
  * @param request - request headers from the HTTP or upgrade request.
  * @returns rejection status, or undefined when the route may accept the request.
  */

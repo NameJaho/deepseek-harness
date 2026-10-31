@@ -316,6 +316,16 @@ flowchart LR
   svc_cordisInspect["ctx.cordisInspect<br/>Dynamic Cordis inspect registry"]
   pkg_experimental_liveshare["experimental-liveshare"]
   svc_liveshareShares["ctx.liveshareShares<br/>Owner share management Remote"]
+  pkg_company_wecom_auth["company-wecom-auth"]
+  svc_companyWecomAuth["ctx.companyWecomAuth<br/>WeCom member login"]
+  pkg_company_cloud_agent["company-cloud-agent"]
+  pkg_company_mcp_provider["company-mcp-provider"]
+  svc_companyMcpProvider["ctx.companyMcpProvider<br/>Company MCP provider"]
+  svc_companyMcp["ctx.companyMcp<br/>Company MCP catalog Remote"]
+  svc_cloudAgents["ctx.cloudAgents<br/>Cloud Agent catalog and releases"]
+  pkg_company_cloud_agent_runtime["company-cloud-agent-runtime"]
+  pkg_company_external_agent_subagent["company-external-agent-subagent"]
+  svc_externalAgentSubagents["ctx.externalAgentSubagents<br/>External agent subagent providers"]
   pkg_action_cards --> svc_actionCards
   pkg_agent --> svc_agents
   pkg_agent_default_model --> svc_agentDefaultModel
@@ -350,6 +360,11 @@ flowchart LR
   pkg_compaction --> svc_compaction
   pkg_compaction_basic --> svc_compaction
   pkg_compaction_tool_result_pruner --> svc_toolResultPruner
+  pkg_company_cloud_agent --> svc_cloudAgents
+  pkg_company_external_agent_subagent --> svc_externalAgentSubagents
+  pkg_company_mcp_provider --> svc_companyMcp
+  pkg_company_mcp_provider --> svc_companyMcpProvider
+  pkg_company_wecom_auth --> svc_companyWecomAuth
   pkg_computer_use --> svc_computerUse
   pkg_config_editor --> svc_configEditor
   pkg_cordis_host_runner --> svc_cordisInspect
@@ -504,7 +519,11 @@ flowchart LR
   svc_browserUse --> pkg_experimental_browser_use_playwright_mcp
   svc_browserUse --> pkg_experimental_browser_use_stagehand_native
   svc_clientModules --> pkg_client_hmr
+  svc_cloudAgents --> pkg_company_cloud_agent_runtime
   svc_compaction --> pkg_compaction_basic
+  svc_companyMcpProvider --> pkg_company_cloud_agent
+  svc_companyMcpProvider --> pkg_company_mcp_provider
+  svc_companyWecomAuth --> pkg_company_cloud_agent
   svc_computerUse --> pkg_experimental_computer_use_cua_driver_mcp
   svc_computerUse --> pkg_experimental_computer_use_cua_driver_native
   svc_configEditor --> pkg_agent_default_model
@@ -757,5 +776,10 @@ flowchart LR
 | `ctx.dynamicCordisRunner` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | 拥有内存定义注册表、Host 半的 vm 沙箱和 request-run 往返流程；浏览器页面通过其 Remote 命名空间在线访问同一服务。 |
 | `ctx.cordisInspect` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | 注册 Host inspect 提供方、镜像 Client 提供方 manifest，并通过动态 Cordis 传输路由 Client 查询。 |
 | `ctx.liveshareShares` | `service` | [`experimental-liveshare`](../packages/experimental/liveshare) | - | - | - | 以单个 Typert Remote 命名空间发布 owner 分享管理操作，供 owner 客户端面调用；每个方法都委托给同源路由原先使用的同一组操作。 |
+| `ctx.companyWecomAuth` | `service` | [`company-wecom-auth`](../packages/company/wecom-auth) | - | [`company-cloud-agent`](../packages/company/cloud-agent) | - | 负责企业微信登录、成员 principal 与成员默认 Workspace；Cloud Agent 读取已登录成员来限定目录与群组范围。 |
+| `ctx.companyMcpProvider` | `seam` | [`company-mcp-provider`](../packages/company/mcp-provider) | [`company-mcp-provider`](../packages/company/mcp-provider) | [`company-mcp-provider`](../packages/company/mcp-provider), [`company-cloud-agent`](../packages/company/cloud-agent) | - | Host 列出、启用和执行公司 MCP 工具的唯一路径；HTTP 适配器与外部网关通信。 |
+| `ctx.companyMcp` | `service` | [`company-mcp-provider`](../packages/company/mcp-provider) | - | - | - | 向浏览器发布提供方目录与启用状态，不暴露网关 URL、请求头或上游错误正文。 |
+| `ctx.cloudAgents` | `service` | [`company-cloud-agent`](../packages/company/cloud-agent) | - | [`company-cloud-agent-runtime`](../packages/company/cloud-agent-runtime) | - | 负责 Cloud Agent 创作、不可变发布与共享使用群组；运行时把每个 Session 固定到其发布版本的工具与提示词。 |
+| `ctx.externalAgentSubagents` | `service` | [`company-external-agent-subagent`](../packages/company/external-agent-subagent) | - | - | - | 为每个已配置的外部应用注册一个 subagent 后端，并只保留存活期运行记录；常规委派工具选择后端。 |
 
 维护模式：混合模式。服务从 Cordis 声明中发现；接口、实现和消费方角色在 `scripts/gen-doc-graphs.ts` 中分类，并设有完整性守卫。

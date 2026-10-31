@@ -1,12 +1,17 @@
 /** Declarative preset configuration and YAML validation. */
 import type { EntryOptions, JsExpr } from '@deepseek-ai/cordis-plugin-loader'
 
+/** Whether ordinary Session creation may select a preset definition. */
+export type PresetAvailability = 'selectable' | 'retained'
+
 /** Identity, display fields and child Cordis plugins of one preset. */
 export interface PresetDefinition {
   readonly id: string
   readonly name?: string
   readonly description?: string
   readonly order?: number
+  /** Retained definitions support exact restoration but stay outside ordinary selection. */
+  readonly availability?: PresetAvailability
   readonly plugins: readonly (Omit<EntryOptions, 'id' | 'disabled'> & { id?: string; disabled?: EntryOptions['disabled'] | JsExpr })[]
 }
 

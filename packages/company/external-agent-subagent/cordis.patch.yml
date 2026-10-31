@@ -1,0 +1,13 @@
+# Optional bundle only. Host deployment overlays supply private agent configuration.
+- insert:
+    - id: company-external-agent-subagent
+      name: '@deepseek-ai/dsh-company-external-agent-subagent'
+      config:
+        agents: []
+    - id: tool-external-agent
+      name: '@deepseek-ai/dsh-tool-subagent'
+      disabled: true
+      config:
+        provider: external-research
+        toolName: subagent_external_research
+        maxDepth: provider-managed

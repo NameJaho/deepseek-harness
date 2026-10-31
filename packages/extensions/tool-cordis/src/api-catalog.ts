@@ -187,7 +187,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'async list(): Promise<AgentPreset[]>',
-        description: 'Read every declared preset, including activation failures.',
+        description: 'Read selectable presets, including their activation failures.',
         parameters: [],
         returns: 'Display metadata and loading diagnostics.',
       },
@@ -195,24 +195,42 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         signature: '@Remote(\'list\') async remoteExportList(): Promise<AgentPresetRoster>',
         description: 'Read the selection roster.',
         parameters: [],
-        returns: 'Current presets, each marked when it is the default.',
+        returns: 'Current selectable presets, each marked when it is the default.',
+      },
+      {
+        signature: 'availabilityOf(id: string): PresetAvailability | undefined',
+        description: 'Read a declared identity\'s selection policy.',
+        parameters: [{ name: 'id', description: 'Preset identity.' }],
+        returns: 'Its normalized availability, or undefined when no definition is declared.',
       },
       {
         signature: 'async resolve(id?: string): Promise<AgentPreset>',
-        description: 'Resolve an identity without starting an Agent.',
+        description: 'Resolve a selectable identity without starting an Agent.',
         parameters: [{ name: 'id', description: 'Explicit preset or the current default.' }],
         returns: 'Current metadata, including failure when activation failed.',
       },
       {
+        signature: 'async resolveRetained(id: string): Promise<AgentPreset>',
+        description: 'Resolve an identity retained for exact Session restoration.',
+        parameters: [{ name: 'id', description: 'Explicit durable preset identity.' }],
+        returns: 'Current metadata, including failure when activation failed.',
+      },
+      {
         signature: '@Remote(\'read\') readDocument(agentPreset: string): Promise<AgentPresetDocument>',
-        description: 'Read one declaration\'s child plugin list as YAML, for viewing only.',
+        description: 'Read one selectable declaration\'s child plugin list as YAML, for viewing only.',
         parameters: [{ name: 'agentPreset', description: 'Preset identity.' }],
         returns: 'The declared composition beside its published metadata.',
       },
       {
-        signature: 'async mount(ctx: Context, id?: string): Promise<AgentPreset>',
-        description: 'Bind an unpublished Agent to the current preset revision.',
+        signature: 'mount(ctx: Context, id?: string): Promise<AgentPreset>',
+        description: 'Bind an unpublished Agent to a selectable preset revision.',
         parameters: [{ name: 'ctx', description: 'Agent context from its setup callback.' }, { name: 'id', description: 'Requested preset, or the default.' }],
+        returns: 'Bound preset identity.',
+      },
+      {
+        signature: 'mountRetained(ctx: Context, id: string): Promise<AgentPreset>',
+        description: 'Bind an unpublished Agent while restoring an exact durable preset identity.',
+        parameters: [{ name: 'ctx', description: 'Agent context from its setup callback.' }, { name: 'id', description: 'Durable preset identity.' }],
         returns: 'Bound preset identity.',
       },
       {
@@ -803,6 +821,24 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [],
       },
       {
+        signature: 'registerBrowserPrincipalProvider(provider: BrowserPrincipalProvider): BrowserPrincipalRegistration',
+        description: 'Register one browser identity provider in the caller\'s Context.',
+        parameters: [{ name: 'provider', description: 'synchronous authentication and optional login route.' }],
+        returns: 'scoped registration; providers revoke Peers on logout, expiry, and account disablement.',
+      },
+      {
+        signature: 'clearOwnerCookie(request: ConnectionTrustRequest): string | undefined',
+        description: 'Expire the built-in Owner cookie after an external login replaces browser identity.',
+        parameters: [{ name: 'request', description: 'trusted headers for the cookie authority.' }],
+        returns: 'deletion Set-Cookie header, or undefined when no authority can be resolved.',
+      },
+      {
+        signature: 'trustRejection(request: ConnectionTrustRequest): 403 | undefined',
+        description: 'Apply the Host/Origin fence to a public route without requiring a credential.',
+        parameters: [{ name: 'request', description: 'request headers from the HTTP carrier.' }],
+        returns: '403 for an untrusted authority or Origin; undefined otherwise.',
+      },
+      {
         signature: 'readonly allowsRemoteAuthorities: boolean',
         description: 'Whether this deployment accepts authorities beyond loopback: true only when a validated `trustedHosts` entry names a non-loopback hostname.',
         parameters: [],
@@ -815,7 +851,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'requestRejection(request: ConnectionTrustRequest): ConnectionRequestRejection',
-        description: 'Apply Connection\'s Host/Origin checks and browser authentication to another Web route.',
+        description: 'Apply Connection\'s Host/Origin checks and browser authentication to another Owner-only Web route. Non-owner Peers receive 403; business routes use admit() and their resource policy instead.',
         parameters: [{ name: 'request', description: 'request headers from the HTTP or upgrade request.' }],
         returns: 'rejection status, or undefined when the route may accept the request.',
       },
@@ -2157,6 +2193,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Record a changed preset, then update each changed knob through its own setter. Selecting the effective preset again appends nothing.',
         parameters: [{ name: 'session', description: 'the session the switch belongs to.' }, { name: 'name', description: 'the preset to switch to; unknown names throw.' }],
       },
+      {
+        signature: 'registerGuard(guard: (session: Session, name: string) => void): () => void',
+        description: 'Validate permission changes for an owning capability.',
+        parameters: [{ name: 'guard', description: 'synchronous validator, called before any permission event is appended; throwing rejects the switch.' }],
+        returns: 'removal of this validator.',
+      },
     ],
   },
   {
@@ -2590,6 +2632,20 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Host service backing the generated `ctx.remote.session` namespace.',
     methods: [
       {
+        signature: 'registerForkPlacementProvider(provider: SessionForkPlacementProvider): () => Promise<void>',
+        description: 'Register a capability-owned placement policy for forked Sessions.',
+        parameters: [{ name: 'provider', description: 'resolves an isolated directory and optional Workspace for a source Session.' }],
+        returns: 'disposer removing this provider; only one placement owner may register.',
+        throws: ['Error when another fork placement provider is registered.'],
+      },
+      {
+        signature: 'registerCreationProvider(provider: SessionCreationProvider): () => Promise<void>',
+        description: 'Register deployment-owned placement and ownership for new conversations.',
+        parameters: [{ name: 'provider', description: 'interceptor receiving the authenticated caller Context and the ordinary creation operation.' }],
+        returns: 'disposer removing this provider; only one placement owner may register.',
+        throws: ['Error when another creation provider is registered.'],
+      },
+      {
         signature: 'resolveAgent(sessionId: SessionId): Promise<ApiSessionAgentResult>',
         description: 'Resolve or resume one ordinary Session for another Host API domain.',
         parameters: [{ name: 'sessionId', description: 'Session identity whose Agent owns the operation.' }],
@@ -2609,13 +2665,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: '@Remote(\'create\') create(request: SessionCreateRequest): Promise<SessionCreateValue>',
-        description: 'Create one ordinary Session for a new conversation, reusing the named blank Session while it is reusable.',
+        description: 'Create one ordinary Session for a new conversation, reusing the named blank Session while it is reusable. A registered creation provider receives the request, the ordinary operation, and the caller Context.',
         parameters: [{ name: 'request', description: 'optional blank Session to reuse, location, and Agent preset.' }],
         returns: 'the created or reused Session identity and its preset when configured.',
       },
       {
         signature: '@Remote(\'selectModel\') selectModel(request: SessionSelectModelRequest): Promise<SessionSelectModelValue>',
-        description: 'Select one Session-local model after explicitly resuming the Session; save the default in the background.',
+        description: 'Select one Session-local model after explicitly resuming the Session. An owner or in-process call also saves the default in the background; a non-owner caller leaves the default unchanged.',
         parameters: [{ name: 'request', description: 'Session identity and requested model selection.' }],
         returns: 'the normalized selection installed for the Session, without waiting for default persistence.',
       },
@@ -4434,28 +4490,28 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the updated Workspace projection.',
       },
       {
-        signature: '@Remote(\'archiveSession\') archiveSession(request: WorkspaceArchiveSessionRequest): Promise<WorkspaceArchiveValue>',
+        signature: '@Remote(\'archiveSession\') async archiveSession(request: WorkspaceArchiveSessionRequest): Promise<WorkspaceArchiveValue>',
         description: 'Hide one known Session from Workspace grouping surfaces.',
         parameters: [{ name: 'request', description: 'Session identity to archive.' }],
-        returns: 'the complete resulting archive set.',
+        returns: 'the resulting archive set, limited to Sessions the caller may see.',
       },
       {
-        signature: '@Remote(\'unarchiveSession\') unarchiveSession(request: WorkspaceUnarchiveSessionRequest): Promise<WorkspaceArchiveValue>',
+        signature: '@Remote(\'unarchiveSession\') async unarchiveSession(request: WorkspaceUnarchiveSessionRequest): Promise<WorkspaceArchiveValue>',
         description: 'Restore one archived Session to Workspace grouping surfaces.',
         parameters: [{ name: 'request', description: 'Session identity to unarchive.' }],
-        returns: 'the complete resulting archive set.',
+        returns: 'the resulting archive set, limited to Sessions the caller may see.',
       },
       {
-        signature: '@Remote(\'pinSession\') pinSession(request: WorkspacePinSessionRequest): Promise<WorkspacePinValue>',
+        signature: '@Remote(\'pinSession\') async pinSession(request: WorkspacePinSessionRequest): Promise<WorkspacePinValue>',
         description: 'Surface one known unarchived Session ahead of unpinned Sessions.',
         parameters: [{ name: 'request', description: 'Session identity to pin.' }],
-        returns: 'the complete resulting pin set, most recently pinned first.',
+        returns: 'the resulting pin set, most recently pinned first, limited to Sessions the caller may see.',
       },
       {
-        signature: '@Remote(\'unpinSession\') unpinSession(request: WorkspaceUnpinSessionRequest): Promise<WorkspacePinValue>',
+        signature: '@Remote(\'unpinSession\') async unpinSession(request: WorkspaceUnpinSessionRequest): Promise<WorkspacePinValue>',
         description: 'Remove one Session\'s pin without changing its saved Session order.',
         parameters: [{ name: 'request', description: 'Session identity to unpin.' }],
-        returns: 'the complete resulting pin set, most recently pinned first.',
+        returns: 'the resulting pin set, most recently pinned first, limited to Sessions the caller may see.',
       },
       {
         signature: '@Remote({ mode: \'stream\' }) async *follow(signal: AbortSignal): AsyncIterable<WorkspaceFollowFrame>',
@@ -4782,6 +4838,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'Recover a failed summary request by synchronously recording a durable change to its selected input.',
     description: 'Recover a failed summary request by synchronously recording a durable change to its selected input. Return true only after making progress; the provider re-derives and re-prices the selection before retrying. Call next() when the failure cannot be recovered. Decisions survive a later summary failure or cancellation.',
     parameters: [{ name: 'payload', description: '.signal - optional compaction cancellation signal.' }, { name: 'next', description: 'delegate to the next recovery listener.' }],
+  },
+  {
+    name: 'company-mcp/changed',
+    mode: 'emit',
+    signature: '\'company-mcp/changed\'(): void',
+    summary: 'Catalog, enablement or reported server state changed.',
+    description: 'Catalog, enablement or reported server state changed.',
+    parameters: [],
   },
   {
     name: 'connection/request',
@@ -5646,6 +5710,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'BrandedNumber',
     declaration: 'export type BrandedNumber<B extends string> = number & {\n    readonly [BRAND]: B;\n};',
+  },
+  {
+    name: 'BrowserPrincipalAuthentication',
+    declaration: 'export interface BrowserPrincipalAuthentication {\n    readonly sessionKey: BrowserSessionKey;\n    readonly principal: Principal;\n}',
+  },
+  {
+    name: 'BrowserPrincipalProvider',
+    declaration: 'export interface BrowserPrincipalProvider {\n    readonly loginPath?: string;\n    readonly requireLogin?: boolean;\n    authenticate(request: ConnectionTrustRequest, secure: boolean): BrowserPrincipalAuthentication | undefined;\n}',
+  },
+  {
+    name: 'BrowserPrincipalRegistration',
+    declaration: 'export interface BrowserPrincipalRegistration {\n    revoke(sessionKey: BrowserSessionKey): Promise<void>;\n    dispose(): Promise<void>;\n}',
+  },
+  {
+    name: 'BrowserSessionKey',
+    declaration: 'export type BrowserSessionKey = Branded<\'browser-session-key\'>;',
   },
   {
     name: 'BrowserUseProviderName',
@@ -7448,8 +7528,12 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type PrepareSessionOptions = (CreateSessionOptions & {\n    readonly eventState?: undefined;\n}) | RestoredSessionOptions;',
   },
   {
+    name: 'PresetAvailability',
+    declaration: 'export type PresetAvailability = \'selectable\' | \'retained\';',
+  },
+  {
     name: 'PresetDefinition',
-    declaration: 'export interface PresetDefinition {\n    readonly id: string;\n    readonly name?: string;\n    readonly description?: string;\n    readonly order?: number;\n    readonly plugins: readonly (Omit<EntryOptions, \'id\' | \'disabled\'> & {\n        id?: string;\n        disabled?: EntryOptions[\'disabled\'] | JsExpr;\n    })[];\n}',
+    declaration: 'export interface PresetDefinition {\n    readonly id: string;\n    readonly name?: string;\n    readonly description?: string;\n    readonly order?: number;\n    readonly availability?: PresetAvailability;\n    readonly plugins: readonly (Omit<EntryOptions, \'id\' | \'disabled\'> & {\n        id?: string;\n        disabled?: EntryOptions[\'disabled\'] | JsExpr;\n    })[];\n}',
   },
   {
     name: 'PresetOption',
@@ -8100,6 +8184,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SessionCreateValue {\n    readonly sessionId: SessionId;\n    readonly agentPreset?: string;\n}',
   },
   {
+    name: 'SessionCreationProvider',
+    declaration: 'export type SessionCreationProvider = (request: SessionCreateRequest, create: (request: SessionCreateRequest) => Promise<SessionCreateValue>, caller: Context) => Promise<SessionCreateValue>;',
+  },
+  {
     name: 'SessionEndInput',
     declaration: 'export interface SessionEndInput {\n    reason: \'clear\' | \'logout\' | \'prompt_input_exit\' | \'resume\' | \'other\';\n    sessionId: string;\n}',
   },
@@ -8206,6 +8294,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SessionFollowRequest',
     declaration: 'export interface SessionFollowRequest extends Pick<SessionPageRequest, \'maxMessages\' | \'turnWindow\'> {\n    readonly address: SessionAddress;\n    readonly activate?: boolean;\n    readonly assistantStream?: true;\n}',
+  },
+  {
+    name: 'SessionForkPlacement',
+    declaration: 'export interface SessionForkPlacement {\n    readonly cwd: string;\n    readonly workspace?: Workspace;\n    readonly rollback?: () => Promise<void>;\n}',
+  },
+  {
+    name: 'SessionForkPlacementProvider',
+    declaration: 'export type SessionForkPlacementProvider = (source: SessionHeader, childId: SessionId) => Promise<SessionForkPlacement | undefined>;',
   },
   {
     name: 'SessionForkRequest',

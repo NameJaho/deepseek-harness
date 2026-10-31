@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import AgentRegistry, { assembleContextFor } from '@deepseek-ai/dsh-agent'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import { entryListProblem } from '../src/index.ts'
 import { currentKey, harness, declare, contribution, agentOn, liveRegistries, plugin } from './harness.ts'
 import { omitsGeneratedPage } from '../../../settings/settings/tests/live-config.ts'
@@ -66,6 +67,52 @@ describe('declarative preset revisions', () => {
     expect(ctx.agentPresets.composedPreset(agent.ctx)).toBe('standard')
     await agent.dispose()
     expect(ctx.agentPresets.inspectCompositions()).toEqual([])
+  })
+
+  it('hides retained definitions while allowing exact restoration', async () => {
+    const ctx = await setup()
+    await declare(ctx, contribution('standard'))
+    await declare(ctx, { ...contribution('private-release'), availability: 'retained' })
+
+    expect((await ctx.agentPresets.list()).map(row => row.id)).toEqual(['standard'])
+    expect((await ctx.agentPresets.remoteExportList()).presets.map(row => row.id)).toEqual(['standard'])
+    expect(ctx.agentPresets.availabilityOf('private-release')).toBe('retained')
+    expect(ctx.agentPresets.availabilityOf('standard')).toBe('selectable')
+    expect(ctx.agentPresets.availabilityOf('missing')).toBeUndefined()
+    await expect(ctx.agentPresets.resolve('private-release')).rejects.toMatchObject({
+      code: 'agent-preset/not-found',
+      details: { available: ['standard'] },
+    })
+    await expect(ctx.agentPresets.readDocument('private-release')).rejects.toMatchObject({
+      code: 'agent-preset/not-found',
+      details: { available: ['standard'] },
+    })
+    await expect(ctx.agentPresets.mount(createScope(ctx, {}).ctx, 'private-release')).rejects.toMatchObject({
+      code: 'agent-preset/not-found',
+    })
+    expect(await ctx.agentPresets.resolveRetained('private-release')).toEqual({ id: 'private-release' })
+    const scope = createScope(ctx, {})
+    expect(await ctx.agentPresets.mountRetained(scope.ctx, 'private-release')).toEqual({ id: 'private-release' })
+    expect(ctx.agentPresets.composedPreset(scope.ctx)).toBe('private-release')
+    await using lease = await ctx.agentPresets.acquireScope('private-release')
+    expect(lease.key).toBeDefined()
+  })
+
+  it('locks a retained Session after its definition is replaced', async () => {
+    const ctx = await setup()
+    await declare(ctx, contribution('standard'))
+    const retained = await declare(ctx, { ...contribution('private-release'), availability: 'retained' })
+    const handle = await ctx.agents.create({
+      sessionId: SessionId('retained-session'),
+      setup: async (agentCtx) => { await ctx.agentPresets.mountRetained(agentCtx, 'private-release') },
+    })
+    await retained.dispose()
+    await declare(ctx, contribution('private-release'))
+
+    await expect(ctx.agentPresets.select(handle.agent, 'standard')).rejects.toMatchObject({
+      code: 'agent-preset/locked',
+    })
+    expect(ctx.agentPresets.composedPreset(handle.agent.ctx)).toBe('private-release')
   })
 
   it('reports a failed definition while allowing healthy definitions and the host to start', async () => {

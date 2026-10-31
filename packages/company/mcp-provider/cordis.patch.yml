@@ -1,0 +1,9 @@
+- insert:
+    - id: company-mcp-provider
+      name: '@deepseek-ai/dsh-company-mcp-provider/http'
+      config:
+        catalogUrl: !!js process.env.DSH_COMPANY_MCP_CATALOG_URL ?? ''
+        invokeUrl: !!js process.env.DSH_COMPANY_MCP_INVOKE_URL ?? ''
+        tokenRef: DSH_COMPANY_MCP_TOKEN
+    - id: company-mcp
+      name: '@deepseek-ai/dsh-company-mcp-provider'

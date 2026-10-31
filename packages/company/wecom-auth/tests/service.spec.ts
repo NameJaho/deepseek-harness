@@ -17,7 +17,7 @@ import { WecomOfficial } from '../src/upstream.ts'
 import type { WecomLoginConfig } from '../src/types.ts'
 
 const publicOrigin = 'https://login.example'
-const config = Config({ corpId: 'wwfixture', agentId: '1000239', publicOrigin } as Config)
+const config: Readonly<Config> = Config({ corpId: 'wwfixture', agentId: '1000239', publicOrigin } as Config)
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.unstubAllGlobals() })
 
 function officialFixture() {
@@ -74,7 +74,7 @@ async function fixture() {
       method: init.method ?? 'GET', headers: { host: 'login.example', ...Object.fromEntries(new Headers(init.headers)) },
     }, (incoming) => {
       const chunks: Buffer[] = []
-      incoming.on('data', (chunk) => { chunks.push(Buffer.from(chunk)) })
+      incoming.on('data', (chunk: Buffer) => { chunks.push(Buffer.from(chunk)) })
       incoming.on('end', () => {
         const headers = new Headers()
         for (let i = 0; i < incoming.rawHeaders.length; i += 2) {
@@ -99,7 +99,7 @@ async function fixture() {
     return { attempt, binding }
   }
   const exchange = (attempt: Awaited<ReturnType<typeof begin>>, state = attempt.attempt.state, binding = attempt.binding) => request(
-    '/auth/wecom/callback?' + new URLSearchParams({ code: 'PRIVATE_CODE', state }), { headers: { cookie: binding } })
+    '/auth/wecom/callback?' + new URLSearchParams({ code: 'PRIVATE_CODE', state }).toString(), { headers: { cookie: binding } })
   return { ctx, fiber, request, begin, exchange, warnings, storedHeaders, ...official }
 }
 
@@ -147,7 +147,7 @@ it('binds state to a browser, consumes once and preserves only local redirects',
 it('accepts browser-bound cross-site OAuth navigation but rejects foreign Origin fetches', async () => {
   const f = await fixture()
   const attempt = await f.begin()
-  const path = '/auth/wecom/callback?' + new URLSearchParams({ code: 'PRIVATE_CODE', state: attempt.attempt.state })
+  const path = '/auth/wecom/callback?' + new URLSearchParams({ code: 'PRIVATE_CODE', state: attempt.attempt.state }).toString()
   expect((await f.request(path, { headers: { cookie: attempt.binding, origin: 'https://attacker.invalid', 'sec-fetch-site': 'cross-site' } })).status).toBe(403)
   expect(f.calls).toHaveLength(0)
   expect((await f.request(path, { headers: { cookie: attempt.binding, 'sec-fetch-site': 'cross-site' } })).status).toBe(303)
@@ -240,12 +240,12 @@ it('isolates each member to one default Workspace and its Sessions', async () =>
     throw new Error('Expected non-owner access baselines')
   }
   expect(firstSnapshot.grants).toEqual(expect.arrayContaining([
-    { resource: { kind: 'workspace', id: firstWorkspace.id }, actions: expect.any(Array) },
-    { resource: { kind: 'session', id: firstSessionId }, actions: expect.any(Array) },
+    { resource: { kind: 'workspace', id: firstWorkspace.id }, actions: expect.any(Array) as string[] },
+    { resource: { kind: 'session', id: firstSessionId }, actions: expect.any(Array) as string[] },
   ]))
   expect(firstSnapshot.grants).not.toEqual(expect.arrayContaining([
-    { resource: { kind: 'workspace', id: secondWorkspace.id }, actions: expect.any(Array) },
-    { resource: { kind: 'session', id: secondSessionId }, actions: expect.any(Array) },
+    { resource: { kind: 'workspace', id: secondWorkspace.id }, actions: expect.any(Array) as string[] },
+    { resource: { kind: 'session', id: secondSessionId }, actions: expect.any(Array) as string[] },
   ]))
   expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'workspace/follow', resources: [{ kind: 'workspace', id: secondWorkspace.id }] })).toEqual({ kind: 'deny', reason: 'no-allow' })
   expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'session/control', resources: [{ kind: 'session', id: secondSessionId }] })).toEqual({ kind: 'deny', reason: 'no-allow' })
@@ -255,6 +255,33 @@ it('isolates each member to one default Workspace and its Sessions', async () =>
   expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'settings/describe', resources: [{ kind: 'global' }] })).toEqual({ kind: 'allow' })
   expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'directoryPicker/list', resources: [{ kind: 'global' }], args: { path: firstWorkspace.path } })).toEqual({ kind: 'deny', reason: 'no-allow' })
   expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'workspace/create', resources: [{ kind: 'global' }], args: { request: { path: firstWorkspace.path } } })).toEqual({ kind: 'deny', reason: 'no-allow' })
+  if (firstPrincipal.kind !== 'wecom-user' || secondPrincipal.kind !== 'wecom-user') throw new Error('Expected WeCom principals')
+  const auth = f.ctx.companyWecomAuth
+  expect(auth.defaultWorkspaceSessions(firstPrincipal)).toEqual([firstSessionId])
+  expect(auth.defaultWorkspaceSessions(secondPrincipal)).toEqual([secondSessionId])
+  expect(auth.defaultWorkspaceSessions({ ...firstPrincipal, userId: secondPrincipal.userId })).toEqual([])
+  expect(auth.defaultWorkspaceSessions({ ...firstPrincipal, corpId: brandString<typeof firstPrincipal.corpId>('foreign-corp') })).toEqual([])
+  expect(auth.sessionOwner(firstSessionId)).toBe('wecom:wwfixture:member')
+  expect(auth.sessionOwner(secondSessionId)).toBe('wecom:wwfixture:other')
+  expect(auth.sessionOwner(brandString<SessionId>('unknown-session'))).toBeUndefined()
+  f.ctx.provide('agents', { currentInitiator: () => ({ id: firstSessionId }) } as never)
+  expect(auth.ownerScope()).toBe('wecom:wwfixture:member')
+
+  const decideCommand = (id: SessionId, line: string) => f.ctx.remoteAccess.decide({ principal: firstPrincipal,
+    action: 'commands/execute', resources: [{ kind: 'session', id }], args: { line } })
+  expect(decideCommand(firstSessionId, '/publish-agent')).toEqual({ kind: 'deny', reason: 'command-not-granted' })
+  const invalidate = vi.spyOn(f.ctx.remoteAccess, 'invalidate')
+  const stop = auth.registerResourceProvider({ defaultWorkspaceCommands: ['publish-agent', 'create-agent'],
+    bindings: () => [], sessionOwner: () => undefined })
+  expect(invalidate).toHaveBeenCalledOnce()
+  expect(decideCommand(firstSessionId, '/publish-agent confirm 1 private')).toEqual({ kind: 'allow' })
+  expect(decideCommand(firstSessionId, '/create-agent requirements')).toEqual({ kind: 'allow' })
+  expect(decideCommand(secondSessionId, '/publish-agent')).toEqual({ kind: 'deny', reason: 'no-allow' })
+  expect(decideCommand(firstSessionId, '/publish-agent-extra')).toEqual({ kind: 'deny', reason: 'command-not-granted' })
+  expect(decideCommand(firstSessionId, '/unrelated')).toEqual({ kind: 'deny', reason: 'command-not-granted' })
+  await stop()
+  expect(invalidate).toHaveBeenCalledTimes(2)
+  expect(decideCommand(firstSessionId, '/publish-agent')).toEqual({ kind: 'deny', reason: 'command-not-granted' })
 })
 
 it('keeps required admission closed after provider disposal and rejects Owner launch credentials', async () => {

@@ -194,6 +194,11 @@ if [[ "$DSH_PROFILE_INIT" == "1" ]]; then
 fi
 # Profile overlays are outer CLI options and must precede runtime arguments.
 DSH_COMMAND+=(--patch "$DSH_REPO/packages/company/wecom-auth/cordis.patch.yml")
+# Cloud Agent 依赖外部 MCP 网关；未配置网关地址时不挂载这两个 patch，避免启动时因空 URL 失败。
+if [[ -n "${DSH_COMPANY_MCP_CATALOG_URL:-}" ]]; then
+  DSH_COMMAND+=(--patch "$DSH_REPO/packages/company/mcp-provider/cordis.patch.yml")
+  DSH_COMMAND+=(--patch "$DSH_REPO/packages/company/cloud-agent/cordis.patch.yml")
+fi
 DSH_COMMAND+=(--no-open --host "$DSH_HOST" --port "$DSH_PORT")
 if [[ -n "$DSH_PUBLIC_URL" ]]; then
   DSH_COMMAND+=(--public-url "$DSH_PUBLIC_URL")

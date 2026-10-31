@@ -15,7 +15,7 @@
  * The General-settings row separately writes the default preset for sessions
  * created later through the host Settings API.
  */
-import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import { Service, type Context as ClientContext } from '@deepseek-ai/cordis'
 import type { SessionFace } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
 import type { PermissionCatalog, PermissionSelection } from '@deepseek-ai/dsh-permission-presets/client'
@@ -66,6 +66,42 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** Current-session permission picker and confirmation copy. */
     'permission.access': keyof typeof accessEn
+  }
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /** Permission choices that require capability-owned navigation. */
+    permissionSelection: PermissionSelectionRouter
+  }
+}
+
+/** Routes a picker choice before the ordinary current-session command. */
+class PermissionSelectionRouter extends Service {
+  private readonly handlers = new Set<(sessionId: SessionId, preset: string) => Promise<boolean | undefined>>()
+  /** @param ctx - registration owner. */
+  constructor(ctx: ClientContext) { super(ctx, 'permissionSelection') }
+  /**
+   * Register a capability-owned transition.
+   * @param handler - resolves undefined to delegate; a boolean settles the selection.
+   * @returns registration disposer.
+   */
+  register(handler: (sessionId: SessionId, preset: string) => Promise<boolean | undefined>): () => void {
+    this.handlers.add(handler)
+    return () => { this.handlers.delete(handler) }
+  }
+  /**
+   * Offer one choice to registered handlers in registration order.
+   * @param sessionId - selected conversation.
+   * @param preset - requested permission preset.
+   * @returns the first handler's settlement, or undefined when none handled it.
+   */
+  async route(sessionId: SessionId, preset: string): Promise<boolean | undefined> {
+    for (const handler of this.handlers) {
+      const result = await handler(sessionId, preset)
+      if (result !== undefined) return result
+    }
+    return undefined
   }
 }
 
@@ -130,7 +166,10 @@ export function apply(ctx: ClientContext): void {
   const t = ctx.locale.bind(PERMISSION_ACCESS_NS)
   const sessionFor = (session: ClientSessionContext): SessionFace | undefined =>
     sessions.binding(session.sessionId)?.session
+  const selectionRouter = new PermissionSelectionRouter(ctx)
   const submit = async (sessionId: SessionId, preset: string): Promise<boolean> => {
+    const handled = await selectionRouter.route(sessionId, preset)
+    if (handled !== undefined) return handled
     const live = sessions.binding(sessionId)?.session
     if (live === undefined) throw new Error('this session is not materialized yet')
     const result = await live.command(`/permission ${preset}`)

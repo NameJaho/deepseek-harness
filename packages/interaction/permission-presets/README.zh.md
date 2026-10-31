@@ -84,6 +84,8 @@ kind: "package-reference"
 
 `set()` 解析预设，并在适用时同步执行 Auto 准入检查。切换仅在有效预设变化时追加 `permission/preset`，再通过各自的权威 setter——`dsh-sandbox-policy` 的 `setSandboxMode` 与 `dsh-user-approval` 的 `setApprovalPolicy`——写入每个变化的旋钮。因此，两个预设共享同一组取值时，选择事件仍会保留用户意图。Auto 与 Full access 之间切换时，记录新的身份与变化的审批策略。净变化为零的选择不追加任何内容。
 
+`registerGuard(guard)` 为 `set()` 和 `/permission <preset>` 安装同步的能力校验器。拒绝时不追加权限或旋钮事件。通过贡献插件的 effect 注册返回的注销函数；卸载时移除该能力的准入规则。
+
 ### 读取侧与 `custom`
 
 `current(session)` 读取必需的 `permissions` 投影；该单元在组合默认值（`ctx.shell.sandboxMode` 与审批配置）之上折叠三个全量值旋钮事件。host 状态还会保留 `session/end-seed` 是否已经出现，使会话固定无需重扫日志即可区分显式为空的恢复 seed 与真正的新会话。仍匹配的最近选择在共享捆绑时胜出，已记录的 Auto 选择在 `never` 审批策略下也匹配；否则配置表中的第一个匹配项胜出；否则返回推导出的 `CUSTOM_PRESET`。该服务在激活期间取得状态读取句柄。

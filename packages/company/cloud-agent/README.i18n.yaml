@@ -1,0 +1,61 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/company/cloud-agent/README.md
+/:
+  en: f990920132baf5e7
+  zh: ed7b3dcb8f8a630f
+/deepseek-ai-dsh-company-cloud-agent:
+  en: 95e2a615687fa08e
+  zh: 117157f934e22b18
+/deepseek-ai-dsh-company-cloud-agent/summary:
+  en: 3938699d3fdc770b
+  zh: 32e7c74895c6d5d0
+/deepseek-ai-dsh-company-cloud-agent/table-of-contents:
+  en: 4ae025c94ad3935a
+  zh: 88607eff9df7fe2e
+/deepseek-ai-dsh-company-cloud-agent/use-this-package:
+  en: 767274913dbe7a6a
+  zh: ddb9094c8929d4a5
+/deepseek-ai-dsh-company-cloud-agent/ownership-and-execution:
+  en: 5370de67658856b2
+  zh: a838d8997676c480
+/deepseek-ai-dsh-company-cloud-agent/persistence-and-lifecycle:
+  en: efd9997fb693fbad
+  zh: 41496e4d2925df7c
+/deepseek-ai-dsh-company-cloud-agent/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-company-cloud-agent/model-experience/draft-authoring-tool:
+  en: c6812a9b19183cf5
+  zh: 139bd758007757ac
+/deepseek-ai-dsh-company-cloud-agent/model-experience/draft-authoring-tool/what-the-model-sees:
+  en: 4931ccfd8cfe5339
+  zh: 719c748be45a22c9
+/deepseek-ai-dsh-company-cloud-agent/model-experience/draft-authoring-tool/token-effect:
+  en: c41f92b377c5ed54
+  zh: daf0ba50042cf457
+/deepseek-ai-dsh-company-cloud-agent/model-experience/draft-authoring-tool/kv-cache-effect:
+  en: a18905a1fbb4d63c
+  zh: 8d4c926358ca6504
+/deepseek-ai-dsh-company-cloud-agent/model-experience/retained-authoring-instructions:
+  en: 771e68b58f9cff3a
+  zh: eaa57812cc7f14f0
+/deepseek-ai-dsh-company-cloud-agent/model-experience/retained-authoring-instructions/what-the-model-sees:
+  en: 504203aa3e9207f1
+  zh: aa55d63afa02d61d
+/deepseek-ai-dsh-company-cloud-agent/model-experience/retained-authoring-instructions/what-the-model-sees/verbatim-authoring-guidance:
+  en: 708099b5cbfcf231
+  zh: dccb04b7191466ee
+/deepseek-ai-dsh-company-cloud-agent/model-experience/retained-authoring-instructions/token-effect:
+  en: 39356d9232e9a029
+  zh: b7b0c2d60a3164f5
+/deepseek-ai-dsh-company-cloud-agent/model-experience/retained-authoring-instructions/kv-cache-effect:
+  en: 754897ede4136df8
+  zh: 6c3a518c9f3c78c8
+/deepseek-ai-dsh-company-cloud-agent/known-limitations-and-deferred-work:
+  en: 501b6f1c23e6b508
+  zh: f8f511c0c03d40a2
+/deepseek-ai-dsh-company-cloud-agent/known-limitations-and-deferred-work/dev-note:
+  en: 7d529c8379bc20b0
+  zh: 57f079960ea495c1

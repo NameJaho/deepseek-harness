@@ -86,6 +86,22 @@ describe('permission preset fold', () => {
 })
 
 describe('PermissionPresetService', () => {
+  it('rejects capability-denied switches before logging and removes the guard on plugin unload', async () => {
+    const ctx = await mounted()
+    const session = freshSession('guarded')
+    const fiber = await ctx.plugin(Object.assign((child: Context) => {
+      child.effect(() => child.permissionPresets.registerGuard((_session, name) => {
+        if (name === 'danger-full-access') throw new Error('Use a separate editing conversation')
+      }))
+    }, { inject: ['permissionPresets'] }))
+    const seq = session.seq
+    expect(() => { ctx.permissionPresets.set(session, 'danger-full-access') }).toThrow('separate editing conversation')
+    expect(session.seq).toBe(seq)
+    await fiber.dispose()
+    ctx.permissionPresets.set(session, 'danger-full-access')
+    expect(ctx.permissionPresets.current(session)).toBe('danger-full-access')
+  })
+
   it('does not activate without the required projection registry', async () => {
     const ctx = await mounted({ projection: false })
     expect(ctx.get('permissionPresets')).toBeUndefined()

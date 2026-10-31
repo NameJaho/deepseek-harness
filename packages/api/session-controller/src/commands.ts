@@ -21,7 +21,7 @@ import type { SessionEvent, SessionHeader, SessionId, UserMessage } from '@deeps
 import { SessionQueryError, type SessionObservation } from '@deepseek-ai/dsh-session-query'
 import { SessionTitleInvalidError } from '@deepseek-ai/dsh-session-title'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
-import { RemoteError, remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
+import { RemoteError, remoteErrorOf, type Principal } from '@deepseek-ai/dsh-typert-protocol'
 import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import {
   ApiSessionAgentController,
@@ -56,6 +56,27 @@ type PromptContentCandidate =
   | SessionPromptRequest['content'][number]
   | Extract<SessionUpdateQueueRequest['action'], { readonly kind: 'edit' }>['content'][number]
 
+/** Placement supplied by a capability that owns isolated fork directories. */
+export interface SessionForkPlacement {
+  /** Directory recorded in the child Session header. */
+  readonly cwd: string
+  /** Workspace that should account for the child Session. */
+  readonly workspace?: Workspace
+  /** Remove provider-owned resources when child creation fails before persistence. */
+  readonly rollback?: () => Promise<void>
+}
+
+/**
+ * Resolve an optional provider-owned placement for one forked Session.
+ * @param source - header of the Session being forked.
+ * @param childId - identity minted for the child before it is created.
+ * @returns the child placement, or undefined to keep the source directory and Workspace.
+ */
+export type SessionForkPlacementProvider = (
+  source: SessionHeader,
+  childId: SessionId,
+) => Promise<SessionForkPlacement | undefined>
+
 /**
  * Whether prompt content carries non-whitespace text or an attachment.
  * @param content - submitted or edited prompt parts.
@@ -87,11 +108,13 @@ export class SessionCommandController {
    * @param ctx - Host context carrying Agent, model, attachment, title, and Workspace services.
    * @param agents - sole owner of create, resume, and Agent composition.
    * @param defaultCwd - project directory used when create names neither a Workspace nor a cwd.
+   * @param forkPlacementProvider - optional capability-owned placement for forked Sessions.
    */
   constructor(
     private readonly ctx: Context,
     private readonly agents: ApiSessionAgentController,
     private readonly defaultCwd: string,
+    private readonly forkPlacementProvider?: SessionForkPlacementProvider,
   ) {}
 
   /**
@@ -142,11 +165,17 @@ export class SessionCommandController {
   }
 
   /**
-   * Validate and record one Session model selection; save the default in the background.
+   * Validate and record one Session model selection. An owner or in-process
+   * selection also saves the default in the background; a non-owner caller
+   * leaves the default unchanged.
    * @param request - Session identity and requested model selection.
+   * @param principal - non-owner Remote caller, or undefined for the owner and trusted in-process code.
    * @returns the normalized selection recorded for the Session, without waiting for default persistence.
    */
-  async selectModel(request: SessionSelectModelRequest): Promise<SessionSelectModelValue> {
+  async selectModel(
+    request: SessionSelectModelRequest,
+    principal: Principal | undefined,
+  ): Promise<SessionSelectModelValue> {
     const agent = await this.resolveAgent(request.sessionId)
     return this.agents.serializeImageAdmission(agent, async () => {
       try {
@@ -160,11 +189,13 @@ export class SessionCommandController {
         }
         await this.ctx.llm.resolveCallConfig(selected)
         agent.model.select(selected)
-        void this.ctx.agentDefaultModel.saveSelection(selected).catch((error: unknown) => {
-          this.ctx.logger.warn(
-            `session-controller: model selection changed for the Session but the default was not saved: ${String(error)}`,
-          )
-        })
+        if (principal === undefined) {
+          void this.ctx.agentDefaultModel.saveSelection(selected).catch((error: unknown) => {
+            this.ctx.logger.warn(
+              `session-controller: model selection changed for the Session but the default was not saved: ${String(error)}`,
+            )
+          })
+        }
         return { selected: { ...selected } }
       } catch (error) {
         if (remoteErrorOf(error) !== undefined) throw error
@@ -206,7 +237,10 @@ export class SessionCommandController {
   /**
    * Create a new ordinary Session from an exact event prefix. An explicit
    * `atSeq` is the inclusive cut; an omitted value selects the latest
-   * completed-turn prefix. An open cut receives synthetic fork closers.
+   * completed-turn prefix. An open cut receives synthetic fork closers. The
+   * child restores the source's recorded preset, including a retained one. A
+   * registered placement provider may supply the child's cwd and Workspace and
+   * owns rollback of its resources when child creation fails.
    * @param request - source Session and optional exact event boundary.
    * @returns the new Session identity.
    */
@@ -245,9 +279,13 @@ export class SessionCommandController {
       )
     }
     const seed = buildForkSeed(source.events, boundary)
+    const childId = brandString<SessionId>(`session-${randomUUID()}`)
+    const composition = await this.agents.composeRetainedAgent(this.agents.presetForObservation(source))
+    let placement: SessionForkPlacement | undefined
     let workspace: Workspace | undefined
     try {
-      workspace = await this.forkWorkspace(source.header)
+      placement = await this.forkPlacementProvider?.(source.header, childId)
+      workspace = placement?.workspace ?? await this.forkWorkspace(source.header)
     } catch (error) {
       throw new RemoteError(
         'gateway/internal',
@@ -255,8 +293,7 @@ export class SessionCommandController {
         {},
       )
     }
-    const childId = brandString<SessionId>(`session-${randomUUID()}`)
-    const composition = await this.agents.composeAgent(this.agents.presetForObservation(source))
+    const cwd = placement?.cwd ?? source.header.cwd
     try {
       const { provider, model } = this.ctx.agentDefaultModel.currentSelection()
       await this.ctx.agents.create({
@@ -264,7 +301,7 @@ export class SessionCommandController {
         seed,
         inheritedEventCount: SessionLogOffset(boundary + 1),
         meta: {
-          ...(source.header.cwd === undefined ? {} : { cwd: source.header.cwd }),
+          ...(cwd === undefined ? {} : { cwd }),
           isSeeded: true,
           ...(composition.agentPreset === undefined
             ? {}
@@ -274,6 +311,11 @@ export class SessionCommandController {
         setup: composition.setup,
       })
     } catch (error) {
+      try {
+        await placement?.rollback?.()
+      } catch (cleanupError) {
+        throw new AggregateError([error, cleanupError], `failed to fork session "${request.sessionId}"`, { cause: error })
+      }
       throw new RemoteError(
         'gateway/internal',
         `failed to fork session "${request.sessionId}": ${String(error)}`,

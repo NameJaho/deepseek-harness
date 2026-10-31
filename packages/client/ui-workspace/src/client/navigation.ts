@@ -21,7 +21,10 @@ import type {
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { DraftInitializationOptions } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { RowToast } from './contract/slots.ts'
+import { WorkspaceNavigationGroups } from './groups.ts'
+import type { WorkspaceNavigationGroup } from './groups.ts'
 import { pinOrderAccounts, pinOrderSource } from './pin-order.ts'
 import type { WorkspaceViewStoreActions } from './stores.ts'
 
@@ -38,6 +41,15 @@ export interface StartSessionOptions extends DraftInitializationOptions {
 
 /** Workspace archive and directory operations consumed by Client UI domains. */
 export interface UiWorkspace {
+  /**
+   * Register capability-owned logical groups without changing physical directory membership. The
+   * sidebar and the Workspace picker list each group as one entry, and its Sessions leave the
+   * ordinary Workspace rows; a new conversation in the group starts through the capability.
+   * @param provider - observable titles, Session members, availability and start callbacks.
+   * @returns idempotent registration disposer, restoring the physical rows.
+   * @throws when the provider is already registered, or when a Session belongs to two groups.
+   */
+  registerGroups(provider: ObservableSnapshot<readonly WorkspaceNavigationGroup[]>): () => void
   /**
    * Select a Session and show its Conversation as one UI navigation action.
    * @param target - known Session identity or durable direct-parent subagent address to display.
@@ -164,6 +176,8 @@ export class DirectoryBrowseError extends Error {
 
 /** Implements Workspace archive and directory UI operations. */
 class UiWorkspaceService extends Service implements UiWorkspace {
+  /** Navigation-only groups; physical resource consumers keep the Workspace Controller source. */
+  readonly navigation: WorkspaceNavigationGroups
   /** The latest in-flight connection per Workspace; a request joins it only when both name the same preset. */
   private readonly connecting = new Map<WorkspaceId, {
     readonly agentPreset: string | undefined
@@ -193,6 +207,8 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     private readonly notify: (toast: RowToast) => void,
   ) {
     super(ctx, 'uiWorkspace')
+    this.navigation = new WorkspaceNavigationGroups(workspaces.list)
+    ctx.effect(() => () => { this.navigation.dispose() }, 'ui-workspace: navigation groups')
     ctx.effect(() => {
       const stop = this.watchNavigation()
       return () => {
@@ -205,17 +221,29 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     }, 'ui-workspace: Workspace navigation policy')
   }
 
+  registerGroups(provider: ObservableSnapshot<readonly WorkspaceNavigationGroup[]>): () => void {
+    return this.navigation.register(provider)
+  }
+
   connectWorkspace(workspaceId: WorkspaceId, options: Pick<StartSessionOptions, 'agentPreset'> = {}): Promise<SessionId> {
     return this.connectBlank(workspaceId, options)
   }
 
   /**
+   * A logical group starts through its owning capability, or through the physical Workspace
+   * holding its earliest member when it supplies no starter; an unavailable group refuses.
    * @param reuse - preset for the reused or created blank.
+   * @param purpose - whether this is a reconnect or an explicit New Session request.
    */
   private async connectBlank(
     workspaceId: WorkspaceId,
     reuse: Pick<StartSessionOptions, 'agentPreset'>,
+    purpose: 'connect' | 'new-session' = 'connect',
   ): Promise<SessionId> {
+    const managed = this.navigation.start(workspaceId, purpose)
+    if (managed?.kind === 'capability') return managed.start()
+    if (managed?.kind === 'unavailable') throw new Error(this.ctx.locale.bind('workspace')('group.unavailable'))
+    if (managed?.kind === 'physical') return this.createInWorkspace(managed.workspace, reuse)
     const workspace = this.workspaces.list.getSnapshot().items
       .find(item => item.workspaceId === workspaceId)
     if (workspace === undefined) {
@@ -294,23 +322,26 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     this.replaceMain(target, this.lifetime.signal, 'reveal')
   }
 
+  /** @param purpose - whether this is a reconnect or an explicit New Session request. */
   openWorkspace(
     workspaceId: WorkspaceId,
     beforeOpen?: (sessionId: SessionId) => void,
     options: Pick<StartSessionOptions, 'agentPreset'> = {},
+    purpose: 'connect' | 'new-session' = 'connect',
   ): Promise<void> {
-    return this.openWorkspaceSession(workspaceId, beforeOpen, options)
+    return this.openWorkspaceSession(workspaceId, beforeOpen, options, purpose)
   }
 
   private async openWorkspaceSession(
     workspaceId: WorkspaceId,
     beforeOpen: ((sessionId: SessionId) => void) | undefined,
     reuse: Pick<StartSessionOptions, 'agentPreset'>,
+    purpose: 'connect' | 'new-session',
   ): Promise<void> {
     const navigation = AbortSignal.any([this.ctx.layout.beginNavigation(), this.lifetime.signal])
     let sessionId: SessionId
     try {
-      sessionId = await this.connectBlank(workspaceId, reuse)
+      sessionId = await this.connectBlank(workspaceId, reuse, purpose)
     } catch (error: unknown) {
       // Reported here, not in connectWorkspace: startup restoration calls that
       // directly and stays console-only.
@@ -339,14 +370,16 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     const draftOptions = options === undefined ? undefined : draft
     const initializeDraft = draftOptions !== undefined && (draftOptions.prompt !== undefined
       || (draftOptions.whenDraftExists ?? (draftOptions.clearPreviousDraft === true ? 'replace' : 'keep')) === 'replace')
-    const workspace = this.workspaces.list.getSnapshot()
+    const workspace = this.navigation.getSnapshot()
+    // An implicit target skips logical groups that refuse new conversations; an explicit one is honored and refused.
+    const startable = workspace.items.filter(item => item.navigationStartable !== false)
     const sessions = this.sessions.list.getSnapshot()
     const current = this.mainReference?.sessionId
     const currentWorkspaceId = current === undefined
       ? undefined
-      : workspace.items.find(item => item.sessionIds.includes(current))?.workspaceId
+      : startable.find(item => item.sessionIds.includes(current))?.workspaceId
     const recent = workspace.phase === 'ready' && sessions.phase === 'ready'
-      ? recentWorkspace(workspace.items, sessions.byId)
+      ? recentWorkspace(startable, sessions.byId)
       : undefined
     const target = workspaceId ?? currentWorkspaceId ?? recent
     if (target === undefined) {
@@ -361,7 +394,7 @@ class UiWorkspaceService extends Service implements UiWorkspace {
       const binding = this.sessions.binding(id)
       if (binding === undefined) this.draftPreparationFailed()
       this.prepareDraft(binding, draftOptions)
-    } : undefined, agentPreset === undefined ? {} : { agentPreset })
+    } : undefined, agentPreset === undefined ? {} : { agentPreset }, 'new-session')
     void opening.catch(
       (reason: unknown) => { console.warn('new session failed:', reason) },
     )
@@ -390,7 +423,7 @@ class UiWorkspaceService extends Service implements UiWorkspace {
 
   async pinSession(sessionId: SessionId): Promise<void> {
     await this.workspaces.pinSession(sessionId)
-    const { items, pinnedSessionIds, archivedSessionIds } = this.workspaces.list.getSnapshot()
+    const { items, pinnedSessionIds, archivedSessionIds } = this.navigation.getSnapshot()
     this.view.pinSessionOrder(
       sessionId,
       pinOrderAccounts(items, sessionId),
@@ -418,6 +451,19 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     const result = await this.directoryPicker.createDirectory(path, name)
     if (!result.ok) throw new DirectoryBrowseError(result.error)
     return result.value
+  }
+
+  /**
+   * Delete a logical capability-owned group or a physical Workspace registration.
+   * @param workspaceId - logical or physical Workspace identity.
+   */
+  async deleteWorkspace(workspaceId: WorkspaceId): Promise<void> {
+    const deletion = this.navigation.deletion(workspaceId)
+    if (deletion !== undefined) {
+      await deletion()
+      return
+    }
+    await this.workspaces.delete(workspaceId)
   }
 
   whenAccess(workspaceId: WorkspaceId, action: RemoteEndpoint, callback: () => AccessEffect): () => void {

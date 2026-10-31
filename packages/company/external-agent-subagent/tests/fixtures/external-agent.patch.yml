@@ -1,0 +1,51 @@
+# Test-only provider over the shipped headless profile; never enabled by a product bundle.
+- id: headless-startup
+  disabled: true
+- id: headless-runner
+  disabled: true
+- id: agent-loop
+  config:
+    agents:
+      - id: main
+        provider: mock
+        model: mock-delegate
+        cwd: !!js process.cwd()
+- id: session-persistence-jsonl
+  config:
+    root: './.sessions'
+    compression: none
+- id: tool-subagent
+  config:
+    provider: external-research
+    toolName: subagent
+    maxDepth: provider-managed
+- insert:
+    - id: external-fixture-credentials
+      name: '../../../../credentials/credentials-local/src/index.ts'
+      config:
+        watch: false
+    - id: mock-external-parent
+      name: './mock-parent.ts'
+    - id: company-external-agent-subagent
+      name: '../../src/index.ts'
+      config:
+        agents:
+          - platform: dify
+            id: research
+            name: Research agent
+            version: release-1
+            environment: test
+            providerName: external-research
+            endpoint: !!js process.env.DSH_EXTERNAL_FIXTURE_ENDPOINT
+            credentialRef: DIFY_TEST_KEY
+            inputs: { language: zh }
+            timeoutMs: 10000
+            maxInputBytes: 4096
+            maxOutputBytes: 4096
+            maxRetainedRuns: 50
+            allowContinuation: false
+- id: sandbox-policy
+  inject: []
+  config:
+    mode: workspace-write
+    workspaceRoot: !!js process.cwd()

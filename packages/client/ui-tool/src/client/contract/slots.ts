@@ -14,14 +14,10 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
     /**
-     * Keyed Tool call view dispatched by wire Tool name. Any name is allowed,
-     * including tools registered by your package. Register with
-     * `key: '<tool name>'`; a typo never renders.
-     *
-     * Registering an occupied key replaces its view; unclaimed keys use the
-     * generic row. The owner supplies the call identity and running
-     * or settled node through explicit phase props. Every stage supplies
-     * `name` and a lazy `args` view; preparing arguments may be incomplete.
+     * Keyed Tool call view dispatched by wire Tool name, including tools your package registers.
+     * Register with `key: '<tool name>'`; a typo never renders. An occupied key's view is replaced;
+     * unclaimed keys use the generic row. The owner supplies the call identity and running or settled
+     * node through phase props; every stage supplies `name` and a lazy `args` view that may be incomplete while preparing.
      */
     'tool.call.toolview': {
       kind: 'keyed'

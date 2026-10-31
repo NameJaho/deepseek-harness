@@ -27,6 +27,7 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
   'approval/policy',
   'assistant/attempt',
   'assistant/message',
+  'cloud-agent/binding',
   'command/done',
   'command/run',
   'compaction/end',

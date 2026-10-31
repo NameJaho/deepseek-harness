@@ -27,11 +27,14 @@ function controllerAgents(
   ctx: Context,
   fixed: {
     readonly composeAgent?: ApiSessionAgentController['composeAgent']
+    readonly composeRetainedAgent?: ApiSessionAgentController['composeRetainedAgent']
     readonly createSession?: ApiSessionAgentController['createSession']
   } = {},
 ): ApiSessionAgentController {
   const agents = new ApiSessionAgentController(ctx)
-  vi.spyOn(agents, 'composeAgent').mockImplementation(fixed.composeAgent ?? (() => Promise.resolve({ setup: () => {} })))
+  const composition = () => Promise.resolve({ setup: () => {} })
+  vi.spyOn(agents, 'composeAgent').mockImplementation(fixed.composeAgent ?? composition)
+  vi.spyOn(agents, 'composeRetainedAgent').mockImplementation(fixed.composeRetainedAgent ?? composition)
   if (fixed.createSession !== undefined) vi.spyOn(agents, 'createSession').mockImplementation(fixed.createSession)
   return agents
 }
@@ -284,7 +287,7 @@ describe('Session fork failures', () => {
       (options: CreateAgentOptions) => Promise.resolve(resolvedHandle(ctx, options.sessionId)),
     )
     const controller = new SessionCommandController(ctx, controllerAgents(ctx, {
-      composeAgent: () => Promise.resolve({ agentPreset: 'minimal', setup: () => {} }),
+      composeRetainedAgent: () => Promise.resolve({ agentPreset: 'minimal', setup: () => {} }),
     }), '/default')
 
     const forked = await controller.fork({ sessionId: source.id })
@@ -292,6 +295,69 @@ describe('Session fork failures', () => {
     const options = create.mock.calls[0]?.[0]
     if (options === undefined) throw new Error('Agent creation was not attempted')
     expect(options.meta?.agentPreset).toBe('minimal')
+    await ctx.fiber.dispose()
+  })
+
+  it('uses a capability-owned fork placement for an isolated child directory', async () => {
+    const ctx = await baseContext()
+    ctx.provide('workspaceRegistry', { list: () => [] } as never)
+    const source = completedSession(ctx, 'isolated-source', '/source')
+    const attachSession = vi.fn().mockResolvedValue(undefined)
+    const workspace: Workspace = {
+      id: 'workspace-child' as WorkspaceId,
+      attachSession,
+    } as never
+    const create = vi.spyOn(ctx.agents, 'create').mockImplementation(
+      (options: CreateAgentOptions) => Promise.resolve(resolvedHandle(ctx, options.sessionId)),
+    )
+    const rollback = vi.fn().mockResolvedValue(undefined)
+    const placement = vi.fn().mockResolvedValue({ cwd: '/child', workspace, rollback })
+    const controller = new SessionCommandController(ctx, controllerAgents(ctx), '/default', placement)
+
+    const forked = await controller.fork({ sessionId: source.id })
+
+    expect(placement).toHaveBeenCalledWith(source.header, forked.sessionId)
+    expect(create.mock.calls[0]?.[0]?.meta?.cwd).toBe('/child')
+    expect(attachSession).toHaveBeenCalledWith(forked.sessionId)
+    expect(rollback).not.toHaveBeenCalled()
+    await ctx.fiber.dispose()
+  })
+
+  it('rolls back a capability-owned fork placement when child creation fails', async () => {
+    const ctx = await baseContext()
+    ctx.provide('workspaceRegistry', { list: () => [] } as never)
+    const source = completedSession(ctx, 'rollback-source', '/source')
+    vi.spyOn(ctx.agents, 'create').mockRejectedValue(new Error('factory failed'))
+    const rollback = vi.fn().mockResolvedValue(undefined)
+    const controller = new SessionCommandController(ctx, controllerAgents(ctx), '/default',
+      () => Promise.resolve({ cwd: '/child', rollback }))
+
+    await expectFailure(controller.fork({ sessionId: source.id }), 'gateway/internal')
+    expect(rollback).toHaveBeenCalledOnce()
+
+    rollback.mockRejectedValue(new Error('cleanup failed'))
+    const failure = controller.fork({ sessionId: source.id })
+    await expect(failure).rejects.toBeInstanceOf(AggregateError)
+    await expect(failure).rejects.toMatchObject({
+      message: `failed to fork session "${source.id}"`,
+      errors: [expect.objectContaining({ message: 'factory failed' }), expect.objectContaining({ message: 'cleanup failed' })],
+    })
+    await ctx.fiber.dispose()
+  })
+
+  it('keeps the source directory when the placement provider declines a fork', async () => {
+    const ctx = await baseContext()
+    ctx.provide('workspaceRegistry', { list: () => [] } as never)
+    const source = completedSession(ctx, 'declined-source', '/source')
+    const create = vi.spyOn(ctx.agents, 'create').mockImplementation(
+      (options: CreateAgentOptions) => Promise.resolve(resolvedHandle(ctx, options.sessionId)),
+    )
+    const controller = new SessionCommandController(ctx, controllerAgents(ctx), '/default',
+      () => Promise.resolve(undefined))
+
+    await controller.fork({ sessionId: source.id })
+
+    expect(create.mock.calls[0]?.[0]?.meta?.cwd).toBe('/source')
     await ctx.fiber.dispose()
   })
 })

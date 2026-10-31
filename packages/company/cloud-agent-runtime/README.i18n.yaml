@@ -1,0 +1,52 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/company/cloud-agent-runtime/README.md
+/:
+  en: b608fe77fce9d747
+  zh: 5e96a3293edbd2cb
+/deepseek-ai-dsh-company-cloud-agent-runtime:
+  en: 1a40f124207afb7b
+  zh: d13ce9dfb7fdbe98
+/deepseek-ai-dsh-company-cloud-agent-runtime/summary:
+  en: 699b286c584fc43f
+  zh: 72a395dbe0737fd0
+/deepseek-ai-dsh-company-cloud-agent-runtime/table-of-contents:
+  en: 62dbba223af8880e
+  zh: 15ccadd74f7b3042
+/deepseek-ai-dsh-company-cloud-agent-runtime/configuration-and-enforcement:
+  en: 956a8ede02cc0366
+  zh: 95e4189fcfd3adaa
+/deepseek-ai-dsh-company-cloud-agent-runtime/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-company-cloud-agent-runtime/model-experience/literal-persona-and-skill-list:
+  en: 6bf795b39c947096
+  zh: 4bb6432e7856ba19
+/deepseek-ai-dsh-company-cloud-agent-runtime/model-experience/literal-persona-and-skill-list/what-the-model-sees:
+  en: fabaa68e2c1c305e
+  zh: 0ca018ea909fa45e
+/deepseek-ai-dsh-company-cloud-agent-runtime/model-experience/literal-persona-and-skill-list/token-effect:
+  en: 9c4eb7ebd73c0b12
+  zh: 56812c1fcf4c3de6
+/deepseek-ai-dsh-company-cloud-agent-runtime/model-experience/literal-persona-and-skill-list/kv-cache-effect:
+  en: 4decbeea44af59d1
+  zh: f94b4042e0e1a5cc
+/deepseek-ai-dsh-company-cloud-agent-runtime/model-experience/scoped-tools-and-results:
+  en: ceb0d9833d9a7940
+  zh: fbb64483d5a703c0
+/deepseek-ai-dsh-company-cloud-agent-runtime/model-experience/scoped-tools-and-results/what-the-model-sees:
+  en: 0c5c5fb09d33859f
+  zh: 318c14a6087ff500
+/deepseek-ai-dsh-company-cloud-agent-runtime/model-experience/scoped-tools-and-results/token-effect:
+  en: 1ba629132f4ca645
+  zh: ac79ddb18b026df4
+/deepseek-ai-dsh-company-cloud-agent-runtime/model-experience/scoped-tools-and-results/kv-cache-effect:
+  en: b4362522f3e88be8
+  zh: f80f4ccf68517124
+/deepseek-ai-dsh-company-cloud-agent-runtime/known-limitations-and-deferred-work:
+  en: 47e71b2361bd821b
+  zh: 8236004b272e9588
+/deepseek-ai-dsh-company-cloud-agent-runtime/known-limitations-and-deferred-work/dev-note:
+  en: 6c0c85e0f1ae71ea
+  zh: 0b4aec2d005cbdd3

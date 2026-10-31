@@ -14,11 +14,12 @@ import {
   Button, IconFolderCloseRegular, IconPlusOutlineRegular, Menu, Modal, type MenuEntry,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
-  WorkspaceId, WorkspaceSnapshot, WorkspaceView,
+  WorkspaceId, WorkspaceView,
 } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { workspaceDisplayTitle } from '@deepseek-ai/dsh-api-workspace-controller/default-workspace'
 import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 import type { DirectoryFlowOwnerProps, WorkspacePickerProps } from './contract/slots.ts'
+import type { NavigationWorkspaceSnapshot } from './groups.ts'
 import { distinguishingPathSuffixes } from './path-suffix.ts'
 import css from './WorkspacePicker.module.css'
 
@@ -38,8 +39,8 @@ export interface WorkspacePickFlowProps {
   open: boolean
   /** The anchor button element — the popover's placement anchor. */
   anchorRef?: RefObject<HTMLElement | null> | undefined
-  /** Selector hook over the workspace list (framework standard hook). */
-  useWorkspaces: <S>(selector: (state: WorkspaceSnapshot) => S) => S
+  /** Selector hook over the workspace list (framework standard hook); logical groups that refuse new conversations list disabled. */
+  useWorkspaces: <S>(selector: (state: NavigationWorkspaceSnapshot) => S) => S
   /** Adopt a picked host directory as a real Workspace. */
   createWorkspace: (input: { path: string }) => Promise<WorkspaceView>
   /** Bound occupancy selector hook for this surface's directory-flow hole (empty leaves the surface with no add action). */
@@ -126,12 +127,14 @@ export function WorkspacePickFlow({
       id: workspace.workspaceId,
       title: workspaceDisplayTitle(workspace.title, defaultWorkspaceName),
       path: workspace.path,
+      startable: workspace.navigationStartable !== false,
     }))
-    const suffixes = distinguishingPathSuffixes(rows)
+    // Logical groups carry no directory to tell apart; only physical rows take path suffixes.
+    const suffixes = distinguishingPathSuffixes(rows.filter(row => row.path !== ''))
     return rows.map(row => ({ ...row, suffix: suffixes.get(row.id) }))
   }, [pinAdd, workspaces, defaultWorkspaceName])
   const items: MenuEntry[] = pinAdd
-    ? listed.map(({ id, title, path, suffix }) => ({
+    ? listed.map(({ id, title, path, suffix, startable }) => ({
       id,
       // The title gives way first, so the suffix that tells the rows apart
       // stays visible; the native tooltip carries the full path.
@@ -145,7 +148,8 @@ export function WorkspacePickFlow({
           </span>
         ),
       icon: <IconFolderCloseRegular size={16} />,
-      disabled: flowBusy,
+      // An unavailable logical group stays listed (it still owns its Sessions) but cannot be a target.
+      disabled: flowBusy || !startable,
     }))
     : addEntries
   // Nothing listed and nothing to add with (a composition that mounts this
@@ -267,19 +271,25 @@ export function WorkspacePicker({
   onClose,
   createWorkspace,
   useDirectoryFlow,
+  useNavigationWorkspaces,
   renderSlot,
   t,
 }: WorkspacePickerProps) {
+  // The owner names a physical Workspace; when a logical group lists that
+  // Workspace's Sessions instead, the group row carries the check.
+  const selectedSessions = useWorkspaces(snapshot => snapshot.items.find(item => item.workspaceId === selectedId)?.sessionIds)
+  const navigationSelectedId = useNavigationWorkspaces(snapshot => snapshot.items.find(item => item.workspaceId === selectedId
+    || (item.navigationGroup !== undefined && selectedSessions?.some(id => item.sessionIds.includes(id)) === true))?.workspaceId)
   return (
     <WorkspacePickFlow
       t={t}
       open={open}
       anchorRef={anchorRef}
-      useWorkspaces={useWorkspaces}
+      useWorkspaces={useNavigationWorkspaces}
       createWorkspace={createWorkspace}
       useDirectoryFlow={useDirectoryFlow}
       renderDirectoryFlow={owner => renderSlot('conversation.hero.workspace.directoryFlow', owner)}
-      selectedId={selectedId}
+      selectedId={navigationSelectedId ?? selectedId}
       onPick={onPick}
       onClose={onClose}
     />

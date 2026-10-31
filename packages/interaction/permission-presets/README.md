@@ -84,6 +84,8 @@ The observable behavior is covered in [Use this package](#use-this-package); thi
 
 `set()` resolves the preset and synchronously runs Auto admission when applicable. Transitions append `permission/preset` only when the effective preset changes, then write each changed knob through its canonical setter — `setSandboxMode` from `dsh-sandbox-policy` and `setApprovalPolicy` from `dsh-user-approval`. The selection event therefore preserves user intent when two presets share a bundle. Switching between Auto and Full access records the new identity and the changed approval policy. A net-zero selection appends nothing.
 
+`registerGuard(guard)` installs a synchronous capability validator for `set()` and `/permission <preset>`. A rejection appends no permission or knob events. Register its returned disposer through the contributing plugin’s effect; unloading removes that capability’s admission rule.
+
 ### Read side and `custom`
 
 `current(session)` reads the required `permissions` projection, whose unit folds the three whole-value knob events over the composition defaults (`ctx.shell.sandboxMode` and the approval config). The host state also retains whether `session/end-seed` has occurred, so session pinning distinguishes an explicitly empty restored seed from a genuinely fresh session without rescanning the log. A still-matching last selection wins shared-bundle ties, and a recorded Auto selection also matches the `never` approval policy; otherwise the first configured match wins; otherwise the derived `CUSTOM_PRESET` is returned. The service acquires its state reader during activation.
