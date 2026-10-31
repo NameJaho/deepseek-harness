@@ -4,6 +4,7 @@ import { brandString } from '@deepseek-ai/dsh-brand'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { CompanyMcpId } from '@deepseek-ai/dsh-company-mcp-provider/types'
 import type { CloudAgentService } from './index.ts'
+import { unavailableCapability } from './capabilities.ts'
 import type { CloudAgentDraft, CloudAgentId, CloudAgentReleaseId } from './types.ts'
 
 /** Register draft authoring with no shell, project, credentials or code-plugin inputs.
@@ -58,7 +59,9 @@ export function registerAuthoringTool(ctx: Context, service: CloudAgentService):
       })
       if (args.action === 'discover') {
         if (args.serverId === undefined) throw new Error('discover requires serverId from catalog')
-        return JSON.stringify(await ctx.companyMcpProvider.discover(brandString<CompanyMcpId>(args.serverId), execution.signal))
+        const provider = ctx.get('companyMcpProvider')
+        if (provider === undefined) throw unavailableCapability(args.serverId)
+        return JSON.stringify(await provider.discover(brandString<CompanyMcpId>(args.serverId), execution.signal))
       }
       if (args.action === 'save') {
         if (args.name === undefined || args.instructions === undefined) throw new Error('save requires name and complete instructions')
@@ -72,14 +75,10 @@ export function registerAuthoringTool(ctx: Context, service: CloudAgentService):
           skills: args.skills ?? base?.skills ?? [],
           ...args.knowledgeSources === undefined && base?.knowledgeSources === undefined ? {}
             : { knowledgeSources: args.knowledgeSources ?? base?.knowledgeSources ?? [] } }
-        for (const name of draft.mcpTools ?? []) if (await ctx.companyMcpProvider.resolveTool(name) === undefined) {
-          throw new Error('Select an available MCP tool from catalog or discovery')
-        }
         if (draft.skills?.some(name => !catalog.capabilities.skills.some(skill => skill.name === name))) throw new Error('Select installed skills from catalog')
         if (draft.knowledgeSources?.some(id => catalog.capabilities.knowledgeSources?.some(source => source.id === id) !== true) === true) {
           throw new Error('Select knowledge source ids from catalog')
         }
-        for (const id of draft.mcpServers ?? []) await ctx.companyMcpProvider.discoverTools(id)
         const saved = await service.saveFromConversation(agent, String(execution.callId), draft,
           args.agentId === undefined ? undefined : brandString<CloudAgentId>(args.agentId), args.expectedRevision)
         return JSON.stringify({ action: 'saved', id: saved.id, revision: saved.revision, draft: saved.draft,

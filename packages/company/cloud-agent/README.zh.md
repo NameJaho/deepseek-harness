@@ -32,7 +32,7 @@ kind: "package-bundle"
 <a id="ownership-and-execution"></a>
 ## 所有权与执行
 
-目录返回本人草稿、当前公开或本人拥有的 release，以及仅属于调用者的对话。公开条目不包含其他所有者的来源 Session 审计。新 usage Session 属于启动它的用户而非发布者，并绑定精确 release id。撤回、可见范围变化、新发布或删除后，已有 Session 保留原所有者与 release。使用条目显示 `available`、`updated`、`disabled`、`withdrawn`、`access-lost` 或 `deleted`；这些状态不会重定向已有 Session。
+目录返回本人草稿、当前公开或本人拥有的 release，以及仅属于调用者的对话。公开条目不包含其他所有者的来源 Session 审计。新 usage Session 属于启动它的用户而非发布者，并绑定精确 release id。撤回、可见范围变化、新发布或删除后，已有 Session 保留原所有者与 release。使用条目显示 `available`、`updated`、`disabled`、`withdrawn`、`access-lost` 或 `deleted`；这些状态不会重定向已有 Session。知识来源缺失或空间授权变化也会使使用条目显示 `disabled`；执行需要重新审核并发布 release。
 
 `creationPreset` 和 `runPreset` 必须可选。创建在编辑器中挂载所选 preset。usage Session 只挂载其保留的 release preset：`runPreset` 仅验证并记录，不挂载，因此不能增加工具或权限。可选 provider/model 覆盖值会经过验证。绑定审计记录创建/运行 preset，以及包含 release、run preset、实际模型和强制 `read-only` 权限的生效摘要。运行时只提供批准的 MCP 工具、批准的知识库检索、固定技能、可下载文本报告和本对话文件读取；见[运行时](../cloud-agent-runtime/README.zh.md)。
 

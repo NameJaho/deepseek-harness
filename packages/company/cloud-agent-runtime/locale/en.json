@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Cloud agent runtime",
+    "description": "Run published agents with pinned instructions and only their approved capabilities."
+  }
+}

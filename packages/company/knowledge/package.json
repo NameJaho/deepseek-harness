@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-company-knowledge",
-  "version": "0.2.1-alpha.3",
+  "version": "0.2.2-alpha.2",
   "private": true,
   "description": "Approved company knowledge search over an external HTTP retrieval service",
   "type": "module",
@@ -17,8 +17,7 @@
       "default": "./lib/client.js"
     },
     "./types": {
-      "types": "./lib/types/types.d.ts",
-      "default": "./lib/types/types.js"
+      "types": "./lib/types/types.d.ts"
     },
     "./typert": {
       "types": "./lib/typert.host.d.ts",
@@ -30,13 +29,14 @@
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./src/*": "./src/*",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
   "files": [
-    "cordis.patch.yml",
+    "locale/*.json",
     "lib/index.js",
     "lib/client.js",
-    "lib/types/**/*.js",
+    "cordis.patch.yml",
     "lib/types/**/*.d.ts",
     "lib/typert.host.js",
     "lib/typert.host.d.ts",
@@ -61,15 +61,14 @@
   },
   "dependencies": {
     "@deepseek-ai/dsh-brand": "workspace:*",
-    "@deepseek-ai/dsh-timeout": "workspace:*",
     "@deepseek-ai/schemastery": "workspace:~",
-    "zod": "4.4.3"
+    "zod": "4.4.3",
+    "@deepseek-ai/dsh-typert-protocol": "workspace:*"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
-    "@deepseek-ai/dsh-company-wecom-auth": "workspace:*",
     "@deepseek-ai/dsh-credentials": "workspace:*",
-    "@deepseek-ai/dsh-typert-protocol": "workspace:*"
+    "@deepseek-ai/dsh-timeout": "workspace:*"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
@@ -82,9 +81,10 @@
     "@deepseek-ai/dsh-client-ui-slots": "workspace:*",
     "@deepseek-ai/dsh-company-wecom-auth": "workspace:*",
     "@deepseek-ai/dsh-credentials": "workspace:*",
-    "@deepseek-ai/dsh-typert-protocol": "workspace:*",
     "@testing-library/react": "^16.3.3",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "@deepseek-ai/dsh-timeout": "workspace:*",
+    "@deepseek-ai/dsh-api-remote-access": "workspace:*"
   }
 }

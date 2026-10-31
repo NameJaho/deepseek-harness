@@ -224,6 +224,8 @@ export class CloudAgentService extends TypertRemoteService {
       .filter(item => item.deletedAt === undefined && (item.ownerId ?? 'local-owner') === ownerId
         && this.allowsSession(item.sessionId))
     const servers = (await this.owner.get('companyMcpProvider')?.catalog())?.servers ?? []
+    const knowledge = this.owner.get('companyKnowledge')
+    const knowledgeGrants = new Map(knowledge?.sources().map(source => [source.id, knowledge.binding(source.id).fingerprint]))
     const used = new Map<CloudAgentId, CloudAgentConversation>()
     for (const conversation of conversations) if (conversation.role === 'usage' && conversation.agentId !== null) {
       used.set(conversation.agentId, conversation)
@@ -236,7 +238,8 @@ export class CloudAgentService extends TypertRemoteService {
         : release === undefined ? 'withdrawn' : !this.visible(record, release, ownerId) ? 'access-lost'
           : (release.definition.mcpServers ?? []).some(id => !servers.some(server => server.id === id && server.enabled && server.status === 'available'))
             || (release.mcpBindings ?? []).some(tool => !servers.some(server => server.enabled && server.status === 'available'
-              && server.tools.some(current => current.name === tool.name && current.fingerprint === tool.fingerprint))) ? 'disabled'
+              && server.tools.some(current => current.name === tool.name && current.fingerprint === tool.fingerprint)))
+            || (release.knowledgeBindings ?? []).some(binding => knowledgeGrants.get(binding.id) !== binding.fingerprint) ? 'disabled'
             : release.id !== binding.releaseId ? 'updated' : 'available'
       return { agentId, ownerId: record?.ownerId ?? brandString<CloudAgentOwnerId>('local-owner'),
         name: bound?.definition.name ?? 'Cloud Agent', status,

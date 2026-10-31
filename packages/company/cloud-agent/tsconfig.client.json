@@ -7,12 +7,10 @@
   },
   "include": [
     "src/client",
-    "src/css-modules.d.ts"
+    "src/css-modules.d.ts",
+    "src/types.ts"
   ],
   "references": [
-    {
-      "path": "./tsconfig.host.json"
-    },
     {
       "path": "../../../vendor/cordis"
     },
@@ -40,18 +38,41 @@
     {
       "path": "../../client/ui-sidebar"
     },
-    { "path": "../../client/ui-sidebar-right" },
+    {
+      "path": "../../client/ui-sidebar-right"
+    },
     {
       "path": "../../client/ui-slots"
     },
     {
       "path": "../../client/ui-workspace"
     },
-    { "path": "../../client/ui-conversation/tsconfig.client.json" },
-    { "path": "../../client/ui-tool" },
-    { "path": "../../client/ui-plugin-manager/tsconfig.client.json" },
-    { "path": "../mcp-provider/tsconfig.json" },
-    { "path": "../../preset/agent-preset-registry" },
-    { "path": "../../util/brand" }
+    {
+      "path": "../../client/ui-conversation/tsconfig.client.json"
+    },
+    {
+      "path": "../../client/ui-tool"
+    },
+    {
+      "path": "../../client/ui-plugin-manager/tsconfig.client.json"
+    },
+    {
+      "path": "../mcp-provider/tsconfig.json"
+    },
+    {
+      "path": "../../preset/agent-preset-registry"
+    },
+    {
+      "path": "../../util/brand"
+    },
+    {
+      "path": "../knowledge/tsconfig.client.json"
+    },
+    {
+      "path": "../../api/session-controller/tsconfig.client.json"
+    },
+    {
+      "path": "../../core/session"
+    }
   ]
 }

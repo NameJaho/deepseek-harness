@@ -436,8 +436,11 @@ it('publishes knowledge-only releases without an MCP provider and rejects foreig
   await expect(f.ctx.cloudAgents.searchKnowledge(agent, releaseId, 'foreign', 'Question', new AbortController().signal))
     .rejects.toMatchObject({ code: 'cloud-agent/capability-unavailable' })
   expect(search).toHaveBeenCalledOnce()
+  expect((await f.ctx.cloudAgents.catalog()).usage[0]?.status).toBe('available')
   await knowledgeFiber.dispose()
+  expect((await f.ctx.cloudAgents.catalog()).usage[0]?.status).toBe('disabled')
   await f.ctx.plugin(Knowledge, KnowledgeConfig({ sources: [{ ...sources[0]!, spaceIds: ['changed'] }] }))
+  expect((await f.ctx.cloudAgents.catalog()).usage[0]?.status).toBe('disabled')
   await expect(f.ctx.cloudAgents.validateCapabilities(releaseId)).rejects.toMatchObject({ code: 'company-knowledge/binding-changed' })
   await expect(f.ctx.cloudAgents.searchKnowledge(agent, releaseId, 'operations', 'Question', new AbortController().signal))
     .rejects.toMatchObject({ code: 'company-knowledge/binding-changed' })
@@ -447,4 +450,18 @@ it('refuses selected MCP tools when no MCP provider is mounted', async (test) =>
   const f = await fixture(test, undefined, [], false)
   const editor = await f.editor()
   await expect(f.ctx.cloudAgents.create(f.draft, editor)).rejects.toMatchObject({ code: 'cloud-agent/capability-unavailable' })
+})
+
+it('reports unavailable MCP discovery in a knowledge-only deployment and validates saved capabilities in the service', async (test) => {
+  const f = await fixture(test, undefined, [], false)
+  const editor = await f.editor()
+  const agent = f.agents.get(editor)!
+  const tool = f.ctx.tools.get('cloud_agent')!
+  const execution = { agent, callId: 'draft-no-mcp', signal: new AbortController().signal } as ToolRunContext
+  await expect(tool.execute({ action: 'discover', serverId: 'sales' }, execution))
+    .rejects.toMatchObject({ code: 'cloud-agent/capability-unavailable' })
+  await expect(tool.execute({ action: 'save', name: 'Sales', instructions: 'Use approved evidence.', mcpTools: ['mcp__sales__ping'] }, execution))
+    .rejects.toMatchObject({ code: 'cloud-agent/capability-unavailable' })
+  await expect(tool.execute({ action: 'save', name: 'Knowledge only', instructions: 'Use approved evidence.' }, execution))
+    .resolves.toContain('"action":"saved"')
 })

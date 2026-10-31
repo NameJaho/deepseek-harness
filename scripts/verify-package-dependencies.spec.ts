@@ -253,8 +253,8 @@ describe('package dependency scope', () => {
       .toEqual(['generatedWorktreeName'])
     expect(PACKAGE_DEPENDENCY_POLICY.peerRequiredHostExports['@deepseek-ai/dsh-fs']).toEqual(['FsError'])
     expect(PACKAGE_DEPENDENCY_POLICY.peerRequiredHostExports['@deepseek-ai/dsh-session'])
-      .toEqual(['SESSION_FORMAT_VERSION', 'appendPluginRecord', 'pluginRecordOf'])
-    expect(PACKAGE_DEPENDENCY_POLICY.peerRequiredHostExports['@deepseek-ai/dsh-timeout']).toEqual(['deadline'])
+      .toEqual(['SESSION_FORMAT_VERSION', 'SessionLogOffset', 'appendPluginRecord', 'pluginRecordOf'])
+    expect(PACKAGE_DEPENDENCY_POLICY.peerRequiredHostExports['@deepseek-ai/dsh-timeout']).toEqual(['deadline', 'timeoutOf'])
   })
 
   it('discovers the Client directory, dsh.client declarations, and configured Host packages', () => {

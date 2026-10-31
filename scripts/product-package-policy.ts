@@ -20,7 +20,7 @@ export const PRODUCT_PACKAGE_POLICY: Readonly<Record<string, ProductPackagePolic
   'packages/company/wecom-auth': { category: 'optional', reason: 'Deployment-selected company login and member resource authorization.' },
   'packages/company/mcp-provider': { category: 'optional', reason: 'Company MCP gateway requires explicit private deployment configuration.' },
   'packages/company/knowledge': { category: 'optional', reason: 'Company knowledge retrieval requires explicit private source configuration.' },
-  'packages/company/cloud-agent': { category: 'optional', reason: 'Company Agent publication and Web UI require an explicitly mounted MCP provider.' },
+  'packages/company/cloud-agent': { category: 'optional', reason: 'Company Agent publication and Web UI require explicit deployment configuration.' },
   'packages/company/cloud-agent-runtime': { category: 'optional', reason: 'Scoped runtime mounted only by company Agent retained presets.' },
   'packages/company/external-agent-subagent': { category: 'optional', reason: 'External Agent delegation requires explicit logical agents and credential references.' },
   'packages/browser-use/browser-use': { category: 'optional', reason: 'Service definition used by explicitly selected browser providers.' },

@@ -9,7 +9,7 @@ kind: "package-group"
 
 ## 概述
 
-本组包含企业部署 Web profile 时使用的集成。企微登录识别成员并隔离其 Workspace，MCP 提供方是访问企业 MCP 工具的唯一路径，知识服务是访问已批准知识空间的唯一路径，Cloud Agent 基于这些工具和来源发布可复用的 Agent，外部 Agent 提供方把任务委派给 Dify 应用。各包 README 负责说明自己的配置和约定；它们都不属于默认 profile。
+本组包含企业部署 Web profile 时使用的集成。企微登录识别成员并隔离其 Workspace，MCP 提供方是访问企业 MCP 工具的唯一路径，知识服务是访问已批准知识空间的唯一路径，Cloud Agent 基于这些工具和来源发布可复用的 Agent，外部 Agent 提供方把任务委派给 Dify 应用。各包 README 负责说明自己的配置和约定；它们都不属于默认 profile。这些私有 workspace 包从源码部署，不参与公开 npm 发布。
 
 ## 目录
 

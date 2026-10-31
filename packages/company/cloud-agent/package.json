@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-company-cloud-agent",
-  "version": "0.2.1-alpha.3",
+  "version": "0.2.2-alpha.2",
   "private": true,
   "description": "Company Cloud Agent drafts, immutable releases, public directory and isolated per-session execution",
   "type": "module",
@@ -17,8 +17,7 @@
       "default": "./lib/client.js"
     },
     "./types": {
-      "types": "./lib/types/types.d.ts",
-      "default": "./lib/types/types.js"
+      "types": "./lib/types/types.d.ts"
     },
     "./typert": {
       "types": "./lib/typert.host.d.ts",
@@ -30,7 +29,8 @@
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./src/*": "./src/*",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
   "dsh": {
     "bundle": {
@@ -56,8 +56,6 @@
   "dependencies": {
     "@deepseek-ai/dsh-brand": "workspace:*",
     "@deepseek-ai/dsh-company-cloud-agent-runtime": "workspace:*",
-    "@deepseek-ai/dsh-company-knowledge": "workspace:*",
-    "@deepseek-ai/dsh-company-mcp-provider": "workspace:*",
     "@deepseek-ai/dsh-compaction-basic": "workspace:*",
     "@deepseek-ai/dsh-compaction-tool-result-pruner": "workspace:*",
     "@deepseek-ai/dsh-typert-protocol": "workspace:*",
@@ -66,21 +64,11 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
-    "@deepseek-ai/dsh-agent": "workspace:*",
-    "@deepseek-ai/dsh-agent-preset-registry": "workspace:*",
-    "@deepseek-ai/dsh-api-session-controller": "workspace:*",
-    "@deepseek-ai/dsh-api-remote-access": "workspace:*",
-    "@deepseek-ai/dsh-attachment": "workspace:*",
-    "@deepseek-ai/dsh-commands": "workspace:*",
-    "@deepseek-ai/dsh-llm": "workspace:*",
-    "@deepseek-ai/dsh-permission-presets": "workspace:*",
     "@deepseek-ai/dsh-session": "workspace:*",
-    "@deepseek-ai/dsh-session-projection": "workspace:*",
-    "@deepseek-ai/dsh-skill": "workspace:*",
-    "@deepseek-ai/dsh-workspace": "workspace:*",
     "@deepseek-ai/dsh-scope": "workspace:*",
     "@deepseek-ai/dsh-storage-domain": "workspace:*",
-    "@deepseek-ai/dsh-tools": "workspace:*"
+    "@deepseek-ai/dsh-tools": "workspace:*",
+    "@deepseek-ai/dsh-company-mcp-provider": "workspace:*"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-company-wecom-auth": "workspace:*",
@@ -122,13 +110,15 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "@deepseek-ai/dsh-permission-presets": "workspace:*",
-    "@deepseek-ai/dsh-client-ui-permission-presets": "workspace:*"
+    "@deepseek-ai/dsh-client-ui-permission-presets": "workspace:*",
+    "@deepseek-ai/dsh-company-knowledge": "workspace:*",
+    "@deepseek-ai/dsh-company-mcp-provider": "workspace:*"
   },
   "files": [
-    "cordis.patch.yml",
+    "locale/*.json",
     "lib/index.js",
     "lib/client.js",
-    "lib/types/**/*.js",
+    "cordis.patch.yml",
     "lib/types/**/*.d.ts",
     "lib/typert.host.js",
     "lib/typert.host.d.ts",

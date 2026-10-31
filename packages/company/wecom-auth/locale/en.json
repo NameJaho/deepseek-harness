@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Company sign-in",
+    "description": "Authenticate company members through WeCom or a trusted identity gateway and isolate their resources."
+  }
+}

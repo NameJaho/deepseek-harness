@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-This group holds integrations for a company deployment of the Web profile. WeCom login identifies members and isolates their Workspaces, the MCP provider is the only path to company MCP tools, the knowledge service is the only path to approved knowledge spaces, Cloud Agent publishes reusable agents built on those tools and sources, and the external agent provider delegates tasks to Dify apps. Each package README owns its configuration and contracts; none is part of a default profile.
+This group holds integrations for a company deployment of the Web profile. WeCom login identifies members and isolates their Workspaces, the MCP provider is the only path to company MCP tools, the knowledge service is the only path to approved knowledge spaces, Cloud Agent publishes reusable agents built on those tools and sources, and the external agent provider delegates tasks to Dify apps. Each package README owns its configuration and contracts; none is part of a default profile. These private workspace packages deploy from source and do not join the public npm release.
 
 ## Table of Contents
 

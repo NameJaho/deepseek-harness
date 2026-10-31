@@ -7211,12 +7211,6 @@ importers:
       '@deepseek-ai/dsh-company-cloud-agent-runtime':
         specifier: workspace:*
         version: link:../cloud-agent-runtime
-      '@deepseek-ai/dsh-company-knowledge':
-        specifier: workspace:*
-        version: link:../knowledge
-      '@deepseek-ai/dsh-company-mcp-provider':
-        specifier: workspace:*
-        version: link:../mcp-provider
       '@deepseek-ai/dsh-typert-protocol':
         specifier: workspace:*
         version: link:../../typert/protocol
@@ -7299,6 +7293,12 @@ importers:
       '@deepseek-ai/dsh-commands':
         specifier: workspace:*
         version: link:../../interaction/commands
+      '@deepseek-ai/dsh-company-knowledge':
+        specifier: workspace:*
+        version: link:../knowledge
+      '@deepseek-ai/dsh-company-mcp-provider':
+        specifier: workspace:*
+        version: link:../mcp-provider
       '@deepseek-ai/dsh-company-wecom-auth':
         specifier: workspace:*
         version: link:../wecom-auth
@@ -7451,9 +7451,9 @@ importers:
       '@deepseek-ai/dsh-brand':
         specifier: workspace:*
         version: link:../../util/brand
-      '@deepseek-ai/dsh-timeout':
+      '@deepseek-ai/dsh-typert-protocol':
         specifier: workspace:*
-        version: link:../../util/timeout
+        version: link:../../typert/protocol
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
@@ -7464,6 +7464,9 @@ importers:
       '@deepseek-ai/cordis':
         specifier: workspace:~
         version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-api-remote-access':
+        specifier: workspace:*
+        version: link:../../api/remote-access
       '@deepseek-ai/dsh-api-remotes':
         specifier: workspace:*
         version: link:../../api/remotes
@@ -7491,9 +7494,9 @@ importers:
       '@deepseek-ai/dsh-credentials':
         specifier: workspace:*
         version: link:../../credentials/credentials
-      '@deepseek-ai/dsh-typert-protocol':
+      '@deepseek-ai/dsh-timeout':
         specifier: workspace:*
-        version: link:../../typert/protocol
+        version: link:../../util/timeout
       '@testing-library/react':
         specifier: ^16.3.3
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)

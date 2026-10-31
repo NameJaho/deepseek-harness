@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-company-cloud-agent-runtime",
-  "version": "0.2.1-alpha.3",
+  "version": "0.2.2-alpha.2",
   "private": true,
   "description": "Scoped literal Cloud Agent prompts and release-scoped tool policies",
   "type": "module",
@@ -13,7 +13,8 @@
       "default": "./lib/index.js"
     },
     "./src/*": "./src/*",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
   "scripts": {
     "bundle": "tsdown"
@@ -38,8 +39,8 @@
     "@deepseek-ai/dsh-tools": "workspace:*"
   },
   "files": [
+    "locale/*.json",
     "lib/index.js",
-    "lib/types/**/*.js",
     "lib/types/**/*.d.ts"
   ]
 }

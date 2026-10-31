@@ -1,7 +1,6 @@
 /** Company knowledge sources, test search and retrieved evidence. */
 import { useState } from 'react'
 import { Button, StateDot, Tag, useClipboardCopy } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { TagTone } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { CompanyKnowledgeHit, CompanyKnowledgeSource } from '../types.ts'
 import type { KnowledgeFailure, KnowledgeInjected, KnowledgeOutcome, KnowledgeSourceStatus } from './controller.ts'
@@ -19,14 +18,13 @@ const failureCopy: Record<Exclude<KnowledgeFailure, 'load'>, readonly [Knowledge
   timeout: ['timeoutTitle', 'timeoutBody'],
   changed: ['changedTitle', 'changedBody'],
 }
-const statusTones: Record<KnowledgeSourceStatus['kind'], TagTone> = { found: 'success', empty: 'warning', failed: 'danger' }
 
 function SourceStatus({ status, t }: { readonly status: KnowledgeSourceStatus | undefined; readonly t: Translate }) {
   if (status === undefined) return <Tag tone="quiet">{t('statusNotTested')}</Tag>
   switch (status.kind) {
-    case 'found': return <Tag tone={statusTones.found}>{t('statusFound', { count: String(status.hits) })}</Tag>
-    case 'empty': return <Tag tone={statusTones.empty}>{t('statusEmpty')}</Tag>
-    case 'failed': return <Tag tone={statusTones.failed}>{t('statusFailed')}</Tag>
+    case 'found': return <Tag tone="success">{t('statusFound', { count: String(status.hits) })}</Tag>
+    case 'empty': return <Tag tone="warning">{t('statusEmpty')}</Tag>
+    case 'failed': return <Tag tone="danger">{t('statusFailed')}</Tag>
   }
 }
 
