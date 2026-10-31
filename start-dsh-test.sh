@@ -78,32 +78,62 @@ if ! command -v corepack > /dev/null 2>&1; then
   exit 1
 fi
 
-# 只停止本脚本 PID 文件记录的进程组；其他服务占用端口时如实报错，不越权终止。
-process_group_of() {
-  ps -o pgid= -p "$1" 2> /dev/null | tr -d ' '
+# Stop every process owned by this checkout and test profile before starting a
+# replacement. The PID file is only one discovery path: an interrupted shell
+# or a manual restart can leave the listener alive without a current PID file.
+process_descendants() {
+  local pid="$1" child
+  for child in $(pgrep -P "$pid" 2> /dev/null || true); do
+    process_descendants "$child"
+  done
+  printf '%s\n' "$pid"
 }
 
-stop_recorded_process() {
-  local pid="$1" signal="$2" pgid
-  pgid="$(process_group_of "$pid")"
-  if [[ "$pgid" =~ ^[0-9]+$ && "$pgid" == "$pid" ]]; then
-    kill -"$signal" -- -"$pgid" 2> /dev/null || true
-  else
-    kill -"$signal" "$pid" 2> /dev/null || true
+stop_process_tree() {
+  local root="$1" member alive attempt
+  local members=()
+  while read -r member; do
+    [[ "$member" =~ ^[0-9]+$ ]] && members+=("$member")
+  done < <(process_descendants "$root")
+  ((${#members[@]} > 0)) || return 0
+
+  for member in "${members[@]}"; do kill -TERM "$member" 2> /dev/null || true; done
+  for (( attempt = 0; attempt < DSH_STOP_TIMEOUT_SECONDS * 2; attempt++ )); do
+    alive=0
+    for member in "${members[@]}"; do
+      if kill -0 "$member" 2> /dev/null; then alive=1; break; fi
+    done
+    (( alive == 0 )) && return 0
+    sleep 0.5
+  done
+
+  printf '旧服务未能在 %s 秒内退出，正在终止其剩余进程\n' "$DSH_STOP_TIMEOUT_SECONDS" >&2
+  for member in "${members[@]}"; do kill -KILL "$member" 2> /dev/null || true; done
+  for (( attempt = 0; attempt < 20; attempt++ )); do
+    alive=0
+    for member in "${members[@]}"; do
+      if kill -0 "$member" 2> /dev/null; then alive=1; break; fi
+    done
+    (( alive == 0 )) && return 0
+    sleep 0.5
+  done
+  return 1
+}
+
+process_command() {
+  ps -p "$1" -o args= 2> /dev/null || true
+}
+
+listener_pids() {
+  if command -v lsof > /dev/null 2>&1; then
+    lsof -tiTCP:"$DSH_PORT" -sTCP:LISTEN 2> /dev/null || true
+  elif command -v ss > /dev/null 2>&1; then
+    ss -Hlnpt "sport = :$DSH_PORT" 2> /dev/null \
+      | sed -nE 's/.*pid=([0-9]+).*/\1/p' | sort -u
   fi
 }
 
-recorded_process_alive() {
-  local pid="$1" pgid
-  pgid="$(process_group_of "$pid")"
-  if [[ "$pgid" =~ ^[0-9]+$ && "$pgid" == "$pid" ]]; then
-    kill -0 -- -"$pgid" 2> /dev/null
-  else
-    kill -0 "$pid" 2> /dev/null
-  fi
-}
-
-stop_previous() {
+stop_pid_file_process() {
   local pid
   [[ -f "$DSH_PID_FILE" ]] || return 0
   read -r pid < "$DSH_PID_FILE" || true
@@ -113,23 +143,44 @@ stop_previous() {
     return 0
   fi
   local command_line
-  command_line="$(ps -p "$pid" -o args= 2> /dev/null || true)"
+  command_line="$(process_command "$pid")"
   if [[ "$command_line" != *"$DSH_REPO"* ]]; then
     printf 'PID 文件指向的进程不属于本仓库，拒绝终止：%s\n' "$pid" >&2
     exit 1
   fi
   printf '正在停止旧服务 PID：%s\n' "$pid"
-  stop_recorded_process "$pid" TERM
-  local attempt
-  for (( attempt = 0; attempt < DSH_STOP_TIMEOUT_SECONDS * 2; attempt++ )); do
-    recorded_process_alive "$pid" || { rm -f "$DSH_PID_FILE"; return 0; }
-    sleep 0.5
-  done
-  printf '旧服务未能在 %s 秒内停止，拒绝启动新服务：%s\n' "$DSH_STOP_TIMEOUT_SECONDS" "$pid" >&2
-  exit 1
+  stop_process_tree "$pid" || { printf '旧服务进程未能退出，拒绝启动新服务\n' >&2; exit 1; }
+  rm -f "$DSH_PID_FILE"
 }
 
-stop_previous
+stop_profile_processes() {
+  local pid command_line
+  while read -r pid command_line; do
+    [[ "$pid" =~ ^[0-9]+$ && "$command_line" == *"$DSH_REPO"* ]] || continue
+    [[ "$command_line" == *"--profile $DSH_PROFILE"* ]] || continue
+    [[ "$pid" == "$$" ]] && continue
+    printf '正在停止遗留服务进程 PID：%s\n' "$pid"
+    stop_process_tree "$pid" || { printf '遗留服务进程未能退出，拒绝启动新服务：%s\n' "$pid" >&2; exit 1; }
+  done < <(ps -axo pid=,args= 2> /dev/null)
+}
+
+stop_listener_processes() {
+  local pid command_line
+  while read -r pid; do
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    command_line="$(process_command "$pid")"
+    if [[ "$command_line" != *"$DSH_REPO"* ]]; then
+      printf '端口 %s 被其他进程占用：%s\n' "$DSH_PORT" "$command_line" >&2
+      exit 1
+    fi
+    printf '正在停止监听端口 %s 的旧进程 PID：%s\n' "$DSH_PORT" "$pid"
+    stop_process_tree "$pid" || { printf '端口 %s 的旧进程未能退出，拒绝启动新服务\n' "$DSH_PORT" >&2; exit 1; }
+  done < <(listener_pids)
+}
+
+stop_pid_file_process
+stop_profile_processes
+stop_listener_processes
 
 port_in_use() {
   if command -v ss > /dev/null 2>&1; then
