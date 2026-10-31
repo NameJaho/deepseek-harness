@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for mcp-market.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/company/mcp-market.md
+/:
+  en: 78439039fb208ebd
+  zh: 1b4ed0f135b64d2f
+/mcp-market-integration:
+  en: 4cb43e70036142f5
+  zh: 0cd1bbba94efa9c7
+/mcp-market-integration/summary:
+  en: 61db166368a4b9dd
+  zh: e4838efbc4596843
+/mcp-market-integration/table-of-contents:
+  en: ab04448d820e703e
+  zh: edab89edd54200bf
+/mcp-market-integration/identity-and-service-authentication:
+  en: 831acf117f80719d
+  zh: f5e470d6d7189a80
+/mcp-market-integration/internal-routes:
+  en: ffcb5dc7bcade063
+  zh: fe9420b0bbf78f6b
+/mcp-market-integration/invocation-checks:
+  en: e18a8ce7704605f6
+  zh: 3e207fb0c62f8e32
+/mcp-market-integration/deployment-and-verification:
+  en: 34a78492a5a00d9c
+  zh: e11d2ce84477098c
+/mcp-market-integration/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

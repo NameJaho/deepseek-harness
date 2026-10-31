@@ -6,6 +6,8 @@ import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/c
 import type {
   WorkspaceId, WorkspaceSnapshot, WorkspaceView,
 } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { NavigationWorkspaceSnapshot } from '../src/client/groups.ts'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import { allowAllAccess, bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
@@ -107,6 +109,7 @@ function mount(
       onClose={onClose}
       createWorkspace={createWorkspace}
       useDirectoryFlow={occupancy.useDirectoryFlow}
+      useNavigationWorkspaces={hook(workspaceState(nextItems))}
       renderSlot={renderSlot}
       t={t}
     />
@@ -125,6 +128,56 @@ function chooseAdd(): void {
 }
 
 describe('WorkspacePicker', () => {
+  it('uses logical navigation groups when the host contributes them', () => {
+    const onPick = vi.fn()
+    const physical = workspaceState([workspace('physical-a', '门店盘点数据分析师'), workspace('physical-b', '门店盘点数据分析师')])
+    const logical: NavigationWorkspaceSnapshot = {
+      ...physical,
+      items: [{ ...workspace('agent:one', '门店盘点数据分析师'), navigationGroup: 'agent:one' }],
+    }
+    const { probe, renderSlot } = flowProbe()
+    render(<WorkspacePicker
+      open anchorRef={anchor()} useSessions={hook(sessions)} useSessionStatus={hook(noPendingInteraction)}
+      useSessionRetainInfo={() => undefined} usePanelInfo={usePanelInfo} useResource={useResource}
+      {...allowAllAccess} useWorkspaces={hook(physical)} useNavigationWorkspaces={hook(logical)}
+      onPick={onPick} onClose={vi.fn()} createWorkspace={vi.fn()}
+      useDirectoryFlow={occupancySource(false).useDirectoryFlow} renderSlot={renderSlot} t={t}
+    />)
+    expect(screen.getAllByRole('menuitem', { name: '门店盘点数据分析师' })).toHaveLength(1)
+    fireEvent.click(screen.getByRole('menuitem', { name: '门店盘点数据分析师' }))
+    expect(onPick).toHaveBeenCalledWith(wid('agent:one'))
+    expect(probe.owner).toBeDefined()
+  })
+
+  it('checks the group holding the selected physical Workspace and disables groups that refuse new conversations', () => {
+    const session = 's1' as SessionId
+    const physical = workspaceState([{ ...workspace('physical'), sessionIds: [session] }])
+    const logical: NavigationWorkspaceSnapshot = {
+      ...physical,
+      items: [
+        { ...workspace('agent:one', 'Agent'), path: '', sessionIds: [session], navigationGroup: 'agent:one' },
+        { ...workspace('agent:two', 'Withdrawn'), path: '', navigationGroup: 'agent:two', navigationStatus: 'withdrawn', navigationStartable: false },
+        { ...workspace('agent:three', 'Withdrawn'), path: '', navigationGroup: 'agent:three' },
+      ],
+    }
+    const { renderSlot } = flowProbe()
+    render(<WorkspacePicker
+      open anchorRef={anchor()} useSessions={hook(sessions)} useSessionStatus={hook(noPendingInteraction)}
+      useSessionRetainInfo={() => undefined} usePanelInfo={usePanelInfo} useResource={useResource}
+      {...allowAllAccess} useWorkspaces={hook(physical)} useNavigationWorkspaces={hook(logical)}
+      selectedId={wid('physical')}
+      onPick={vi.fn()} onClose={vi.fn()} createWorkspace={vi.fn()}
+      useDirectoryFlow={occupancySource(false).useDirectoryFlow} renderSlot={renderSlot} t={t}
+    />)
+    // The trailing check is the only icon besides the leading folder.
+    expect(screen.getByRole('menuitem', { name: 'Agent' }).querySelectorAll('svg')).toHaveLength(2)
+    // Directory-less groups take no path suffix even when their titles collide.
+    const [withdrawn, available] = screen.getAllByRole('menuitem', { name: 'Withdrawn' }) as HTMLButtonElement[]
+    expect(withdrawn?.disabled).toBe(true)
+    expect(withdrawn?.querySelectorAll('svg')).toHaveLength(1)
+    expect(available?.disabled).toBe(false)
+  })
+
   it('labels same-title Workspaces with distinguishing path suffixes and forwards the selected id', () => {
     const b = mount([
       { ...workspace('alpha', 'Shared'), path: '/one/a/Shared' },
@@ -234,7 +287,8 @@ describe('WorkspacePicker', () => {
         usePanelInfo={usePanelInfo} useResource={useResource}
         {...allowAllAccess}
         onPick={vi.fn()} onClose={vi.fn()} createWorkspace={vi.fn()}
-        useDirectoryFlow={occupancySource().useDirectoryFlow} renderSlot={renderSlot} t={t}
+        useDirectoryFlow={occupancySource().useDirectoryFlow} useNavigationWorkspaces={hook(workspaceState([workspace('alpha', 'Alpha')]))}
+        renderSlot={renderSlot} t={t}
       />,
     )
     expect(screen.queryByRole('menu')).toBeNull()
@@ -253,7 +307,8 @@ describe('WorkspacePicker', () => {
         usePanelInfo={usePanelInfo} useResource={useResource}
         {...allowAllAccess}
         onPick={vi.fn()} onClose={vi.fn()} createWorkspace={vi.fn()}
-        useDirectoryFlow={occupancySource().useDirectoryFlow} renderSlot={renderSlot} t={t}
+        useDirectoryFlow={occupancySource().useDirectoryFlow} useNavigationWorkspaces={hook(state)}
+        renderSlot={renderSlot} t={t}
       />,
     )
     // An empty list is not final yet: jumping into the directory flow here

@@ -54,6 +54,10 @@ declare module '@deepseek-ai/cordis' {
        * @param packageName - npm package name of the bundle.
        */
       openBundle(packageName: string): void
+      /** Open an official plugin item without changing the current Session.
+       * @param id - registered plugin item identity.
+       */
+      openItem(id: string): void
       /** Open the Plugins main list without opening a dialog or changing the current Session. */
       openList(): void
     }
@@ -155,6 +159,11 @@ export function apply(ctx: ClientContext): void {
           ctx.layout.selectPanel(PANEL_ID)
           instance.actions.setTab('installed')
           instance.actions.setView({ kind: 'list' })
+        },
+        openItem: (id: string) => {
+          ctx.layout.selectPanel(PANEL_ID)
+          instance.actions.setTab('installed')
+          instance.actions.setView({ kind: 'item', id })
         },
         openBundle: (packageName: string) => {
           ctx.layout.selectPanel(PANEL_ID)

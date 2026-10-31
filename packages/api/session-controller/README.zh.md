@@ -45,7 +45,7 @@ Host 仅在配置的工作时间片耗尽时，于完整条目之间让出事件
 
 Client 列表行和驻留 Session 使用当前 `sessionListMetadata` 投影纠正过期的空白会话提示；最近活动时间取摘要时间戳与投影中最后一次用户提示词时间的较晚值。当 SessionManager 在列表行到达前创建实例时，会使用已保留的该 Session 元数据对账空白状态。因此，即使旧列表响应仍将已有对话标为空白，新会话操作也不会复用已经打开过的对话。
 
-`session.create` 返回一个用于新对话的 Session，响应指明实际使用的 Session。请求指明的 `sessionId` 在满足以下条件时被复用：仍为空白（尚未开始任何轮次）、属于请求的目录、是请求的工作区中未归档的成员，且未被其他写者占用；活动 Session 原地复用，持久化 Session 被恢复并持续持有其写锁。被复用的 Session 运行请求的 `agentPreset`，请求未指明时运行配置的默认 preset：不解析它记录的 preset，变更在 Agent 发布前记录为 `agent-preset/selected`。指明的 Session 若已开始、不满足工作区归属，或被其他写者占用，则保持不变，改为新建 Session。没有对应已存储 Session 的 `sessionId` 成为新 Session 的标识。指明其他目录中的 Session 返回 `session/conflict`，指明由 subagent 路由拥有的 Session 返回 `session/agent-busy`；这两项检查先于 preset 解析。指明同一标识的创建请求按到达顺序执行，preset 解析也包含在内，每个响应报告其自身请求完成时该 Session 运行的 preset。`session.list` 根据缓存元数据列出持久化空白会话，不打开冷日志正文。
+`session.create` 返回一个用于新对话的 Session，响应指明实际使用的 Session。请求指明的 `sessionId` 在满足以下条件时被复用：仍为空白（尚未开始任何轮次）、属于请求的目录、是请求的工作区中未归档的成员，且未被其他写者占用；活动 Session 原地复用，持久化 Session 被恢复并持续持有其写锁。被复用的 Session 运行请求的 `agentPreset`，请求未指明时运行配置的默认 preset：不解析它记录的 preset，变更在 Agent 发布前记录为 `agent-preset/selected`。指明的 Session 若已开始、不满足工作区归属，或被其他写者占用，则保持不变，改为新建 Session。没有对应已存储 Session 的 `sessionId` 成为新 Session 的标识。指明其他目录中的 Session 返回 `session/conflict`，指明由 subagent 路由拥有的 Session 返回 `session/agent-busy`；这两项检查先于 preset 解析。指明同一标识的创建请求按到达顺序执行，preset 解析也包含在内，每个响应报告其自身请求完成时该 Session 运行的 preset。记录了 retained preset 的空白 Session 不会被复用；恢复已开始的 Session 时还原其记录的 retained preset。能力提供方可以注册一个 creation provider；此后 `create` 把请求、普通创建操作和调用方 Context 交给它。`session.list` 根据缓存元数据列出持久化空白会话，不打开冷日志正文。
 
 Client 列表刷新保留未变化的行对象，并在顺序和值均相同时复用条目数组。每行的 `retainedBy` 包含正数的本地引用来源计数，Host 元数据刷新不能覆盖它们。缓存成员检查使用每次刷新构建的 ID 集合，因此对账成本随当前列表和保留缓存的规模线性增长。 Host 摘要更新会替换运行状态与 Agent 可用性；本地 create/fork 响应只补充已有行缺失的元数据。普通 Session 被移除后，仅在目录仍有子项时保留其投影 store。
 
@@ -64,7 +64,7 @@ Session 对象还承载本地提交回显：`session.beginSubmission` 在调用�
 
 面向用户调用的 `skills/list` 元数据包含胜出提供方可选的指令文件 `path`。输入框可据此预览文件，无需加载每个 skill 的正文或激活冷态 Agent。
 
-Fork 将 `atSeq` 选定的含边界事件前缀（包括开放轮次内的截点）复制到不带 `parentSession` 的独立 Session。客户端占位项同样省略 `parentSessionId`；列表缩进仅适用于 subagent 来源的行，历史普通 fork 即使保留父 ID 也不缩进。工作区绑定及可选标题递增使用本次操作选定的源会话。子会话在合成的 fork 结果和结束事件之前记录继承标记。省略 `atSeq` 时选择最近已结束轮次及其独立尾部，在下一轮次或排队输入之前停止；不存在的事件会被拒绝。聊天操作选择已结束轮次。
+Fork 将 `atSeq` 选定的含边界事件前缀（包括开放轮次内的截点）复制到不带 `parentSession` 的独立 Session。客户端占位项同样省略 `parentSessionId`；列表缩进仅适用于 subagent 来源的行，历史普通 fork 即使保留父 ID 也不缩进。工作区绑定及可选标题递增使用本次操作选定的源会话。子会话在合成的 fork 结果和结束事件之前记录继承标记。省略 `atSeq` 时选择最近已结束轮次及其独立尾部，在下一轮次或排队输入之前停止；不存在的事件会被拒绝。聊天操作选择已结束轮次。能力提供方可以注册 placement provider，为所属 fork 创建新的 cwd 和 Workspace；普通 Session 继续沿用来源 Workspace。子会话创建失败时调用该 placement 的 rollback。来源记录了 retained preset 的 fork 沿用该 preset。
 
 恢复会话时若已有写句柄占用，返回 `session/writer-held`，并携带会话 id；其他恢复失败仍返回 `gateway/internal`。
 
@@ -92,7 +92,7 @@ Client 的首次 `follow`、重连首屏与 `loadOlder()` 至少请求 50 条以
 
 GUI 模型选择要求确切提供方／模型对出现在可用目录中；不可用的选择以 `session/model-unavailable` 拒绝。提示词准入保留已保存的路由，不按目录可用性阻断发送，由请求执行报告凭据缺失或模型不可用。`initializeDefaultModel()` 在账号登录后、其他提供方均未配置 API key 时，将第一个可用账号模型保存为默认模型；凭据检查使用已配置的引用，不依赖模型是否可用。提供方没有可用模型时，初始化以 `session/provider-models-unavailable` 拒绝。可用性变化不会替换模型或改写会话选择。
 
-`selectModel` 成功返回表示会话模型选择已记录，不等待默认 profile 设置保存。循环注册该投影；变更从下一个步骤开始生效，已准备的步骤保留捕获的选择。默认设置在后台按提交顺序保存；保存失败会记录警告，并保留会话选择。尚未记录选择或请求的会话通过 `AgentOptions` 的动态访问器读取最近一次成功保存的默认值。显式选择即使与默认值相同也会记录。省略推理强度会清除显式强度，让每次请求使用适配器默认值。
+`selectModel` 成功返回表示会话模型选择已记录，不等待默认 profile 设置保存。只有 owner 与进程内调用会保存默认值；非 owner 的 Remote 调用方只改变该会话的选择。循环注册该投影；变更从下一个步骤开始生效，已准备的步骤保留捕获的选择。默认设置在后台按提交顺序保存；保存失败会记录警告，并保留会话选择。尚未记录选择或请求的会话通过 `AgentOptions` 的动态访问器读取最近一次成功保存的默认值。显式选择即使与默认值相同也会记录。省略推理强度会清除显式强度，让每次请求使用适配器默认值。
 
 -----
 

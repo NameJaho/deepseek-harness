@@ -138,6 +138,13 @@ optionOf(name: string): PresetOption
  * @param name - the preset to switch to; unknown names throw.
  */
 set(session: Session, name: string): void
+
+/**
+ * Validate permission changes for an owning capability.
+ * @param guard - synchronous validator, called before any permission event is appended; throwing rejects the switch.
+ * @returns removal of this validator.
+ */
+registerGuard(guard: (session: Session, name: string) => void): () => void
 ```
 
 Types: [Session](session.zh.md)

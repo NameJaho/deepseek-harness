@@ -833,6 +833,22 @@ Host service backing the generated `ctx.remote.session` namespace.
 
 ```ts cordis-catalog
 /**
+ * Register a capability-owned placement policy for forked Sessions.
+ * @param provider - resolves an isolated directory and optional Workspace for a source Session.
+ * @returns disposer removing this provider; only one placement owner may register.
+ * @throws Error when another fork placement provider is registered.
+ */
+registerForkPlacementProvider(provider: SessionForkPlacementProvider): () => Promise<void>
+
+/**
+ * Register deployment-owned placement and ownership for new conversations.
+ * @param provider - interceptor receiving the authenticated caller Context and the ordinary creation operation.
+ * @returns disposer removing this provider; only one placement owner may register.
+ * @throws Error when another creation provider is registered.
+ */
+registerCreationProvider(provider: SessionCreationProvider): () => Promise<void>
+
+/**
  * Resolve or resume one ordinary Session for another Host API domain.
  * @param sessionId - Session identity whose Agent owns the operation.
  * @returns the live Agent or the stable Session-domain failure.
@@ -859,13 +875,16 @@ resolveAgent(sessionId: SessionId): Promise<ApiSessionAgentResult>
 
 /**
  * Create one ordinary Session for a new conversation, reusing the named blank Session while it is reusable.
+ * A registered creation provider receives the request, the ordinary operation, and the caller Context.
  * @param request - optional blank Session to reuse, location, and Agent preset.
  * @returns the created or reused Session identity and its preset when configured.
  */
 @Remote('create') create(request: SessionCreateRequest): Promise<SessionCreateValue>
 
 /**
- * Select one Session-local model after explicitly resuming the Session; save the default in the background.
+ * Select one Session-local model after explicitly resuming the Session. An
+ * owner or in-process call also saves the default in the background; a
+ * non-owner caller leaves the default unchanged.
  * @param request - Session identity and requested model selection.
  * @returns the normalized selection installed for the Session, without waiting for default persistence.
  */

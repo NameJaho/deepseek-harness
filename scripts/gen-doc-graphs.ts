@@ -108,6 +108,26 @@ const GROUP_ORDER = [
 
 const SERVICE_ROLES: ServiceRole[] = [
   {
+    key: 'companyMcpProvider', pkg: 'company-mcp-provider', title: 'Member-authorized MCP access', mode: 'seam',
+    implementations: ['company-mcp-provider'], consumers: ['company-mcp-provider', 'company-cloud-agent'],
+    note: 'Queries the Market for a verified member and rechecks authorization and pinned schemas before every invocation.',
+  },
+  {
+    key: 'companyMcp', pkg: 'company-mcp-provider', title: 'Member MCP catalog Remote', mode: 'service',
+    consumers: ['company-cloud-agent'],
+    note: 'Derives caller identity on the Host and exposes authorized catalog and member enablement preferences.',
+  },
+  {
+    key: 'companyWecomAuth', pkg: 'company-wecom-auth', title: 'Company member authentication', mode: 'service',
+    consumers: ['company-cloud-agent', 'company-mcp-provider'],
+    note: 'Verifies official WeCom identities and resolves private Session ownership and business resource grants.',
+  },
+  {
+    key: 'cloudAgents', pkg: 'company-cloud-agent', title: 'Reusable company Agents', mode: 'service',
+    consumers: ['company-cloud-agent-runtime'],
+    note: 'Retains member-owned drafts and immutable releases and authorizes MCP execution for the member running the release.',
+  },
+  {
     key: 'actionCards',
     pkg: 'action-cards',
     title: 'Optional action cards',

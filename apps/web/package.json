@@ -76,6 +76,9 @@
     "@deepseek-ai/dsh-experimental-forge-bundle": "workspace:*"
   },
   "dependencies": {
-    "@deepseek-ai/dsh-message-quotes": "workspace:*"
+    "@deepseek-ai/dsh-message-quotes": "workspace:*",
+    "@deepseek-ai/dsh-company-cloud-agent": "workspace:*",
+    "@deepseek-ai/dsh-company-cloud-agent-runtime": "workspace:*",
+    "@deepseek-ai/dsh-company-mcp-provider": "workspace:*"
   }
 }

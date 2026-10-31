@@ -1,0 +1,32 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "tsBuildInfoFile": "lib/tsconfig.host.tsbuildinfo"
+  },
+  "include": ["src/*.ts"],
+  "references": [
+    { "path": "../wecom-auth" },
+    { "path": "../mcp-provider" },
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../../vendor/schemastery" },
+    { "path": "../../util/brand" },
+    { "path": "../../typert/protocol" },
+    { "path": "../../core/agent" },
+    { "path": "../../core/session" },
+    { "path": "../../preset/agent-preset-registry" },
+    { "path": "../../api/session-controller/tsconfig.host.json" },
+    { "path": "../../api/remote-access/tsconfig.host.json" },
+    { "path": "../../llm/llm" },
+    { "path": "../../storage/storage-domain" },
+    { "path": "../../core/tools" },
+    { "path": "../../core/scope" },
+    { "path": "../../skill/skill" },
+    { "path": "../../attachment/attachment" },
+    { "path": "../../session/session-projection" },
+    { "path": "../../workspace/workspace" },
+    { "path": "../../interaction/permission-presets" },
+    { "path": "../../interaction/commands" }
+  ]
+}

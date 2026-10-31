@@ -142,6 +142,7 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
     renderSlot: renderDirectoryFlowOnly,
     t,
     ...overrides,
+    useNavigationWorkspaces: overrides.useNavigationWorkspaces ?? overrides.useWorkspaces ?? hook(workspaceState([])),
   }
   const view = render(<WorkspaceBrowser {...props} />)
   return { view, props, store, controls }
@@ -150,6 +151,9 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
 /** Re-render with (possibly) changed props — WorkspaceBrowser has no side channel. */
 function rerender(b: ReturnType<typeof mount>, overrides: Partial<WorkspaceBrowserProps>) {
   Object.assign(b.props, overrides)
+  if (overrides.useWorkspaces !== undefined && overrides.useNavigationWorkspaces === undefined) {
+    b.props.useNavigationWorkspaces = overrides.useWorkspaces
+  }
   b.view.rerender(<WorkspaceBrowser {...b.props} />)
 }
 
@@ -2516,6 +2520,61 @@ describe('WorkspaceBrowser', () => {
     expect(screen.getByRole('dialog', { name: '删除工作区' })).toBeTruthy()
     rerender(browser, { useWorkspaces: hook(workspaceState([])) })
     expect(screen.queryByRole('dialog', { name: '删除工作区' })).toBeNull()
+  })
+
+  it('shows the capability deletion copy and retains the confirmed operation across catalog changes', () => {
+    const deleteWorkspace = vi.fn(async () => {})
+    const deletion = vi.fn(async () => {})
+    const managed = {
+      ...workspace('cloud-agent:new', ['session'], '新建智能体'),
+      navigationGroup: 'cloud-agent:new',
+      navigationDelete: deletion,
+      navigationDeleteConfirmation: { title: '删除智能体及工作区', description: '会话记录会保留' },
+    }
+    const browser = mount({
+      useSessions: hook(sessionState([summary('session', 1)])),
+      useWorkspaces: hook(workspaceState([managed])),
+      useNavigationWorkspaces: hook(workspaceState([managed])),
+      deleteWorkspace,
+    })
+    fireEvent.click(screen.getByRole('button', { name: '工作区“新建智能体”的操作' }))
+    expect(screen.queryByRole('menuitem', { name: '重命名' })).toBeNull()
+    fireEvent.click(screen.getByRole('menuitem', { name: '删除智能体及工作区' }))
+    expect(screen.getByText('会话记录会保留')).toBeTruthy()
+    const changedDeletion = vi.fn(async () => {})
+    const changed = { ...managed, navigationDelete: changedDeletion }
+    rerender(browser, { useNavigationWorkspaces: hook(workspaceState([changed])) })
+    fireEvent.click(screen.getByRole('button', { name: '删除智能体及工作区' }))
+    expect(deletion).toHaveBeenCalledOnce()
+    expect(deleteWorkspace).not.toHaveBeenCalled()
+    expect(changedDeletion).not.toHaveBeenCalled()
+  })
+
+  it('labels an unavailable logical group and withholds its New Session action while keeping its Sessions', () => {
+    const startSession = vi.fn()
+    const physical = workspace('physical', ['kept', 'live'])
+    const withdrawn = {
+      ...workspace('agent:gone', ['kept'], 'Gone'),
+      navigationGroup: 'agent:gone', navigationStatus: 'withdrawn' as const, navigationStartable: false,
+    }
+    const available = {
+      ...workspace('agent:live', ['live'], 'Live'),
+      navigationGroup: 'agent:live', navigationStatus: 'available' as const, navigationStartable: true,
+    }
+    mount({
+      useSessions: hook(sessionState([summary('kept', 2), summary('live', 1)])),
+      useWorkspaces: hook(workspaceState([physical])),
+      useNavigationWorkspaces: hook(workspaceState([withdrawn, available])),
+      startSession,
+    })
+    expect(screen.getByText('已撤回')).toBeTruthy()
+    // Only the unavailable group carries a status label.
+    expect(screen.getAllByText(/^(已撤回|已删除|无访问权限|已停用)$/)).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: '在“Gone”中新建会话' })).toBeNull()
+    // No delete callback: the managed row offers no Workspace menu at all.
+    expect(screen.queryByRole('button', { name: '工作区“Gone”的操作' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '在“Live”中新建会话' }))
+    expect(startSession).toHaveBeenCalledWith(wid('agent:live'))
   })
 
   it('keeps the delete dialog open on failure and allows retry or cancellation', async () => {

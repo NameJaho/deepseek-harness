@@ -36,6 +36,8 @@ interface StoredSession {
 interface HarnessOptions {
   /** Declared presets; the first is the default. Omitted, no roster is composed. */
   readonly presets?: readonly string[]
+  /** Declared presets reserved for exact durable restoration. */
+  readonly retained?: ReadonlySet<string>
   /** Stored Sessions keyed by id. */
   readonly stored?: ReadonlyMap<SessionId, StoredSession>
   /** Stored Sessions whose writer another owner holds. */
@@ -71,17 +73,18 @@ async function harness(options: HarnessOptions = {}) {
   const selections: { sessionId: SessionId; agentPreset: string }[] = []
   const resumed: SessionId[] = []
   if (presets !== undefined) {
-    const known = (id?: string): string => {
+    const available = presets.filter(id => options.retained?.has(id) !== true)
+    const known = (id?: string, exact = false): string => {
       const wanted = id ?? presets[0] ?? ''
-      if (!presets.includes(wanted)) {
+      if (!presets.includes(wanted) || (!exact && options.retained?.has(wanted) === true)) {
         throw new RemoteError('agent-preset/not-found', `Unknown agent preset: ${wanted}`, {
-          agentPreset: wanted, available: [...presets],
+          agentPreset: wanted, available,
         })
       }
       return wanted
     }
-    const usable = (id?: string): string => {
-      const wanted = known(id)
+    const usable = (id?: string, exact = false): string => {
+      const wanted = known(id, exact)
       if (options.broken?.has(wanted) === true) {
         throw new RemoteError('agent-preset/invalid', 'activation failed', { agentPreset: wanted, reason: 'activation failed' })
       }
@@ -90,9 +93,14 @@ async function harness(options: HarnessOptions = {}) {
     ctx.provide('agentPresets', {
       defaultId: presets[0],
       presetForSession: (session: Session) => preset.stateOf(session),
+      availabilityOf: (id: string) => !presets.includes(id)
+        ? undefined
+        : options.retained?.has(id) === true ? 'retained' : 'selectable',
       resolve: (id?: string) => Promise.resolve(id === undefined ? undefined : options.resolving?.get(id))
         .then(() => ({ id: known(id) })),
+      resolveRetained: (id: string) => Promise.resolve({ id: known(id, true) }),
       mount: (_ctx: Context, id?: string) => Promise.resolve().then(() => ({ id: usable(id) })),
+      mountRetained: (_ctx: Context, id: string) => Promise.resolve().then(() => ({ id: usable(id, true) })),
       select: async (agent: Agent, agentPreset: string) => {
         usable(agentPreset)
         if (options.locked?.has(agent.id) === true) {
@@ -465,6 +473,47 @@ describe('session.create reuse of a stored blank Session', () => {
     expect(resumed).toEqual(['stale-draft'])
     expect(presetOf(draft)).toBe('standard')
     expect(selectedEvents(draft)).toEqual([{ agentPreset: 'standard' }])
+  })
+
+  it('does not adopt a blank Session that records a retained preset', async () => {
+    const draft = SessionId('private-draft')
+    const cwd = realpathSync(mkdtempSync(join(tmpdir(), 'dsh-session-preset-stored-')))
+    tempDirs.push(cwd)
+    const { remote, resumed } = await harness({
+      presets: ['standard', 'cloud-release'],
+      retained: new Set(['cloud-release']),
+      stored: new Map([[draft, {
+        header: storedHeader(draft, cwd, { agentPreset: 'cloud-release' }),
+        events: [modelSelection(0)],
+      }]]),
+    })
+
+    const created = await remote.create({ sessionId: draft, cwd })
+
+    if (!created.ok) throw new Error(`create failed: ${created.error.message}`)
+    expect(created.value.sessionId).not.toBe('private-draft')
+    expect(created.value.agentPreset).toBe('standard')
+    expect(resumed).toEqual([])
+  })
+
+  it('resumes a started Session under the retained preset it recorded', async () => {
+    const started = SessionId('private-started')
+    const cwd = realpathSync(mkdtempSync(join(tmpdir(), 'dsh-session-preset-stored-')))
+    tempDirs.push(cwd)
+    const { ctx, resumed, presetOf } = await harness({
+      presets: ['standard', 'cloud-release'],
+      retained: new Set(['cloud-release']),
+      stored: new Map([[started, {
+        header: storedHeader(started, cwd, { agentPreset: 'cloud-release' }),
+        events: completedTurn(0),
+      }]]),
+    })
+
+    const result = await ctx.sessionController.resolveAgent(started)
+
+    expect(result).toMatchObject({ agent: { id: 'private-started' } })
+    expect(resumed).toEqual(['private-started'])
+    expect(presetOf(started)).toBe('cloud-release')
   })
 
   it('resumes a blank Session under the default even when its previous choice is still declared', async () => {

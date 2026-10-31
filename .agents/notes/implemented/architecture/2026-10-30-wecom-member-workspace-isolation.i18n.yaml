@@ -3,7 +3,7 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-30-wecom-member-workspace-isolation.md
 /agent-note-wecom-member-specific-default-workspaces:
-  en: 40c3ee86523d9e4d
+  en: f79e49ff177c4825
   zh: 86007e234268b1a2
 /agent-note-wecom-member-specific-default-workspaces/problem:
   en: a83d49098f4ae5a4

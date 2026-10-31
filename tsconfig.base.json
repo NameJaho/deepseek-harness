@@ -28,6 +28,16 @@
     // not declaration path aliases, keep each package/vendor source compiled
     // under its own tsconfig boundary.
     "paths": {
+      "@deepseek-ai/dsh-company-mcp-provider": ["./packages/company/mcp-provider/src/index.ts"],
+      "@deepseek-ai/dsh-company-mcp-provider/http": ["./packages/company/mcp-provider/src/http.ts"],
+      "@deepseek-ai/dsh-company-mcp-provider/types": ["./packages/company/mcp-provider/src/types.ts"],
+      "@deepseek-ai/dsh-company-mcp-provider/remote": ["./packages/company/mcp-provider/lib/typert.remote-client.d.ts"],
+      "@deepseek-ai/dsh-company-cloud-agent": ["./packages/company/cloud-agent/src/index.ts"],
+      "@deepseek-ai/dsh-company-cloud-agent/types": ["./packages/company/cloud-agent/src/types.ts"],
+      "@deepseek-ai/dsh-company-cloud-agent/remote": ["./packages/company/cloud-agent/lib/typert.remote-client.d.ts"],
+      "@deepseek-ai/dsh-company-cloud-agent-runtime": ["./packages/company/cloud-agent-runtime/src/index.ts"],
+      "@deepseek-ai/dsh-company-cloud-agent-runtime/types": ["./packages/company/cloud-agent-runtime/src/types.ts"],
+      "@deepseek-ai/dsh-company-cloud-agent/client": ["./packages/company/cloud-agent/src/client/index.ts"],
       "@deepseek-ai/dsh-client-ui-entry-customization": ["./packages/client/ui-entry-customization/src/index.ts"],
       "@deepseek-ai/dsh-client-ui-entry-customization/client": ["./packages/client/ui-entry-customization/src/client/index.ts"],
       "@deepseek-ai/dsh-client-ui-entry-customization/src/*": ["./packages/client/ui-entry-customization/src/*"],

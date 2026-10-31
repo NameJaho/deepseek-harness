@@ -20,7 +20,9 @@ import {
   ApiSessionAgentController,
   type ApiSessionAgentResult,
 } from './agent.ts'
-import { SessionCommandController, hasPromptContent } from './commands.ts'
+import {
+  SessionCommandController, hasPromptContent, type SessionForkPlacementProvider,
+} from './commands.ts'
 import { SessionControlController } from './control.ts'
 import { HistoryController } from './history/controller.ts'
 import { StateController } from './state/controller.ts'
@@ -67,6 +69,7 @@ import type {
 } from './types.ts'
 
 export type * from './types.ts'
+export type { SessionForkPlacement, SessionForkPlacementProvider } from './commands.ts'
 export { ApiSessionNotFound } from './agent.ts'
 export { SessionFileReferences } from './file-references.ts'
 export { SessionSkillCatalog } from './skill-catalog.ts'
@@ -131,6 +134,19 @@ export interface SessionControllerInternals {
   readonly canOpenPath?: () => boolean
 }
 
+/**
+ * Deployment-owned new-Session placement and ownership interceptor.
+ * @param request - validated creation request.
+ * @param create - ordinary creation operation; the provider may replace placement before calling it.
+ * @param caller - Context carrying the actual Remote invocation, or trusted in-process Context.
+ * @returns the resulting Session; the provider owns cleanup of resources it adds.
+ */
+export type SessionCreationProvider = (
+  request: SessionCreateRequest,
+  create: (request: SessionCreateRequest) => Promise<SessionCreateValue>,
+  caller: Context,
+) => Promise<SessionCreateValue>
+
 /** Host service backing the generated `ctx.remote.session` namespace. */
 export class SessionController extends TypertRemoteService {
   static inject = [
@@ -168,6 +184,8 @@ export class SessionController extends TypertRemoteService {
   private readonly revealPath: (path: string, signal: AbortSignal) => Promise<void>
   private readonly canOpenPath: () => boolean
   private readonly listWorkSliceMs: number
+  private forkPlacementProvider: SessionForkPlacementProvider | undefined
+  private creationProvider: SessionCreationProvider | undefined
   private readonly promotions = new Set<Promise<void>>()
 
   /**
@@ -191,7 +209,8 @@ export class SessionController extends TypertRemoteService {
     ctx.typert.resources.register('session', { resolve: resolveSessionResource })
     this.agents = new ApiSessionAgentController(ctx)
     this.agents.initialize()
-    this.commands = new SessionCommandController(ctx, this.agents, process.cwd())
+    this.commands = new SessionCommandController(ctx, this.agents, process.cwd(), (...args) =>
+      this.forkPlacementProvider === undefined ? Promise.resolve(undefined) : this.forkPlacementProvider(...args))
     ctx.effect(() => ctx.fileUploads.registerAgentResolver(async (sessionId) => {
       const result = await this.agents.resolveAgent(sessionId)
       if ('error' in result) throw result.error
@@ -241,6 +260,38 @@ export class SessionController extends TypertRemoteService {
       if (event.type !== 'user/message' || event.data.source.kind !== 'user') return
       ctx.emit('api-session/activity', session.id, event.time)
     })
+  }
+
+  /**
+   * Register a capability-owned placement policy for forked Sessions.
+   * @param provider - resolves an isolated directory and optional Workspace for a source Session.
+   * @returns disposer removing this provider; only one placement owner may register.
+   * @throws Error when another fork placement provider is registered.
+   */
+  registerForkPlacementProvider(provider: SessionForkPlacementProvider): () => Promise<void> {
+    if (this.forkPlacementProvider !== undefined) {
+      throw new Error('session-controller: fork placement provider is already registered')
+    }
+    return this.ctx.effect(() => {
+      this.forkPlacementProvider = provider
+      return () => { this.forkPlacementProvider = undefined }
+    }, 'session-controller: fork placement')
+  }
+
+  /**
+   * Register deployment-owned placement and ownership for new conversations.
+   * @param provider - interceptor receiving the authenticated caller Context and the ordinary creation operation.
+   * @returns disposer removing this provider; only one placement owner may register.
+   * @throws Error when another creation provider is registered.
+   */
+  registerCreationProvider(provider: SessionCreationProvider): () => Promise<void> {
+    if (this.creationProvider !== undefined) {
+      throw new Error('session-controller: creation provider is already registered')
+    }
+    return this.ctx.effect(() => {
+      this.creationProvider = provider
+      return () => { this.creationProvider = undefined }
+    }, 'session-controller: creation placement')
   }
 
   /**
@@ -297,22 +348,28 @@ export class SessionController extends TypertRemoteService {
 
   /**
    * Create one ordinary Session for a new conversation, reusing the named blank Session while it is reusable.
+   * A registered creation provider receives the request, the ordinary operation, and the caller Context.
    * @param request - optional blank Session to reuse, location, and Agent preset.
    * @returns the created or reused Session identity and its preset when configured.
    */
   @Remote('create')
   create(request: SessionCreateRequest): Promise<SessionCreateValue> {
+    if (this.creationProvider !== undefined) {
+      return this.creationProvider(request, next => this.commands.create(next), this.ctx)
+    }
     return this.commands.create(request)
   }
 
   /**
-   * Select one Session-local model after explicitly resuming the Session; save the default in the background.
+   * Select one Session-local model after explicitly resuming the Session. An
+   * owner or in-process call also saves the default in the background; a
+   * non-owner caller leaves the default unchanged.
    * @param request - Session identity and requested model selection.
    * @returns the normalized selection installed for the Session, without waiting for default persistence.
    */
   @Remote('selectModel')
   selectModel(request: SessionSelectModelRequest): Promise<SessionSelectModelValue> {
-    return this.commands.selectModel(request)
+    return this.commands.selectModel(request, principalOf(this.ctx.invocation))
   }
 
   /**

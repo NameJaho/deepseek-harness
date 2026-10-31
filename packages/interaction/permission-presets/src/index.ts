@@ -195,6 +195,7 @@ export class PermissionPresetService extends TypertRemoteService {
   static inject = ['shell', 'approval', 'sessions', 'agents', 'sessionProjections']
 
   private readonly presets: Record<string, PresetSpec>
+  private readonly guards = new Set<(session: Session, name: string) => void>()
   private autoAdmit: (() => void) | undefined
   private defaultSettings: () => PermissionSettings
 
@@ -399,9 +400,20 @@ export class PermissionPresetService extends TypertRemoteService {
     this.apply(session, name, (policy) => { setApprovalPolicy(session, policy) })
   }
 
+  /**
+   * Validate permission changes for an owning capability.
+   * @param guard - synchronous validator, called before any permission event is appended; throwing rejects the switch.
+   * @returns removal of this validator.
+   */
+  registerGuard(guard: (session: Session, name: string) => void): () => void {
+    this.guards.add(guard)
+    return () => { this.guards.delete(guard) }
+  }
+
   /** Apply one preset through its durable identity and canonical knob setters. */
   private apply(session: Session, name: string, setApproval: (policy: ApprovalPolicy) => void): void {
     const spec = this.resolve(name)
+    for (const guard of this.guards) guard(session, name)
     if (name === AUTO_PRESET) this.autoAdmit?.()
     const current = this.current(session)
     const knobs = this.permissionState(session)

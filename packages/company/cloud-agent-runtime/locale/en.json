@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Company agent runtime",
+    "description": "Run a published company agent with its pinned instructions and authorized tools."
+  }
+}

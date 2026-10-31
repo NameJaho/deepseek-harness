@@ -1,5 +1,7 @@
 /** Browser-safe enterprise member identities; app credentials never enter these projections. */
 import type { Branded } from '@deepseek-ai/dsh-brand'
+import type { RemoteAccessBinding } from '@deepseek-ai/dsh-api-remote-access/types'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 
 /** Stable Host identity for one enterprise member. */
 export type WecomIdentityId = Branded<'wecom-identity-id'>
@@ -21,6 +23,29 @@ export interface WecomUserPrincipal {
   readonly corpId: WecomCorpId
   readonly userId: WecomUserId
   readonly role: WecomUserRole
+}
+
+/** Authenticated company member supplied by OAuth or a trusted gateway. */
+export type CompanyUserPrincipal = WecomUserPrincipal | GatewayUserPrincipal
+
+/** Resource owner scope: `wecom:<corpId>:<userId>`, `gateway:<userId>`, or `local-owner`. */
+export type CompanyOwnerScope = Branded<'company-owner-scope'>
+
+/** Business-owned grants and Session ownership lookup contributed by another company plugin. */
+export interface WecomResourceProvider {
+  /** Additional command names allowed only in the member's default Workspace Sessions; omission grants none. */
+  readonly defaultWorkspaceCommands?: readonly string[]
+  /** Compute grants for one active member from current committed business records. */
+  bindings(principal: CompanyUserPrincipal): readonly RemoteAccessBinding[]
+  /** Resolve the owner of a tool-initiating Session; `undefined` delegates to another provider. */
+  sessionOwner(sessionId: SessionId): CompanyOwnerScope | undefined
+}
+
+/** Server-derived identity accepted by the internal Market API; never accepted as Remote input. */
+export interface WecomMarketSubject {
+  readonly scope: CompanyOwnerScope
+  readonly corpId: WecomCorpId
+  readonly sub: WecomUserId
 }
 
 /** Public QR/OAuth parameters and unpredictable state. */

@@ -41,7 +41,7 @@ kind: "package-reference"
 
 ### 工作区层级
 
-选择**添加工作区**并选取目录，即可注册工作区并打开 Session。**视图选项 → 分组方式**默认为**按工作区**，将工作区作为同级分组显示。选择**按工作区树**后，每个 Workspace 会位于最近的已注册祖先之下，之后添加的 Workspace 也会自动归入。每个 Workspace 保留自己的 Session 和行操作，子 Workspace 显示在父级自己的 Session 之前。祖先默认展开，已有的折叠偏好除外。保存的折叠状态也会隐藏当前 Session；如果后代 Workspace 包含当前 Session，祖先文件夹图标仍保持高亮。各层级的高亮和点击区域保持整行同宽，仅内容缩进。拖拽 Workspace 仅重排同级项目；落在后代行上时，由最近的兼容祖先接收，因此无需先折叠父级就能将其他工作区拖到其后。选择搜索结果会展开全部祖先。分组方式和展开状态保存在当前浏览器中；切换模式会保留各 Workspace 的展开偏好，单列表视图保持平铺。
+选择**添加工作区**并选取目录，即可注册工作区并打开 Session。空白会话的 Workspace 选择器与侧栏使用相同的逻辑导航分组，因此由能力拥有的智能体分组只显示一次，不会暴露每个物理 Session 目录。**视图选项 → 分组方式**默认为**按工作区**，将工作区作为同级分组显示。选择**按工作区树**后，每个 Workspace 会位于最近的已注册祖先之下，之后添加的 Workspace 也会自动归入。每个 Workspace 保留自己的 Session 和行操作，子 Workspace 显示在父级自己的 Session 之前。祖先默认展开，已有的折叠偏好除外。保存的折叠状态也会隐藏当前 Session；如果后代 Workspace 包含当前 Session，祖先文件夹图标仍保持高亮。各层级的高亮和点击区域保持整行同宽，仅内容缩进。拖拽 Workspace 仅重排同级项目；落在后代行上时，由最近的兼容祖先接收，因此无需先折叠父级就能将其他工作区拖到其后。选择搜索结果会展开全部祖先。分组方式和展开状态保存在当前浏览器中；切换模式会保留各 Workspace 的展开偏好，单列表视图保持平铺。
 
 层级仅使用已注册的规范路径，不扫描项目，也不解析符号链接别名。嵌套不会改变 Session 的工作目录、日志或 Workspace 归属。删除父 Workspace 后，子 Workspace 仍保持注册，并归入下一个已注册祖先；没有祖先时显示在根层级。
 
@@ -106,6 +106,12 @@ Workspace 和 Session 的启动基线均就绪后，空安装环境调用 `works
 Session 行可通过 Tab 聚焦，使用不带修饰键的 Enter 或空格打开；Tab 也可移到行内操作按钮，组合键则继续交由全局快捷键处理。
 
 客户端调用方可以在 `uiWorkspace.startSession` 的第二参数中传入 `prompt`、`whenDraftExists` 与 `clearPreviousDraft`。提示词仅接受普通文字；结构化草稿由内部恢复和工作区携带流程处理。空稿直接采用提示词。目标已有文字或附件时，`whenDraftExists: 'keep'`（默认）保留原稿，`'replace'` 只用提示词替换目标 Session 的文字和内联引用、无提示词时清空，`'append'` 在原有文字之后另起段落追加提示词；附件在各种情况下都保留。只有未传 `whenDraftExists` 时，`clearPreviousDraft: true` 才等同 `'replace'`。在异步创建前捕获选项值，在导航提交前应用到准确保留的 binding。已被后续操作取代的导航不写内容；输入处于提交阻塞状态时拒绝准备并保留原选择。无论是否传入选项，都按上文所述选择并打开空白 Session，因此新会话会回到其未发送的草稿。[草稿初始化决策](../../../.agents/notes/implemented/architecture/2026-09-30-structured-draft-initialization.zh.md)说明输入 owner 的数据流。
+
+`ctx.uiWorkspace.registerGroups(source)` 注册可观察的逻辑分组，包含稳定 id、Session 成员、标题，以及由能力拥有的重新连接、显式“新建会话”和可选删除回调。未提供 `start` 或 `newSession` 的分组会在持有其最早成员的物理 Workspace 中创建标准 Session。侧栏和空白会话的 Workspace 选择器读取此投影；全局 Workspace 来源仍标识真实目录。托管分组以自身 id 管理搜索、展开、置顶顺序和选择，可只提供删除而不提供改名或拖动操作，在树模式中仍为平级。注销贡献后恢复真实目录行。
+
+分组可选的 `status` 表示它是否仍接受新会话。默认为 `available`；`withdrawn`、`deleted`、`access-lost` 和 `disabled` 会保留分组及其 Session，在行上显示本地化标签，移除其“新建会话”操作，在选择器中禁用该分组，不将其作为隐式新建会话的目标，并以本地化失败提示拒绝显式启动。
+
+分组可用 `deleteConfirmation` 提供符合其删除语义的本地化菜单与确认文案。打开对话框时会捕获删除回调及文案，目录更新不会替换用户正在确认的操作。删除失败时保留对话框及分组；成功后等待已提交的导航投影再关闭对话框。
 
 ### 目录流子 slot
 

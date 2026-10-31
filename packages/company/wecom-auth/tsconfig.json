@@ -1,12 +1,51 @@
 {
   "extends": "../../../tsconfig.base.json",
-  "compilerOptions": { "rootDir": "src", "outDir": "lib/types" },
-  "include": ["src/*.ts"],
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types"
+  },
+  "include": [
+    "src/*.ts"
+  ],
   "references": [
-    { "path": "../../../vendor/cordis" }, { "path": "../../../vendor/schemastery" },
-    { "path": "../../util/brand" }, { "path": "../../typert/protocol" },
-    { "path": "../../api/remote-access/tsconfig.host.json" }, { "path": "../../core/session" },
-    { "path": "../../client/connection/tsconfig.host.json" }, { "path": "../../credentials/credentials" },
-    { "path": "../../host/webserver" }, { "path": "../../storage/storage-domain" }, { "path": "../../workspace/workspace" }
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../util/brand"
+    },
+    {
+      "path": "../../typert/protocol"
+    },
+    {
+      "path": "../../api/remote-access/tsconfig.host.json"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../client/connection/tsconfig.host.json"
+    },
+    {
+      "path": "../../credentials/credentials"
+    },
+    {
+      "path": "../../host/webserver"
+    },
+    {
+      "path": "../../storage/storage-domain"
+    },
+    {
+      "path": "../../workspace/workspace"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/session"
+    }
   ]
 }

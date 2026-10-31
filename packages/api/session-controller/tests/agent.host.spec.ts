@@ -239,14 +239,17 @@ describe('ApiSession creation', () => {
       list: () => Promise.resolve([childMeta]),
       inspect: () => Promise.resolve({ meta: childMeta, events: [] }),
     })
+    const adopt = () => {
+      child.ctx.sessions.create(childMeta.id, {
+        meta: { ...childMeta, parentSession: SessionId('parent'), origin: 'subagent' },
+      })
+      return Promise.resolve({ id: 'standard' })
+    }
     child.ctx.provide('agentPresets', {
-      resolve: () => {
-        child.ctx.sessions.create(childMeta.id, {
-          meta: { ...childMeta, parentSession: SessionId('parent'), origin: 'subagent' },
-        })
-        return Promise.resolve({ id: 'standard' })
-      },
+      resolve: adopt,
+      resolveRetained: adopt,
       mount: () => Promise.resolve(),
+      mountRetained: () => Promise.resolve(),
     } as never)
     await expect(child.agents.resolveAgent(childMeta.id)).resolves.toMatchObject({
       error: { code: 'session/agent-busy' },

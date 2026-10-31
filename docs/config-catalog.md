@@ -243,7 +243,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-api-session-controller`
 
 - `inject`: `agentDefaultModel` · `agents` · `attachments` · `fileUploads` · `fs` · `llm` · `remoteAccess` · `sessions` · `sessionProjections` · `sessionQuery` · `typert` · `typertGateway` · `workspaceRegistry`
-- `source`: [`packages/api/session-controller/src/index.ts:110`](../packages/api/session-controller/src/index.ts)
+- `source`: [`packages/api/session-controller/src/index.ts:113`](../packages/api/session-controller/src/index.ts)
 
 ```ts config-catalog
 /** Session Controller deployment policy. */
@@ -795,12 +795,86 @@ export interface ToolResultPruneConfig {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-compaction-tool-result-pruner -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-company-cloud-agent -->
+<a id="deepseek-aidsh-company-cloud-agent"></a>
+
+## `@deepseek-ai/dsh-company-cloud-agent`
+
+- `inject`: `storageDomain` · `agentPresets` · `agents` · `llm` · `sessionController` · `tools` · `workspaceRegistry` · `companyMcpProvider` · `sessionProjections` · `permissionPresets` · `sessionPersistence`
+- `source`: [`packages/company/cloud-agent/src/config.ts:5`](../packages/company/cloud-agent/src/config.ts)
+
+```ts config-catalog
+/** Publication settings controlled by the deployment, never by an agent author. */
+export interface Config {
+  /** Absolute root containing a private directory for each session's saved files. */
+  workspaceRoot: string
+  /** Maximum source bytes retained per published skill, including resources. */
+  skillMaxBytes: number
+  /** Maximum resource files retained per skill. */
+  skillMaxFiles: number
+  /** Selectable preset supplying configured MCP connections and skill providers; defaults to standard. */
+  capabilityPreset: string
+  /** Maximum stored attachment bytes accepted by the conversation text reader. */
+  fileReadMaxBytes: number
+  /** Largest Unicode-code-point page returned by the conversation text reader. */
+  filePageChars: number
+  /** Maximum UTF-8 bytes retained in one downloadable conversation report. */
+  reportMaxBytes: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-company-cloud-agent -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-company-cloud-agent-runtime -->
+<a id="deepseek-aidsh-company-cloud-agent-runtime"></a>
+
+## `@deepseek-ai/dsh-company-cloud-agent-runtime`
+
+- `inject`: `tools` · `systemPrompt` · `cloudAgents`
+- `source`: [`packages/company/cloud-agent-runtime/src/index.ts:17`](../packages/company/cloud-agent-runtime/src/index.ts)
+
+```ts config-catalog
+/** Trusted configuration compiled from a saved release by the catalog. */
+export interface Config {
+  /** Literal system instructions, without template expansion or executable YAML. */
+  instructions: string
+  /** Immutable release the tool must match at execution. */
+  releaseId: string
+  /** Exact deployment MCP tool names selected by the release. */
+  mcpTools?: string[]
+  /** Published skill instructions and resources. */
+  skills?: CloudAgentRuntimeSkill[]
+  /** Authoring or ordinary retained release behavior. */
+  mode?: 'authoring' | 'release'
+}
+
+/** Pinned Skill instructions and resources available to one release Session. */
+export interface CloudAgentRuntimeSkill {
+  /** Kebab-case Skill name. */
+  name: string
+  /** Short catalog description. */
+  description: string
+  /** Immutable instruction body. */
+  content: string
+  /** Regular non-link resources included in the release. */
+  resources: CloudAgentRuntimeSkillResource[]
+}
+
+/** One regular resource captured into a published Skill snapshot. */
+export interface CloudAgentRuntimeSkillResource {
+  /** Relative resource path under the Skill directory. */
+  path: string
+  /** Base64 bytes retained by the immutable release. */
+  base64: string
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-company-cloud-agent-runtime -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-company-wecom-auth -->
 <a id="deepseek-aidsh-company-wecom-auth"></a>
 
 ## `@deepseek-ai/dsh-company-wecom-auth`
 
-- `inject`: `credentials` · `storageDomain` · `connection` · `webServer`
+- `inject`: `credentials` · `storageDomain` · `connection` · `webServer` · `remoteAccess` · `workspaceRegistry`
 - `source`: [`packages/company/wecom-auth/src/config.ts:5`](../packages/company/wecom-auth/src/config.ts)
 
 ```ts config-catalog
@@ -824,6 +898,10 @@ export interface Config {
   maxResponseBytes: number
   /** Root directory under which each member receives one private default Workspace. */
   workspaceRoot?: string
+  /** Accept URL-encoded X-User-Info identity data from a trusted upstream gateway. */
+  gatewayIdentityEnabled: boolean
+  /** Optional upstream logout URL used by gateway-authenticated account pages. */
+  gatewayLogoutUrl: string
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-company-wecom-auth -->
@@ -1807,7 +1885,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-host-open-in-app`
 
 - `inject`: `webServer` · `connection` · `subprocess`
-- `source`: [`packages/host/open-in-app/src/index.ts:50`](../packages/host/open-in-app/src/index.ts)
+- `source`: [`packages/host/open-in-app/src/index.ts:51`](../packages/host/open-in-app/src/index.ts)
 
 ```ts config-catalog
 /** Open-in-app host configuration. */
@@ -4917,6 +4995,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-command-goal` | `commands` · `goals` | [`packages/goal/command-goal/src/index.ts`](../packages/goal/command-goal/src/index.ts) |
 | `@deepseek-ai/dsh-commands` | — | [`packages/interaction/commands/src/index.ts`](../packages/interaction/commands/src/index.ts) |
 | `@deepseek-ai/dsh-compaction-image-offload` | `agents` · `sessions` | [`packages/compaction/compaction-image-offload/src/index.ts`](../packages/compaction/compaction-image-offload/src/index.ts) |
+| `@deepseek-ai/dsh-company-mcp-provider` | `companyMcpProvider` · `companyWecomAuth` | [`packages/company/mcp-provider/src/index.ts`](../packages/company/mcp-provider/src/index.ts) |
 | `@deepseek-ai/dsh-computer-use` | — | [`packages/computer-use/computer-use/src/index.ts`](../packages/computer-use/computer-use/src/index.ts) |
 | `@deepseek-ai/dsh-config-editor` | `loader` · `profileContext` | [`packages/boot/config-editor/src/index.ts`](../packages/boot/config-editor/src/index.ts) |
 | `@deepseek-ai/dsh-cordis-client-runner` | — | [`packages/extensions/cordis-client-runner/src/index.ts`](../packages/extensions/cordis-client-runner/src/index.ts) |

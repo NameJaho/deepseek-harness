@@ -608,34 +608,53 @@ async register(definition: PresetDefinition): Promise<() => Promise<void>>
  */
 inspectCompositions(ctx?: Context): AgentPresetInspection[]
 
-/** Read every declared preset, including activation failures.
+/** Read selectable presets, including their activation failures.
  * @returns Display metadata and loading diagnostics.
  */
 async list(): Promise<AgentPreset[]>
 
 /** Read the selection roster.
- * @returns Current presets, each marked when it is the default.
+ * @returns Current selectable presets, each marked when it is the default.
  */
 @Remote('list') async remoteExportList(): Promise<AgentPresetRoster>
 
-/** Resolve an identity without starting an Agent.
+/** Read a declared identity's selection policy.
+ * @param id Preset identity.
+ * @returns Its normalized availability, or undefined when no definition is declared.
+ */
+availabilityOf(id: string): PresetAvailability | undefined
+
+/** Resolve a selectable identity without starting an Agent.
  * @param id Explicit preset or the current default.
  * @returns Current metadata, including failure when activation failed.
  */
 async resolve(id?: string): Promise<AgentPreset>
 
-/** Read one declaration's child plugin list as YAML, for viewing only.
+/** Resolve an identity retained for exact Session restoration.
+ * @param id Explicit durable preset identity.
+ * @returns Current metadata, including failure when activation failed.
+ */
+async resolveRetained(id: string): Promise<AgentPreset>
+
+/** Read one selectable declaration's child plugin list as YAML, for viewing only.
  * @param agentPreset Preset identity.
  * @returns The declared composition beside its published metadata.
  */
 @Remote('read') readDocument(agentPreset: string): Promise<AgentPresetDocument>
 
-/** Bind an unpublished Agent to the current preset revision.
+/** Bind an unpublished Agent to a selectable preset revision.
  * @param ctx Agent context from its setup callback.
  * @param id Requested preset, or the default.
  * @returns Bound preset identity.
  */
-async mount(ctx: Context, id?: string): Promise<AgentPreset>
+mount(ctx: Context, id?: string): Promise<AgentPreset>
+
+/** Bind an unpublished Agent while restoring an exact durable preset identity.
+ * @param ctx Agent context from its setup callback.
+ * @param id Durable preset identity.
+ * @returns Bound preset identity.
+ */
+mountRetained(ctx: Context, id: string): Promise<AgentPreset>
 
 /** Join a child to the exact revision retained by its parent.
  * @param ctx Child Agent context.

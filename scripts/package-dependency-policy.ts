@@ -71,6 +71,8 @@ const SAFE_HOST_DEPENDENCY_EXPORTS = {
 
 /** Runtime exports that require every consumer to resolve the provider's shared peer instance. */
 const PEER_REQUIRED_HOST_EXPORTS = {
+  // Cloud Agent publication and runtime use the configured Market provider's fingerprint algorithm.
+  '@deepseek-ai/dsh-company-mcp-provider': ['companyMcpFingerprint'],
   // Profile settings must match the installed Node provider's configuration schema.
   '@deepseek-ai/dsh-ptc-runtime-node/configuration': ['resolvePersistentExecution'],
   // CUA checks UserQuestionError and preserves AttachmentError from image admission.
@@ -85,7 +87,9 @@ const PEER_REQUIRED_HOST_EXPORTS = {
   '@deepseek-ai/dsh-fs': ['FsError'],
   '@deepseek-ai/dsh-scope': ['carrierKeyOf', 'createScope', 'scopeOf', 'scopeTarget'],
   // appendPluginRecord writes through the Session class's private log; pluginRecordOf is stateless.
-  '@deepseek-ai/dsh-session': ['SESSION_FORMAT_VERSION', 'appendPluginRecord', 'pluginRecordOf'],
+  '@deepseek-ai/dsh-session': ['SESSION_FORMAT_VERSION', 'SessionLogOffset', 'appendPluginRecord', 'pluginRecordOf'],
+  '@deepseek-ai/dsh-storage-domain': ['domainTable'],
+  '@deepseek-ai/dsh-tools': ['defineTool'],
   '@deepseek-ai/dsh-session-persistence': ['SessionPersistenceNotFoundError'],
   // Readers recognize a deadline's TimeoutReason only by `instanceof` against their own copy.
   '@deepseek-ai/dsh-timeout': ['deadline'],

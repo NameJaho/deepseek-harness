@@ -9,6 +9,14 @@
 
 ```mermaid
 flowchart LR
+  pkg_company_mcp_provider["company-mcp-provider"]
+  svc_companyMcpProvider["ctx.companyMcpProvider<br/>Member-authorized MCP access"]
+  pkg_company_cloud_agent["company-cloud-agent"]
+  svc_companyMcp["ctx.companyMcp<br/>Member MCP catalog Remote"]
+  pkg_company_wecom_auth["company-wecom-auth"]
+  svc_companyWecomAuth["ctx.companyWecomAuth<br/>Company member authentication"]
+  svc_cloudAgents["ctx.cloudAgents<br/>Reusable company Agents"]
+  pkg_company_cloud_agent_runtime["company-cloud-agent-runtime"]
   pkg_action_cards["action-cards"]
   svc_actionCards["ctx.actionCards<br/>Optional action cards"]
   pkg_creation_recommendations["creation-recommendations"]
@@ -350,6 +358,10 @@ flowchart LR
   pkg_compaction --> svc_compaction
   pkg_compaction_basic --> svc_compaction
   pkg_compaction_tool_result_pruner --> svc_toolResultPruner
+  pkg_company_cloud_agent --> svc_cloudAgents
+  pkg_company_mcp_provider --> svc_companyMcp
+  pkg_company_mcp_provider --> svc_companyMcpProvider
+  pkg_company_wecom_auth --> svc_companyWecomAuth
   pkg_computer_use --> svc_computerUse
   pkg_config_editor --> svc_configEditor
   pkg_cordis_host_runner --> svc_cordisInspect
@@ -504,7 +516,13 @@ flowchart LR
   svc_browserUse --> pkg_experimental_browser_use_playwright_mcp
   svc_browserUse --> pkg_experimental_browser_use_stagehand_native
   svc_clientModules --> pkg_client_hmr
+  svc_cloudAgents --> pkg_company_cloud_agent_runtime
   svc_compaction --> pkg_compaction_basic
+  svc_companyMcp --> pkg_company_cloud_agent
+  svc_companyMcpProvider --> pkg_company_cloud_agent
+  svc_companyMcpProvider --> pkg_company_mcp_provider
+  svc_companyWecomAuth --> pkg_company_cloud_agent
+  svc_companyWecomAuth --> pkg_company_mcp_provider
   svc_computerUse --> pkg_experimental_computer_use_cua_driver_mcp
   svc_computerUse --> pkg_experimental_computer_use_cua_driver_native
   svc_configEditor --> pkg_agent_default_model
@@ -650,6 +668,10 @@ flowchart LR
 
 | ctx 键 | 角色 | 所属包 | 实现 | 直接消费方 | 配套插件 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
+| `ctx.companyMcpProvider` | `seam` | [`company-mcp-provider`](../packages/company/mcp-provider) | [`company-mcp-provider`](../packages/company/mcp-provider) | [`company-mcp-provider`](../packages/company/mcp-provider), [`company-cloud-agent`](../packages/company/cloud-agent) | - | 按已验证成员查询市场，并在每次调用前重新检查授权和固定的 schema。 |
+| `ctx.companyMcp` | `service` | [`company-mcp-provider`](../packages/company/mcp-provider) | - | [`company-cloud-agent`](../packages/company/cloud-agent) | - | 在 Host 派生调用者身份，并提供已授权目录和成员启用偏好。 |
+| `ctx.companyWecomAuth` | `service` | [`company-wecom-auth`](../packages/company/wecom-auth) | - | [`company-cloud-agent`](../packages/company/cloud-agent), [`company-mcp-provider`](../packages/company/mcp-provider) | - | 验证官方企业微信身份，并解析私人 Session 所有权和业务资源授权。 |
+| `ctx.cloudAgents` | `service` | [`company-cloud-agent`](../packages/company/cloud-agent) | - | [`company-cloud-agent-runtime`](../packages/company/cloud-agent-runtime) | - | 保存成员所有的草稿和不可变发布版本，并按运行发布版本的成员授权 MCP 执行。 |
 | `ctx.actionCards` | `service` | [`action-cards`](../packages/experimental/action-cards) | - | [`creation-recommendations`](../packages/experimental/creation-recommendations), [`client-ui-action-cards`](../packages/experimental/client-ui-action-cards) | - | 负责卡片工具、卡片状态、用户操作和状态通知；各卡片种类注册自己的动作和处理器。 |
 | `ctx.pluginRecommendations` | `service` | [`plugin-recommendations`](../packages/experimental/plugin-recommendations) | - | [`client-ui-plugin-recommendations`](../packages/experimental/client-ui-plugin-recommendations) | - | 读取官方插件卡片的当前目录文本，并在用户点击后通过配置插件管理器启用该插件。 |
 | `ctx.headlessStartup` | `core` | [`headless`](../packages/bundle/headless) | - | [`headless`](../packages/bundle/headless) | - | 将解析后的任务和运行选项提供给无界面运行器及其 sandbox-policy 配置。 |

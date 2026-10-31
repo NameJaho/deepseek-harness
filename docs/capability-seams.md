@@ -7,6 +7,14 @@ A service can be a core spine service, a swappable capability seam, a bundle/com
 
 ```mermaid
 flowchart LR
+  pkg_company_mcp_provider["company-mcp-provider"]
+  svc_companyMcpProvider["ctx.companyMcpProvider<br/>Member-authorized MCP access"]
+  pkg_company_cloud_agent["company-cloud-agent"]
+  svc_companyMcp["ctx.companyMcp<br/>Member MCP catalog Remote"]
+  pkg_company_wecom_auth["company-wecom-auth"]
+  svc_companyWecomAuth["ctx.companyWecomAuth<br/>Company member authentication"]
+  svc_cloudAgents["ctx.cloudAgents<br/>Reusable company Agents"]
+  pkg_company_cloud_agent_runtime["company-cloud-agent-runtime"]
   pkg_action_cards["action-cards"]
   svc_actionCards["ctx.actionCards<br/>Optional action cards"]
   pkg_creation_recommendations["creation-recommendations"]
@@ -348,6 +356,10 @@ flowchart LR
   pkg_compaction --> svc_compaction
   pkg_compaction_basic --> svc_compaction
   pkg_compaction_tool_result_pruner --> svc_toolResultPruner
+  pkg_company_cloud_agent --> svc_cloudAgents
+  pkg_company_mcp_provider --> svc_companyMcp
+  pkg_company_mcp_provider --> svc_companyMcpProvider
+  pkg_company_wecom_auth --> svc_companyWecomAuth
   pkg_computer_use --> svc_computerUse
   pkg_config_editor --> svc_configEditor
   pkg_cordis_host_runner --> svc_cordisInspect
@@ -502,7 +514,13 @@ flowchart LR
   svc_browserUse --> pkg_experimental_browser_use_playwright_mcp
   svc_browserUse --> pkg_experimental_browser_use_stagehand_native
   svc_clientModules --> pkg_client_hmr
+  svc_cloudAgents --> pkg_company_cloud_agent_runtime
   svc_compaction --> pkg_compaction_basic
+  svc_companyMcp --> pkg_company_cloud_agent
+  svc_companyMcpProvider --> pkg_company_cloud_agent
+  svc_companyMcpProvider --> pkg_company_mcp_provider
+  svc_companyWecomAuth --> pkg_company_cloud_agent
+  svc_companyWecomAuth --> pkg_company_mcp_provider
   svc_computerUse --> pkg_experimental_computer_use_cua_driver_mcp
   svc_computerUse --> pkg_experimental_computer_use_cua_driver_native
   svc_configEditor --> pkg_agent_default_model
@@ -648,6 +666,10 @@ flowchart LR
 
 | ctx key | Role | Owner | Implementations | Direct consumers | Companion plugins | Note |
 | --- | --- | --- | --- | --- | --- | --- |
+| `ctx.companyMcpProvider` | `seam` | [`company-mcp-provider`](../packages/company/mcp-provider) | [`company-mcp-provider`](../packages/company/mcp-provider) | [`company-mcp-provider`](../packages/company/mcp-provider), [`company-cloud-agent`](../packages/company/cloud-agent) | - | Queries the Market for a verified member and rechecks authorization and pinned schemas before every invocation. |
+| `ctx.companyMcp` | `service` | [`company-mcp-provider`](../packages/company/mcp-provider) | - | [`company-cloud-agent`](../packages/company/cloud-agent) | - | Derives caller identity on the Host and exposes authorized catalog and member enablement preferences. |
+| `ctx.companyWecomAuth` | `service` | [`company-wecom-auth`](../packages/company/wecom-auth) | - | [`company-cloud-agent`](../packages/company/cloud-agent), [`company-mcp-provider`](../packages/company/mcp-provider) | - | Verifies official WeCom identities and resolves private Session ownership and business resource grants. |
+| `ctx.cloudAgents` | `service` | [`company-cloud-agent`](../packages/company/cloud-agent) | - | [`company-cloud-agent-runtime`](../packages/company/cloud-agent-runtime) | - | Retains member-owned drafts and immutable releases and authorizes MCP execution for the member running the release. |
 | `ctx.actionCards` | `service` | [`action-cards`](../packages/experimental/action-cards) | - | [`creation-recommendations`](../packages/experimental/creation-recommendations), [`client-ui-action-cards`](../packages/experimental/client-ui-action-cards) | - | Owns the card tool, card state, user actions and status notices; card kinds register their actions and handlers. |
 | `ctx.pluginRecommendations` | `service` | [`plugin-recommendations`](../packages/experimental/plugin-recommendations) | - | [`client-ui-plugin-recommendations`](../packages/experimental/client-ui-plugin-recommendations) | - | Reads the current catalog text of an official plugin card and enables the plugin through the profile plugin manager after a click. |
 | `ctx.headlessStartup` | `core` | [`headless`](../packages/bundle/headless) | - | [`headless`](../packages/bundle/headless) | - | Supplies parsed task and run options to the headless runner and its sandbox-policy configuration. |

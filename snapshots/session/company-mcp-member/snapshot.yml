@@ -1,0 +1,10 @@
+version: 1
+scenario: company-mcp-member
+profile: headless
+composition: company-mcp-member
+recording: authored
+header:
+  class: company-mcp-member
+  pin: true
+environment:
+  DSH_MCP_MARKET_TOKEN: SNAPSHOT_MARKET_SERVICE

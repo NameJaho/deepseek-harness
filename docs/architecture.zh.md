@@ -158,6 +158,7 @@ seam 正是替换一个提供方就能改变整个产品的原因。文件系统
 | 管理后台任务 | 在 `ctx.jobs` 上注册；`job_*` 工具读取或停止任务 |
 | 从外部 webhook 启动 Session | 在 `ctx.webhookRuntime` 上注册可信规则，并挂载提供方适配器 |
 | 添加文件系统访问或策略 | 注册 `ctx.fs` 提供方，或监听 `fs/*` 事件 |
+| 接入成员授权 MCP | 注册按成员隔离的 MCP Provider，从已验证 Principal 或发起 Session 解析身份 |
 | 限制所启动的进程 | 使用 `ctx.sandbox` 后端；消费方在启动进程前包装 argv |
 | 拦截请求、工具或轮次 | 使用相应的 `agent/*` 或 `tools/*` 事件；`agent/turn-stopping` 会停止轮次 |
 | 添加模型可见上下文 | 调用 `agent.inject()`；它会落到下一次获准的请求中 |

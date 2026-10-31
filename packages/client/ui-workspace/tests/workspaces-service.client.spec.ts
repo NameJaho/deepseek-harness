@@ -196,7 +196,7 @@ class FakeWorkspaces implements IWorkspaces {
 
   declare readonly create: IWorkspaces['create']
   declare readonly rename: IWorkspaces['rename']
-  declare readonly delete: IWorkspaces['delete']
+  readonly delete = vi.fn<IWorkspaces['delete']>(async () => undefined)
   declare readonly insertBefore: IWorkspaces['insertBefore']
   declare readonly insertSessionBefore: IWorkspaces['insertSessionBefore']
   readonly pinCalls: SessionId[] = []
@@ -320,6 +320,94 @@ function lastOpening(open: MockInstance<UiWorkspaceService['openWorkspace']>): P
 }
 
 describe('UiWorkspaceService', () => {
+  it('opens a logical Workspace through its capability starter without sending its id to directory creation', async () => {
+    const b = bench({ workspaces: workspaceState([workspace('physical')]) })
+    const start = vi.fn(async () => sid('agent-usage'))
+    const groups = createSnapshotStore([{ key: wid('agent:a'), title: 'Agent', sessionIds: [sid('existing')], start }])
+    b.uiWorkspace.registerGroups(groups)
+    const prepare = vi.fn()
+    await b.uiWorkspace.openWorkspace(wid('agent:a'), prepare)
+    expect(start).toHaveBeenCalledOnce()
+    expect(b.sessions.create).not.toHaveBeenCalled()
+    expect(b.sessions.retain).toHaveBeenCalledExactlyOnceWith(sid('agent-usage'), { source: 'mainView' })
+    expect(prepare).toHaveBeenCalledExactlyOnceWith(sid('agent-usage'))
+  })
+
+  it('creates a standard Session in the physical Workspace behind a logical group', async () => {
+    const b = bench({ workspaces: workspaceState([workspace('physical', [sid('existing')])]) })
+    const start = vi.fn(async () => sid('agent-usage'))
+    const groups = createSnapshotStore([{ key: wid('agent:a'), title: 'Agent', sessionIds: [sid('existing')], start }])
+    b.uiWorkspace.registerGroups(groups)
+    b.uiWorkspace.startSession(wid('agent:a'))
+    await vi.waitFor(() => { expect(b.sessions.create).toHaveBeenCalledWith({ workspaceId: wid('physical') }) })
+    expect(start).not.toHaveBeenCalled()
+  })
+
+  it('starts the explicit New Session action through the group capability when it provides one', async () => {
+    const b = bench({ workspaces: workspaceState([workspace('physical', [sid('existing')])]) })
+    const start = vi.fn(async () => sid('reconnect'))
+    const newSession = vi.fn(async () => sid('authoring'))
+    b.uiWorkspace.registerGroups(createSnapshotStore([
+      { key: wid('agent:a'), title: 'Agent', sessionIds: [sid('existing')], start, newSession },
+    ]))
+    b.uiWorkspace.startSession(wid('agent:a'))
+    await vi.waitFor(() => { expect(newSession).toHaveBeenCalledOnce() })
+    expect(start).not.toHaveBeenCalled()
+    expect(b.sessions.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses to start in an unavailable group with a localized toast and never touches its capability', async () => {
+    const b = bench({ workspaces: workspaceState([workspace('physical', [sid('existing')])]) })
+    const start = vi.fn(async () => sid('agent-usage'))
+    b.uiWorkspace.registerGroups(createSnapshotStore([
+      { key: wid('agent:a'), title: 'Agent', sessionIds: [sid('existing')], start, status: 'withdrawn' as const },
+    ]))
+    b.uiWorkspace.startSession(wid('agent:a'))
+    await vi.waitFor(() => {
+      expect(b.notify).toHaveBeenCalledExactlyOnceWith({ kind: 'createFailed', message: en['group.unavailable'] })
+    })
+    expect(start).not.toHaveBeenCalled()
+    expect(b.sessions.create).not.toHaveBeenCalled()
+  })
+
+  it('skips an unavailable group when choosing the implicit New Session target', async () => {
+    const b = bench({
+      sessions: sessionState([summary('existing', { cwd: '/w/physical', updatedAt: 2 }), summary('other-s', { cwd: '/w/other', updatedAt: 1 })]),
+      workspaces: workspaceState([workspace('physical', [sid('existing')]), workspace('other', [sid('other-s')])]),
+    })
+    const start = vi.fn(async () => sid('agent-usage'))
+    b.uiWorkspace.registerGroups(createSnapshotStore([
+      { key: wid('agent:a'), title: 'Agent', sessionIds: [sid('existing')], start, status: 'disabled' as const },
+    ]))
+    b.uiWorkspace.startSession()
+    await vi.waitFor(() => { expect(b.sessions.create).toHaveBeenCalledWith({ workspaceId: wid('other') }) })
+    expect(start).not.toHaveBeenCalled()
+    expect(b.notify).not.toHaveBeenCalled()
+  })
+
+  it('deletes a logical group through its capability and a physical Workspace through the registry', async () => {
+    const b = bench({ workspaces: workspaceState([workspace('physical', [sid('existing')]), workspace('other')]) })
+    const deletion = vi.fn(async () => {})
+    b.uiWorkspace.registerGroups(createSnapshotStore([
+      { key: wid('agent:a'), title: 'Agent', sessionIds: [sid('existing')], delete: deletion },
+    ]))
+    await b.uiWorkspace.deleteWorkspace(wid('agent:a'))
+    expect(deletion).toHaveBeenCalledOnce()
+    expect(b.workspaces.delete).not.toHaveBeenCalled()
+    await b.uiWorkspace.deleteWorkspace(wid('other'))
+    expect(b.workspaces.delete).toHaveBeenCalledExactlyOnceWith(wid('other'))
+  })
+
+  it('withdraws contributed groups when the registration is disposed', async () => {
+    const b = bench({ workspaces: workspaceState([workspace('physical', [sid('existing')])]) })
+    const dispose = b.uiWorkspace.registerGroups(createSnapshotStore([
+      { key: wid('agent:a'), title: 'Agent', sessionIds: [sid('existing')] },
+    ]))
+    expect(b.uiWorkspace.navigation.getSnapshot().items.map(item => item.workspaceId)).toEqual(['agent:a'])
+    dispose()
+    expect(b.uiWorkspace.navigation.getSnapshot().items.map(item => item.workspaceId)).toEqual(['physical'])
+  })
+
   it('prepares and selects the default Workspace after both startup baselines', async () => {
     const b = bench({ configureWorkspaces: (workspaces) => {
       workspaces.initializeDefault.mockImplementation(async () => {

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Autenticación de WeCom",
+    "description": "Autentica a los miembros de la empresa mediante WeCom y determina la propiedad de sus espacios de trabajo privados."
+  }
+}

@@ -224,8 +224,11 @@ type ProjectRowItemProps = {
   containsCurrentDescendant?: boolean
   onToggle: () => void
   onCreate: () => void
-  /** Real-Workspace actions; absent for the ungrouped bucket (no menu shown). */
-  actions?: { rename: () => void; delete: () => void } | undefined
+  /**
+   * Workspace actions; absent for the ungrouped bucket (no menu shown). Managed groups may expose
+   * deletion without rename, under the capability's own label.
+   */
+  actions?: { rename?: () => void; delete?: () => void; deleteLabel?: string | undefined } | undefined
   /** Present only for real Workspace rows in the grouped view. */
   drag?: WorkspaceRowDragProps | undefined
   /** Host account home; POSIX home-rooted hover paths display as `~`. */
@@ -248,7 +251,9 @@ interface ProjectRowAccess {
  * `containsCurrent` arrives on the node (derivation fact, no renderer scan).
  * The create button, each Workspace menu row, and the drag handle are absent
  * while the access snapshot excludes their endpoint: a real Workspace asks
- * its own resource, and the ungrouped bucket asks the global resource.
+ * its own resource, and the ungrouped bucket asks the global resource. A
+ * capability-owned group asks the global resource and its own availability,
+ * and labels an unavailable state beside its title.
  * @param props.group - derived group node.
  * @param props.containsCurrentDescendant - highlight an ancestor even when its subtree is collapsed.
  * @param props.onToggle - expand/collapse the group.
@@ -260,9 +265,19 @@ interface ProjectRowAccess {
  */
 export function ProjectRowItem(props: ProjectRowItemProps) {
   const workspaceId = props.group.workspaceId
-  return workspaceId === undefined
-    ? <UngroupedProjectRow {...props} />
+  if (workspaceId === undefined) return <UngroupedProjectRow {...props} />
+  return props.group.managed === true
+    ? <ManagedProjectRow {...props} />
     : <WorkspaceProjectRow {...props} workspaceId={workspaceId} />
+}
+
+/**
+ * A capability-owned group's header: its key names no Workspace resource, so starting a Session asks
+ * the global resource and the group's availability; deletion is the capability's own operation.
+ */
+function ManagedProjectRow(props: ProjectRowItemProps) {
+  const create = props.useRemoteAccess('session/create') && props.group.startable !== false
+  return <ProjectRow {...props} access={{ create, rename: false, delete: props.group.delete !== undefined, reorder: false }} />
 }
 
 /** The ungrouped bucket's header: no Workspace resource, so starting a Session there asks the global resource. */
@@ -295,9 +310,15 @@ function ProjectRow({
   const [menuOpen, setMenuOpen] = useState(false)
   const dragPreview = useRowDragPreview(css.dragPreview as string, DRAG_PREVIEW_PROPERTIES)
   const workspaceMenuItems = [
-    ...access.rename ? [{ id: 'rename', label: t('rename'), icon: <IconEditOutlineRegular /> }] : [],
-    ...access.delete ? [{ id: 'delete', label: t('delete.workspace'), icon: <IconTrashOutlineRegular />, danger: true }] : [],
+    ...access.rename && actions?.rename !== undefined
+      ? [{ id: 'rename', label: t('rename'), icon: <IconEditOutlineRegular /> }]
+      : [],
+    ...access.delete && actions?.delete !== undefined
+      ? [{ id: 'delete', label: actions.deleteLabel ?? t('delete.workspace'), icon: <IconTrashOutlineRegular />, danger: true }]
+      : [],
   ]
+  // A managed group that refuses new conversations names its state beside the title.
+  const unavailable = row.status === undefined || row.status === 'available' ? undefined : t(`group.status.${row.status}`)
   const ownRow = (
     <div
       className={clsx(css.projectRow, menuOpen && css.menuOpen)}
@@ -325,6 +346,7 @@ function ProjectRow({
       <span className={css.projectText}>
         <span className={css.title}>{label}</span>
       </span>
+      {unavailable !== undefined && <span className={css.groupStatus}>{unavailable}</span>}
       <span className={css.rowActions}>
         {actions !== undefined && workspaceMenuItems.length > 0 && (
           <Menu
@@ -337,8 +359,8 @@ function ProjectRow({
               // not inherit the destructive branch as an else fallback.
               /* v8 ignore next -- Menu can emit only the rename and delete rows supplied above. */
               if (id !== 'rename' && id !== 'delete') return
-              if (id === 'rename') actions.rename()
-              else actions.delete()
+              if (id === 'rename') actions.rename?.()
+              else actions.delete?.()
             }}
             portal
             closeOnPointerLeave

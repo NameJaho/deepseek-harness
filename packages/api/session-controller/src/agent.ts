@@ -224,8 +224,9 @@ export class ApiSessionAgentController {
    * while it is still reusable. A reused Session runs the requested preset, or
    * the configured default when the request names none; the preset it recorded
    * is not resolved, and a change is logged as `agent-preset/selected` before
-   * the Agent is published. A named Session that has started a turn, fails the
-   * caller's placement rule, or is written by another owner stays unchanged,
+   * the Agent is published. A named Session that has started a turn, records a
+   * retained preset, fails the caller's placement rule, or is written by another
+   * owner stays unchanged,
    * and a new Session is created instead. Requests naming one identity run in
    * arrival order, including their preset resolution, and check the named
    * Session's directory and ownership before resolving the preset.
@@ -263,24 +264,44 @@ export class ApiSessionAgentController {
     return result
   }
 
-  /**
-   * Resolve the preset id and pre-publication Agent setup for a create or resume.
-   * @param presetId - requested preset or the configured default when omitted.
-   * @returns the resolved preset identity and Agent setup callback.
-   */
-  async composeAgent(presetId: string | undefined): Promise<ApiSessionComposition> {
+  private async compose(
+    presetId: string | undefined,
+    retained: boolean,
+  ): Promise<ApiSessionComposition> {
     const presets = this.ctx.get('agentPresets')
     if (presets === undefined) {
       return { setup: (agentCtx) => { installModelSelection(agentCtx) } }
     }
-    const resolvedId = (await presets.resolve(presetId)).id
+    const exact = retained && presetId !== undefined
+    const resolvedId = exact
+      ? (await presets.resolveRetained(presetId)).id
+      : (await presets.resolve(presetId)).id
     return {
       agentPreset: resolvedId,
       setup: async (agentCtx) => {
         installModelSelection(agentCtx)
-        await presets.mount(agentCtx, resolvedId)
+        if (exact) await presets.mountRetained(agentCtx, resolvedId)
+        else await presets.mount(agentCtx, resolvedId)
       },
     }
+  }
+
+  /**
+   * Resolve the preset id and pre-publication Agent setup for ordinary creation.
+   * @param presetId - requested selectable preset or the configured default when omitted.
+   * @returns the resolved preset identity and Agent setup callback.
+   */
+  composeAgent(presetId: string | undefined): Promise<ApiSessionComposition> {
+    return this.compose(presetId, false)
+  }
+
+  /**
+   * Resolve the exact preset identity recorded by a durable Session.
+   * @param presetId - recorded preset, or the selectable default for legacy preset-less Sessions.
+   * @returns the resolved preset identity and Agent setup callback.
+   */
+  composeRetainedAgent(presetId: string | undefined): Promise<ApiSessionComposition> {
+    return this.compose(presetId, true)
   }
 
   private liveAgent(sessionId: SessionId): ApiSessionAgentResult | undefined {
@@ -315,7 +336,7 @@ export class ApiSessionAgentController {
     if (hasApiSessionSubagentOwner(this.ctx, { header: observation.header }, undefined)) {
       throw new ApiSessionSubagentOwnership(sessionId)
     }
-    const composition = await this.composeAgent(this.presetForObservation(observation))
+    const composition = await this.composeRetainedAgent(this.presetForObservation(observation))
     const published = this.ctx.sessions.get(sessionId)
     const live = this.ctx.agents.get(sessionId)
     if (published !== undefined && hasApiSessionSubagentOwner(this.ctx, published, live)) {
@@ -369,7 +390,9 @@ export class ApiSessionAgentController {
       if (observed.header.cwd !== request.cwd) {
         throw new ApiSessionCwdConflict(sessionId, request.cwd, observed.header.cwd)
       }
-      reusable = request.reusable(sessionId) && !observed.events.some(event => event.type === 'turn/start')
+      reusable = request.reusable(sessionId)
+        && !observed.events.some(event => event.type === 'turn/start')
+        && this.recordedPresetIsReusable(observed)
     }
     const composition = await this.composeAgent(request.agentPreset)
     if (!reusable) return this.createMinted(request.cwd, composition)
@@ -428,6 +451,12 @@ export class ApiSessionAgentController {
   private isBlank(session: Session): boolean {
     const boundary = this.ctx.agents.turnBoundaryOf(session)
     return boundary.openTurnStartSeq === null && boundary.lastTurn === 0
+  }
+
+  /** A stored blank Session recording a retained preset stays with its owner instead of being adopted by ordinary creation. */
+  private recordedPresetIsReusable(observation: SessionObservation): boolean {
+    const current = this.presetForObservation(observation)
+    return current === undefined || this.ctx.get('agentPresets')?.availabilityOf(current) !== 'retained'
   }
 
   /** Without a roster, reuse cannot apply a named preset. */

@@ -11,6 +11,7 @@ import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import SessionController from '../src/index.ts'
 import type { ApiSessionAgentController } from '../src/agent.ts'
+import { SessionCommandController } from '../src/commands.ts'
 import { createSessionTestController, testSessionPersistence } from './test-remote.ts'
 
 const defaults = {
@@ -90,6 +91,56 @@ describe('SessionController facade', () => {
     await stateFrames.return?.(undefined)
     await expect(controller.wait({ sessionId, afterSeq: -1, maxMessages: 10, timeoutMs: 50 }, signal))
       .resolves.toMatchObject({ reason: 'idle' })
+  })
+
+  it('routes creation through one registered provider until its owner disposes it', async () => {
+    const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
+    await mountAgentLoopTestDependencies(ctx)
+    await mountAgentLoopTestHarness(ctx)
+    const gateway: Partial<TypertGatewayService> = { getPendingRemoteEvents: () => [] }
+    ctx.provide('typertGateway', gateway as TypertGatewayService)
+    const controller = await createSessionTestController(ctx, defaults)
+    const ordinary = vi.spyOn(SessionCommandController.prototype, 'create')
+      .mockImplementation(request => Promise.resolve({ sessionId: request.sessionId ?? SessionId('ordinary') }))
+    onTestFinished(() => { ordinary.mockRestore() })
+    const callers: Context[] = []
+    const dispose = controller.registerCreationProvider(async (request, create, caller) => {
+      callers.push(caller)
+      const created = await create({ ...request, cwd: '/placed' })
+      return { ...created, agentPreset: 'placed' }
+    })
+
+    await expect(controller.create({ sessionId: SessionId('routed'), cwd: '/requested' }))
+      .resolves.toEqual({ sessionId: SessionId('routed'), agentPreset: 'placed' })
+    expect(ordinary).toHaveBeenLastCalledWith({ sessionId: SessionId('routed'), cwd: '/placed' })
+    expect(callers).toHaveLength(1)
+    expect(() => controller.registerCreationProvider(async (request, create) => await create(request)))
+      .toThrow('creation provider is already registered')
+
+    await dispose()
+    await expect(controller.create({ sessionId: SessionId('direct'), cwd: '/requested' }))
+      .resolves.toEqual({ sessionId: SessionId('direct') })
+    expect(ordinary).toHaveBeenLastCalledWith({ sessionId: SessionId('direct'), cwd: '/requested' })
+    expect(callers).toHaveLength(1)
+  })
+
+  it('admits one fork placement provider at a time and frees the slot when disposed', async () => {
+    const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
+    await mountAgentLoopTestDependencies(ctx)
+    await mountAgentLoopTestHarness(ctx)
+    const gateway: Partial<TypertGatewayService> = { getPendingRemoteEvents: () => [] }
+    ctx.provide('typertGateway', gateway as TypertGatewayService)
+    const controller = await createSessionTestController(ctx, defaults)
+    const decline = () => Promise.resolve(undefined)
+    const dispose = controller.registerForkPlacementProvider(decline)
+
+    expect(() => controller.registerForkPlacementProvider(decline))
+      .toThrow('fork placement provider is already registered')
+    await dispose()
+    const replacement = controller.registerForkPlacementProvider(decline)
+    await replacement()
   })
 
   it('owns Host service methods and publishes Agent lifecycle projections', async () => {

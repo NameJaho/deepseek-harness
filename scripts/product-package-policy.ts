@@ -16,6 +16,10 @@ export interface ProductPackagePolicy {
  * Optional integrations may be reached by an optional bundle without becoming default capabilities.
  */
 export const PRODUCT_PACKAGE_POLICY: Readonly<Record<string, ProductPackagePolicy>> = {
+  'packages/company/wecom-auth': { category: 'optional', reason: 'Enterprise member login requires an explicitly configured WeCom application.' },
+  'packages/company/mcp-provider': { category: 'optional', reason: 'MCP Market requires an explicit enterprise and service credential.' },
+  'packages/company/cloud-agent': { category: 'optional', reason: 'Company Agent publication consumes the opt-in member MCP provider.' },
+  'packages/company/cloud-agent-runtime': { category: 'optional', reason: 'Scoped runtime mounted by company Agent retained presets.' },
   'packages/core/agent-tool-presentation': { category: 'optional', reason: 'Deprecated selector retained for existing executor configurations.' },
   'packages/browser-use/browser-use': { category: 'optional', reason: 'Service definition used by explicitly selected browser providers.' },
   'packages/computer-use/computer-use': { category: 'optional', reason: 'Service definition used by explicitly selected computer providers.' },

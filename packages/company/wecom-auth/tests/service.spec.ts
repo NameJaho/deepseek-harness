@@ -8,6 +8,7 @@ import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import WebServer from '@deepseek-ai/dsh-host-webserver'
 import * as Connection from '@deepseek-ai/dsh-client-connection'
 import RemoteAccessService from '@deepseek-ai/dsh-api-remote-access'
+import type { RemoteInvocation } from '@deepseek-ai/dsh-typert-protocol'
 import WorkspaceRegistry from '@deepseek-ai/dsh-workspace'
 import { afterEach, expect, it, onTestFinished, vi } from 'vitest'
 import { MemoryCredentials } from '../../../credentials/credentials/tests/memory.ts'
@@ -65,7 +66,7 @@ async function fixture(overrides: Partial<{ gatewayIdentityEnabled: boolean; gat
   await ctx.plugin(WebServer, { host: '127.0.0.1', port: 0 })
   new RemoteAccessService(ctx)
   await ctx.plugin(Connection, { trustedHosts: ['login.example'], requireBrowserLogin: true })
-  const fiber = ctx.plugin(Auth, Config({ ...config, ...overrides } as Config))
+  const fiber = ctx.plugin(Auth, Config(Object.assign({}, config, overrides)))
   await fiber
   ctx.effect(() => ctx.webServer.registerFallback((req, res) => {
     if (ctx.connection.authorizeIndex(req, res)) { res.writeHead(200); res.end('APPLICATION') }
@@ -75,7 +76,7 @@ async function fixture(overrides: Partial<{ gatewayIdentityEnabled: boolean; gat
       method: init.method ?? 'GET', headers: { host: 'login.example', ...Object.fromEntries(new Headers(init.headers)) },
     }, (incoming) => {
       const chunks: Buffer[] = []
-      incoming.on('data', (chunk) => { chunks.push(Buffer.from(chunk)) })
+      incoming.on('data', (chunk: Uint8Array) => { chunks.push(Buffer.from(chunk)) })
       incoming.on('end', () => {
         const headers = new Headers()
         for (let i = 0; i < incoming.rawHeaders.length; i += 2) {
@@ -100,9 +101,35 @@ async function fixture(overrides: Partial<{ gatewayIdentityEnabled: boolean; gat
     return { attempt, binding }
   }
   const exchange = (attempt: Awaited<ReturnType<typeof begin>>, state = attempt.attempt.state, binding = attempt.binding) => request(
-    '/auth/wecom/callback?' + new URLSearchParams({ code: 'PRIVATE_CODE', state }), { headers: { cookie: binding } })
+    '/auth/wecom/callback?' + new URLSearchParams({ code: 'PRIVATE_CODE', state }).toString(), { headers: { cookie: binding } })
   return { ctx, fiber, request, begin, exchange, warnings, storedHeaders, ...official }
 }
+
+function authForPeer(ctx: Context, peer: RemoteInvocation['peer']) {
+  const invocation: RemoteInvocation = {
+    request: { namespace: 'companyMcp', method: 'catalog', args: {} }, service: 'companyMcp', peer, signal: peer.signal,
+    uplink: <In>(): AsyncIterable<In> => ({ [Symbol.asyncIterator]: () => ({ next: async () => ({ done: true, value: undefined }) }) }),
+  }
+  return ctx.extend({ invocation }).companyWecomAuth
+}
+
+it('derives Market identity only from a verified official member or the retained Session owner', async () => {
+  const f = await fixture()
+  const result = await f.exchange(await f.begin())
+  const cookie = result.headers.getSetCookie()[0]?.split(';')[0]
+  if (cookie === undefined) throw new Error('Missing session cookie')
+  const admitted = f.ctx.connection.admit({ headers: { host: 'login.example', cookie } })
+  if (!('peer' in admitted)) throw new Error('Expected member Peer')
+  const memberAuth = authForPeer(f.ctx, admitted.peer)
+  const subject = memberAuth.marketSubject()
+  expect(subject).toEqual({ scope: 'wecom:wwfixture:member', corpId: 'wwfixture', sub: 'member' })
+  const retained = brandString<SessionId>('retained-member-session')
+  f.ctx.companyWecomAuth.registerResourceProvider({ bindings: () => [], sessionOwner: id => id === retained ? subject.scope : undefined })
+  expect(f.ctx.companyWecomAuth.marketSubject(retained)).toEqual(subject)
+  expect(() => f.ctx.companyWecomAuth.marketSubject(brandString<SessionId>('unowned')))
+    .toThrow(expect.objectContaining({ code: 'wecom-auth/forbidden' }))
+  expect(() => f.ctx.companyWecomAuth.marketSubject()).toThrow(expect.objectContaining({ code: 'wecom-auth/forbidden' }))
+})
 
 it('admits a trusted gateway identity and exposes its configured logout destination', async () => {
   const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
@@ -112,6 +139,7 @@ it('admits a trusted gateway identity and exposes its configured logout destinat
   const admitted = f.ctx.connection.admit({ headers: gatewayHeaders })
   if (!('peer' in admitted)) throw new Error('Expected gateway Peer')
   expect(admitted.peer.principal.kind).toBe('gateway-user')
+  expect(() => authForPeer(f.ctx, admitted.peer).marketSubject()).toThrow(expect.objectContaining({ code: 'wecom-auth/forbidden' }))
   const me = await f.request('/auth/me', { headers: gatewayHeaders })
   expect(me.status).toBe(200)
   expect(await me.json()).toMatchObject({ session: { userId: 'portal-user', displayName: 'Portal User', logoutUrl: 'https://portal.example/logout' } })
@@ -175,7 +203,7 @@ it('binds state to a browser, consumes once and preserves only local redirects',
 it('accepts browser-bound cross-site OAuth navigation but rejects foreign Origin fetches', async () => {
   const f = await fixture()
   const attempt = await f.begin()
-  const path = '/auth/wecom/callback?' + new URLSearchParams({ code: 'PRIVATE_CODE', state: attempt.attempt.state })
+  const path = '/auth/wecom/callback?' + new URLSearchParams({ code: 'PRIVATE_CODE', state: attempt.attempt.state }).toString()
   expect((await f.request(path, { headers: { cookie: attempt.binding, origin: 'https://attacker.invalid', 'sec-fetch-site': 'cross-site' } })).status).toBe(403)
   expect(f.calls).toHaveLength(0)
   expect((await f.request(path, { headers: { cookie: attempt.binding, 'sec-fetch-site': 'cross-site' } })).status).toBe(303)
@@ -184,7 +212,7 @@ it('accepts browser-bound cross-site OAuth navigation but rejects foreign Origin
 it('bounds concurrent login attempts before asynchronous storage writes', async () => {
   const f = await fixture()
   await f.fiber.dispose()
-  await f.ctx.plugin(Auth, { ...config, maxLoginAttempts: 1 })
+  await f.ctx.plugin(Auth, Object.assign({}, config, { maxLoginAttempts: 1 }))
   const results = await Promise.all([f.request('/login'), f.request('/login')])
   expect(results.map(result => result.status).sort()).toEqual([200, 429])
 })
@@ -269,13 +297,13 @@ it('isolates each member to one default Workspace and its Sessions', async () =>
   if (firstSnapshot.type !== 'baseline' || secondSnapshot.type !== 'baseline' || firstSnapshot.owner || secondSnapshot.owner) {
     throw new Error('Expected non-owner access baselines')
   }
-  expect(firstSnapshot.grants).toEqual(expect.arrayContaining([
-    { resource: { kind: 'workspace', id: firstWorkspace.id }, actions: expect.any(Array) },
-    { resource: { kind: 'session', id: firstSessionId }, actions: expect.any(Array) },
+  expect(firstSnapshot.grants.map(grant => grant.resource)).toEqual(expect.arrayContaining([
+    { kind: 'workspace', id: firstWorkspace.id },
+    { kind: 'session', id: firstSessionId },
   ]))
-  expect(firstSnapshot.grants).not.toEqual(expect.arrayContaining([
-    { resource: { kind: 'workspace', id: secondWorkspace.id }, actions: expect.any(Array) },
-    { resource: { kind: 'session', id: secondSessionId }, actions: expect.any(Array) },
+  expect(firstSnapshot.grants.map(grant => grant.resource)).not.toEqual(expect.arrayContaining([
+    { kind: 'workspace', id: secondWorkspace.id },
+    { kind: 'session', id: secondSessionId },
   ]))
   expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'workspace/follow', resources: [{ kind: 'workspace', id: secondWorkspace.id }] })).toEqual({ kind: 'deny', reason: 'no-allow' })
   expect(f.ctx.remoteAccess.decide({ principal: firstPrincipal, action: 'session/control', resources: [{ kind: 'session', id: secondSessionId }] })).toEqual({ kind: 'deny', reason: 'no-allow' })
@@ -383,6 +411,6 @@ it('rejects gettoken success without required token fields', async () => {
 it('bounds official API responses and sanitizes network failures', async () => {
   const f = officialFixture()
   f.overrides.set('/gettoken', { errcode: 0, access_token: 'x'.repeat(500), expires_in: 7200 })
-  const api = new WecomOfficial({ ...config, maxResponseBytes: 100 }, 'TEST_SECRET', new AbortController().signal)
+  const api = new WecomOfficial(Object.assign({}, config, { maxResponseBytes: 100 }), 'TEST_SECRET', new AbortController().signal)
   await expect(api.exchange('code')).rejects.toMatchObject({ code: 'wecom-auth/remote-failure' })
 })

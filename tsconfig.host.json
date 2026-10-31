@@ -8,6 +8,9 @@
     "rewriteRelativeImportExtensions": false
   },
   "include": [
+    "packages/company/mcp-provider/tests/**/*.ts",
+    "packages/company/cloud-agent/tests/**/*.spec.ts",
+    "packages/company/cloud-agent-runtime/tests/**/*.ts",
     "apps/web/tests/creation-recommendations.e2e.ts",
     "apps/web/tests/plugin-recommendations.e2e.ts",
     "apps/web/tests/japanese-plugin-metadata.e2e.ts",
@@ -264,6 +267,10 @@
     "scripts/client-bundle-purity.spec.ts"
   ],
   "references": [
+    { "path": "./packages/company/cloud-agent/tsconfig.host.json" },
+    { "path": "./packages/company/mcp-provider" },
+    { "path": "./packages/company/cloud-agent-runtime" },
+
     { "path": "./packages/experimental/action-cards" },
     { "path": "./packages/experimental/creation-recommendations" },
     { "path": "./packages/experimental/plugin-recommendations" },

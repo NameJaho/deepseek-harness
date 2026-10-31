@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-10-31-mcp-market-member-authorization.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-31-mcp-market-member-authorization.md
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-10-31-mcp-market-member-authorization:
+  en: bb86f912b094f973
+  zh: 7b855f9f298428c0
+/2026-10-31-mcp-market-member-authorization/summary:
+  en: add24c11e704d24d
+  zh: c0dc997c60e28765
+/2026-10-31-mcp-market-member-authorization/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-10-31-mcp-market-member-authorization/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-10-31-mcp-market-member-authorization/compatibility:
+  en: 73af89bf5e6d7f53
+  zh: a591d98bd9608623
+/2026-10-31-mcp-market-member-authorization/verification:
+  en: 1ad840b2aee13a8e
+  zh: 57f43c67952cb0c6
+/2026-10-31-mcp-market-member-authorization/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

@@ -1400,6 +1400,16 @@ describe('headless recorded-session snapshots', () => {
               expect(results.every(result => result.isError === false)).toBe(true)
               expect(log).toContain('# Office task routing')
             }
+            if (scenario.name === 'company-mcp-member') {
+              const log = actualLogs[0]!.content
+              const results = parseSessionLog(log).flatMap(event => event.type === 'tool/result' ? [event.data.message] : [])
+              expect(results).toMatchObject([
+                { toolCallId: 'member-1', isError: false, content: [{ type: 'text', text: 'Member-authorized CRM result.' }] },
+                { toolCallId: 'member-2', isError: true, content: [{ type: 'text', text: 'Error: MCP access is unavailable for this account; check your Market permissions' }] },
+              ])
+              expect(log).not.toContain('SNAPSHOT_MARKET_SERVICE')
+              expect(log).not.toContain('wecom:fixture:alice')
+            }
             if (scenario.name === 'advanced-toolchain') verifyAdvancedToolchain(actualLogs)
             if (scenario.name === 'session-query-spill') {
               await verifySessionQuerySpill(actualLogs[0]!.content, spillRoot, locatorRoot)
