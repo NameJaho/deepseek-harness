@@ -71,6 +71,19 @@ if [[ -n "$DSH_INHERITED_HOME" && "$DSH_INHERITED_HOME" != "$DSH_HOME" ]]; then
     "$DSH_INHERITED_HOME" "$DSH_HOME" >&2
 fi
 
+# Optional container execution: keep the application/runtime tree read-only in
+# the container and allow only the deployment's user/session workspace roots.
+if [[ -n "${DSH_CONTAINER_SANDBOX_IMAGE:-}" ]]; then
+  if [[ "$(id -u)" == "0" && -z "${DSH_CONTAINER_USER:-}" ]]; then
+    printf '启用容器沙箱时请以专用非 root 用户运行，或显式设置一个拥有工作区的非 root DSH_CONTAINER_USER\n' >&2
+    exit 1
+  fi
+  DSH_CONTAINER_USER="${DSH_CONTAINER_USER:-$(id -u):$(id -g)}"
+  DSH_CONTAINER_WORKSPACE_ROOTS="${DSH_CONTAINER_WORKSPACE_ROOTS:-$DSH_BASE/workspaces:$DSH_HOME}"
+  DSH_CONTAINER_READONLY_ROOTS="${DSH_CONTAINER_READONLY_ROOTS:-$DSH_REPO:$(dirname "$(command -v node)")}"
+  export DSH_CONTAINER_USER DSH_CONTAINER_WORKSPACE_ROOTS DSH_CONTAINER_READONLY_ROOTS
+fi
+
 DSH_START_TIMEOUT_SECONDS="${DSH_START_TIMEOUT_SECONDS:-120}"
 for timeout_name in DSH_STOP_TIMEOUT_SECONDS DSH_START_TIMEOUT_SECONDS; do
   if [[ ! "${!timeout_name}" =~ ^[1-9][0-9]*$ ]]; then

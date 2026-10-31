@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/sandbox/sandbox-container/README.md
+/:
+  en: fed842f3e267f918
+  zh: 819c69708a12c958
+/deepseek-ai-dsh-sandbox-container:
+  en: 7060d0b3ec887642
+  zh: 3997e897dbecc63f
+/deepseek-ai-dsh-sandbox-container/summary:
+  en: 3bd54a1f682376c5
+  zh: a9c7943c01ba1e72
+/deepseek-ai-dsh-sandbox-container/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 7b30b973a849247d
+/deepseek-ai-dsh-sandbox-container/use-this-package:
+  en: bf59db2a39b44b0f
+  zh: 851d7a43303aa7c8
+/deepseek-ai-dsh-sandbox-container/understand-the-implementation:
+  en: e2dc3be2283e1286
+  zh: 7a774ac5225cda58
+/deepseek-ai-dsh-sandbox-container/further-exploration:
+  en: 2e1effa60e31dcce
+  zh: e5f58957c3494786
+/deepseek-ai-dsh-sandbox-container/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-sandbox-container/model-experience/container-execution:
+  en: c7754e1e8dc3b00a
+  zh: 06a2a19d8effb41d
+/deepseek-ai-dsh-sandbox-container/model-experience/container-execution/what-the-model-sees:
+  en: 3f6d0bd6ca7310d7
+  zh: 4d145e98742b34b9
+/deepseek-ai-dsh-sandbox-container/model-experience/container-execution/token-effect:
+  en: d53a34c7f9a401c5
+  zh: ae02d40d20509453
+/deepseek-ai-dsh-sandbox-container/model-experience/container-execution/kv-cache-effect:
+  en: bc1072c0da642113
+  zh: 6ef5a330c03aa2aa
+/deepseek-ai-dsh-sandbox-container/known-limitations-and-deferred-work:
+  en: 8c60e7cb7040f7fa
+  zh: fc59cf9aaddda8f5
+/deepseek-ai-dsh-sandbox-container/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 3bb0c20c93f16f98

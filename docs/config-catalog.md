@@ -3059,6 +3059,38 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-repeat-tool-reminder -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-sandbox-container -->
+<a id="deepseek-aidsh-sandbox-container"></a>
+
+## `@deepseek-ai/dsh-sandbox-container`
+
+- `source`: [`packages/sandbox/sandbox-container/src/index.ts:20`](../packages/sandbox/sandbox-container/src/index.ts)
+
+```ts config-catalog
+/** Deployment settings for the container runtime and its resource budget. */
+export interface Config {
+  /** Container runtime executable, normally `docker` or `podman`. */
+  runtime?: string
+  /** Image containing the command executables used by the selected profile. */
+  image: string
+  /** Physical deployment roots under which Session workspaces must exist. */
+  workspaceRoots?: string[]
+  /** Host roots mounted read-only so the container can run the shipped runtime. */
+  readOnlyRoots?: string[]
+  /** Container memory limit accepted by the runtime, for example `1g`. */
+  memory?: string
+  /** Container CPU quota accepted by the runtime, for example `2`. */
+  cpus?: string
+  /** Maximum number of processes in one container. */
+  pidsLimit?: number
+  /** Numeric uid:gid used inside the container; empty uses the non-root service uid:gid. */
+  user?: string
+  /** Runtime probe timeout in milliseconds. */
+  probeTimeoutMs?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-sandbox-container -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-sandbox-local -->
 <a id="deepseek-aidsh-sandbox-local"></a>
 

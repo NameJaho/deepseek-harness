@@ -23,6 +23,7 @@ export const PRODUCT_PACKAGE_POLICY: Readonly<Record<string, ProductPackagePolic
   'packages/company/cloud-agent': { category: 'optional', reason: 'Company Agent publication and Web UI require explicit deployment configuration.' },
   'packages/company/cloud-agent-runtime': { category: 'optional', reason: 'Scoped runtime mounted only by company Agent retained presets.' },
   'packages/company/external-agent-subagent': { category: 'optional', reason: 'External Agent delegation requires explicit logical agents and credential references.' },
+  'packages/sandbox/sandbox-container': { category: 'optional', reason: 'Container confinement requires an explicitly configured runtime image and workspace allow-list.' },
   'packages/browser-use/browser-use': { category: 'optional', reason: 'Service definition used by explicitly selected browser providers.' },
   'packages/computer-use/computer-use': { category: 'optional', reason: 'Service definition used by explicitly selected computer providers.' },
   'packages/lsp/lsp': { category: 'optional', reason: 'Service definition for deployment-configured language servers.' },

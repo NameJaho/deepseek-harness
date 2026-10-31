@@ -239,6 +239,23 @@
     # sessions pin workspace-write + ask through the permission service below.
     - id: sandbox
       name: '@deepseek-ai/dsh-sandbox-local'
+      disabled: !!js Boolean(process.env.DSH_CONTAINER_SANDBOX_IMAGE)
+
+    # A deployment can replace host-local confinement with one disposable
+    # container per confined call. The container provider mounts only the
+    # calling Session workspace and is enabled only when an image is set.
+    - id: sandbox-container
+      name: '@deepseek-ai/dsh-sandbox-container'
+      disabled: !!js "!process.env.DSH_CONTAINER_SANDBOX_IMAGE"
+      config:
+        runtime: !!js process.env.DSH_CONTAINER_RUNTIME ?? 'docker'
+        image: !!js process.env.DSH_CONTAINER_SANDBOX_IMAGE ?? ''
+        workspaceRoots: !!js "(process.env.DSH_CONTAINER_WORKSPACE_ROOTS ?? process.cwd()).split(':').map((value) => value.trim()).filter((value) => value !== '')"
+        readOnlyRoots: !!js "(process.env.DSH_CONTAINER_READONLY_ROOTS ?? process.cwd()).split(':').map((value) => value.trim()).filter((value) => value !== '')"
+        memory: !!js process.env.DSH_CONTAINER_MEMORY ?? '1g'
+        cpus: !!js process.env.DSH_CONTAINER_CPUS ?? '2'
+        pidsLimit: !!js Number(process.env.DSH_CONTAINER_PIDS_LIMIT ?? 256)
+        user: !!js process.env.DSH_CONTAINER_USER ?? ''
 
     - id: sandbox-policy
       name: '@deepseek-ai/dsh-sandbox-policy'
