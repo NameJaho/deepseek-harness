@@ -2,8 +2,9 @@
 # 企业微信自建应用测试环境：强制登录，不接受公网 Owner 启动凭据。
 # 公网域名在上游终止 TLS，由反向代理保留 Host 并转发到 DSH_PORT。
 # 应用 Secret 仅从服务端环境读取，不写入 patch、profile 或日志。
-# DSH_* 变量不能写进仓库 .env（dsh 会拒绝启动）；改为 export，或写入 DSH_LAUNCH_ENV
-# 指向的文件（默认 $DSH_BASE/launch.env，权限 600），该文件中的值覆盖当前 shell。
+# DSH_* 变量不能写进仓库 .env（dsh 会拒绝启动）；写入仓库根目录 startup.env（已 gitignore，
+# 模板见 startup.env.example），或 DSH_LAUNCH_ENV 指向的文件（默认 $DSH_BASE/launch.env）。
+# 两个文件都会以 export 方式加载并覆盖当前 shell，launch.env 最后加载；权限应为 600。
 set -euo pipefail
 # 不设置全局 umask：安装与构建产物在仓库内，须保持仓库属主的默认权限；
 # 数据目录与服务进程在下方单独收紧。
@@ -19,6 +20,13 @@ if [[ -n "$foreign_path" ]]; then
   exit 1
 fi
 
+DSH_STARTUP_ENV="$DSH_REPO/startup.env"
+if [[ -f "$DSH_STARTUP_ENV" ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  source "$DSH_STARTUP_ENV"
+  set +a
+fi
 DSH_BASE="${DSH_BASE:-$HOME/dsh-dev}"
 DSH_LAUNCH_ENV="${DSH_LAUNCH_ENV:-$DSH_BASE/launch.env}"
 if [[ -f "$DSH_LAUNCH_ENV" ]]; then
