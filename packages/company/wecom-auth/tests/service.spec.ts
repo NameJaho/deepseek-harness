@@ -119,6 +119,13 @@ it('admits a trusted gateway identity and exposes its configured logout destinat
   expect(await account.text()).toContain('https://portal.example/logout')
 })
 
+it('falls back to WeCom OAuth when gateway identity is enabled but the request has no gateway header', async () => {
+  const f = await fixture({ gatewayIdentityEnabled: true, gatewayLogoutUrl: 'https://portal.example/logout' })
+  const { attempt } = await f.begin()
+  expect(attempt.state).toEqual(expect.any(String))
+  expect((await f.request('/auth/me')).status).toBe(401)
+})
+
 it('redirects protected root, offers desktop QR and automatically authorizes a WeCom browser', async () => {
   const f = await fixture()
   const root = await f.request('/?tab=mine&token=private')
