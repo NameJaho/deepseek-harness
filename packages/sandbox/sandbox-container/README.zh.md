@@ -34,7 +34,7 @@ DSH_CONTAINER_WORKSPACE_ROOTS=/srv/dsh/workspaces:/srv/dsh/data
 DSH_CONTAINER_READONLY_ROOTS=/srv/dsh/app
 ```
 
-提供方接受 `docker` 或 `podman`，把配置的只读运行时根目录按原路径挂载，并把 Session 工作区挂载到 `/workspace`。测试启动器会把宿主 Node 可执行文件目录加入只读根目录，因为 PTC 会在沙箱包装调用前解析可执行文件。`read-only` 以只读方式挂载工作区；`workspace-write` 以读写方式挂载。额外可写根目录会被拒绝，因为每次容器必须只有一个明确的工作区挂载。
+提供方接受 `docker` 或 `podman`，把配置的只读运行时根目录按原路径挂载，并把 Session 工作区挂载到 `/workspace`。测试启动器会把宿主 Node 可执行文件目录加入只读根目录，因为 PTC 会在沙箱包装调用前解析可执行文件。`read-only` 在工作区的 `--mount` 选项中添加 `readonly`；`workspace-write` 使用默认的读写绑定挂载。额外可写根目录会被拒绝，因为每次容器必须只有一个明确的工作区挂载。
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|

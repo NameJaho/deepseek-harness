@@ -106,6 +106,7 @@ export class ContainerSandboxProvider extends SandboxProvider {
   private readonly allowedRoots: readonly string[]
   private readonly readOnlyRoots: readonly string[]
   private readonly probe: (runtime: string, timeoutMs: number) => Promise<void>
+  /** Settles when the runtime probe succeeds; rejects when the runtime is unavailable. */
   readonly ready: Promise<void>
 
   /** @param ctx - Cordis owner of the `ctx.sandbox` service. @param config - container runtime and isolation settings. */
@@ -159,7 +160,7 @@ export class ContainerSandboxProvider extends SandboxProvider {
     const workspaceStat = await stat(workspace).catch((error: unknown) => { throw new SandboxUnsupportedPolicyError(`sandbox-container: workspace is unavailable: ${String(error)}`) })
     if (!workspaceStat.isDirectory()) throw new SandboxUnsupportedPolicyError('sandbox-container: workspaceRoot must be a directory')
 
-    const mountMode = policy.mode === 'read-only' ? 'ro' : 'rw'
+    const mountMode = policy.mode === 'read-only' ? ',readonly' : ''
     const wrapped: string[] = [
       this.config.runtime, 'run', '--rm', '--init', '--network=none', '--read-only',
       '--tmpfs', '/tmp:rw,nosuid,nodev,noexec', '--cap-drop=ALL', '--security-opt=no-new-privileges',
@@ -167,7 +168,7 @@ export class ContainerSandboxProvider extends SandboxProvider {
       '--user', this.config.user,
     ]
     for (const root of this.readOnlyRoots) wrapped.push('--mount', `type=bind,src=${root},dst=${root},readonly`)
-    wrapped.push('--mount', `type=bind,src=${workspace},dst=/workspace,${mountMode}`, '--workdir', '/workspace')
+    wrapped.push('--mount', `type=bind,src=${workspace},dst=/workspace${mountMode}`, '--workdir', '/workspace')
     if (policy.sessionId !== undefined) wrapped.push('--label', `com.deepseek.dsh.session=${policy.sessionId}`)
     wrapped.push(this.config.image, ...argv)
     return {

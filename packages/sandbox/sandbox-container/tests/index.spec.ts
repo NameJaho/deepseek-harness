@@ -42,7 +42,7 @@ describe('container argv', () => {
     expect(result.argv).toContain('--network=none')
     expect(result.argv).toContain('--cap-drop=ALL')
     expect(result.argv).toContain(`type=bind,src=${await realpath(readOnly)},dst=${await realpath(readOnly)},readonly`)
-    expect(result.argv).toContain(`type=bind,src=${await realpath(root)},dst=/workspace,rw`)
+    expect(result.argv).toContain(`type=bind,src=${await realpath(root)},dst=/workspace`)
     expect(result.argv.at(-4)).toBe('node:24-bookworm')
     expect(result.argv.at(-3)).toBe('/bin/bash')
   })
@@ -50,7 +50,7 @@ describe('container argv', () => {
   it('mounts the workspace read-only and labels the Session', async () => {
     const { root, service } = await provider()
     const result = await service.confine(['node', '-e', '1'], policy(root, 'read-only'))
-    expect(result.argv).toContain(`type=bind,src=${await realpath(root)},dst=/workspace,ro`)
+    expect(result.argv).toContain(`type=bind,src=${await realpath(root)},dst=/workspace,readonly`)
     expect(result.argv).toContain('com.deepseek.dsh.session=session-a')
   })
 

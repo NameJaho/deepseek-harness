@@ -34,7 +34,7 @@ DSH_CONTAINER_WORKSPACE_ROOTS=/srv/dsh/workspaces:/srv/dsh/data
 DSH_CONTAINER_READONLY_ROOTS=/srv/dsh/app
 ```
 
-The provider accepts `docker` or `podman`, mounts configured read-only runtime roots at their original paths, and mounts the Session workspace as `/workspace`. The test launcher adds the host Node executable directory to the read-only roots because PTC resolves its executable before the sandbox wraps the call. `read-only` binds the workspace read-only; `workspace-write` binds it read-write. Additional writable roots are rejected because the container must have one explicit workspace mount per call.
+The provider accepts `docker` or `podman`, mounts configured read-only runtime roots at their original paths, and mounts the Session workspace as `/workspace`. The test launcher adds the host Node executable directory to the read-only roots because PTC resolves its executable before the sandbox wraps the call. `read-only` adds `readonly` to the workspace `--mount` option; `workspace-write` uses the default read-write bind mount. Additional writable roots are rejected because the container must have one explicit workspace mount per call.
 
 | Field | Default | Meaning |
 |---|---|---|
