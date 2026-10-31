@@ -45,11 +45,6 @@ kind: "package-bundle"
         maxOutputBytes: 262144
         maxRetainedRuns: 1000
         allowContinuation: false
-- name: '@deepseek-ai/dsh-tool-subagent'
-  config:
-    provider: external-research
-    toolName: subagent_external_research
-    maxDepth: provider-managed
 ```
 
 | 字段 | 含义 |
