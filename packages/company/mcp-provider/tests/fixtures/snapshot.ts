@@ -22,13 +22,9 @@ export async function apply(ctx: Context): Promise<void> {
     const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>
     let data: unknown
     switch (request.url) {
-      case '/api/mcp/admin/user/list':
-        if (body.keyword !== 'alice') throw new Error('Expected current WeCom identity')
-        data = { records: [{ userId: 101, thirdUid: 'alice', userStatus: '3', name: 'Alice' }], total: 1, pageNum: 1, pageSize: 100 }
-        break
       case '/api/mcp/list': {
-        const viewer = JSON.parse(decodeURIComponent(String(request.headers['x-user-info']))) as { userId: number }
-        if (viewer.userId !== 101) throw new Error('Expected mapped portal identity')
+        const viewer = JSON.parse(decodeURIComponent(String(request.headers['x-user-info']))) as { userId: string; userName: string }
+        if (viewer.userId !== 'alice' || viewer.userName !== 'alice') throw new Error('Expected verified WeCom identity')
         data = { records: [{ id: 10001, name: 'crm', displayName: 'CRM', description: 'Customer lookup',
           authorized: true, accessStatus: 'open', toolCount: 1 }], total: 1, pageNum: 1, pageSize: 100 }
         break
