@@ -988,6 +988,9 @@ importers:
       '@deepseek-ai/dsh-company-cloud-agent-runtime':
         specifier: workspace:*
         version: link:../../packages/company/cloud-agent-runtime
+      '@deepseek-ai/dsh-company-knowledge':
+        specifier: workspace:*
+        version: link:../../packages/company/knowledge
       '@deepseek-ai/dsh-company-mcp-provider':
         specifier: workspace:*
         version: link:../../packages/company/mcp-provider
