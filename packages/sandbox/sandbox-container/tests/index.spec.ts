@@ -8,6 +8,7 @@ import { Service } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ContainerSandboxProvider from '../src/index.ts'
 import type { Config } from '../src/index.ts'
+import { parseInvocation } from '../src/runner.ts'
 
 const dirs: string[] = []
 afterEach(async () => { await Promise.all(dirs.splice(0).map(dir => rm(dir, { recursive: true, force: true })) ) })
@@ -34,24 +35,35 @@ async function provider(overrides: Partial<Config> = {}) {
 
 const policy = (root: string, mode: 'read-only' | 'workspace-write' = 'workspace-write') => ({ mode, workspaceRoot: root, sessionId: SessionId('session-a') })
 
-describe('container argv', () => {
+// Runtime fixtures and mount destinations require POSIX paths and executable files.
+describe.skipIf(process.platform === 'win32')('container argv', () => {
   it('mounts only the selected workspace read-write and disables network/capabilities', async () => {
     const { root, readOnly, service } = await provider()
     const result = await service.confine(['/bin/bash', '-c', 'echo ok'], policy(root))
+    const invocation = parseInvocation(result.argv.at(-1)!)
     expect(result.enforcement).toBe('full')
-    expect(result.argv).toContain('--network=none')
-    expect(result.argv).toContain('--cap-drop=ALL')
-    expect(result.argv).toContain(`type=bind,src=${await realpath(readOnly)},dst=${await realpath(readOnly)},readonly`)
-    expect(result.argv).toContain(`type=bind,src=${await realpath(root)},dst=/workspace`)
-    expect(result.argv.at(-4)).toBe('node:24-bookworm')
-    expect(result.argv.at(-3)).toBe('/bin/bash')
+    expect(result.argv[0]).toBe(process.execPath)
+    expect(invocation.image).toBe('node:24-bookworm')
+    expect(invocation.options).toContain('--network=none')
+    expect(invocation.options).toContain('--cap-drop=ALL')
+    expect(invocation.options).toContain(`type=bind,src=${await realpath(readOnly)},dst=${await realpath(readOnly)},readonly`)
+    expect(invocation.options).toContain(`type=bind,src=${await realpath(root)},dst=${root}`)
+    expect(invocation.command).toEqual(['/bin/bash', '-c', 'echo ok'])
   })
 
   it('mounts the workspace read-only and labels the Session', async () => {
     const { root, service } = await provider()
     const result = await service.confine(['node', '-e', '1'], policy(root, 'read-only'))
-    expect(result.argv).toContain(`type=bind,src=${await realpath(root)},dst=/workspace,readonly`)
-    expect(result.argv).toContain('com.deepseek.dsh.session=session-a')
+    const invocation = parseInvocation(result.argv.at(-1)!)
+    expect(invocation.options).toContain(`type=bind,src=${await realpath(root)},dst=${root},readonly`)
+    expect(invocation.options).toContain('com.deepseek.dsh.session=session-a')
+  })
+
+  it('uses the image Node executable instead of the host binary', async () => {
+    const { root, service } = await provider({ nodeExecutable: '/opt/node/bin/node' })
+    const result = await service.confine([process.execPath, '--eval', '1 + 1'], policy(root))
+    const invocation = parseInvocation(result.argv.at(-1)!)
+    expect(invocation.command).toEqual(['/opt/node/bin/node', '--eval', '1 + 1'])
   })
 
   it('rejects a workspace outside the deployment allow-list', async () => {
@@ -113,6 +125,12 @@ describe('container argv', () => {
       ['read-only root', { image: 'node', readOnlyRoots: ['relative'] }],
       ['workspace host root', { image: 'node', workspaceRoots: ['/'] }],
       ['read-only host root', { image: 'node', readOnlyRoots: ['/'] }],
+      ['host system binaries', { readOnlyRoots: ['/usr/bin'] }],
+      ['host system libraries', { readOnlyRoots: ['/lib'] }],
+      ['host system parent', { readOnlyRoots: ['/usr'] }],
+      ['image Node directory', { readOnlyRoots: ['/usr/local/bin'] }],
+      ['mount delimiter injection', { readOnlyRoots: ['/tmp/work,src=/etc'] }],
+      ['quoted mount path', { workspaceRoots: ['/tmp/"workspace'] }],
       ['user', { image: 'node', user: '0:0' }], ['memory', { image: 'node', memory: 'x y' }],
       ['cpus', { image: 'node', cpus: 'x y' }],
     ]
@@ -125,6 +143,6 @@ describe('container argv', () => {
   it('does not require a Session label for an agentless call', async () => {
     const { root, service } = await provider()
     const result = await service.confine(['true'], { mode: 'read-only', workspaceRoot: root })
-    expect(result.argv).not.toContain('--label')
+    expect(parseInvocation(result.argv.at(-1)!).options).not.toContain('--label')
   })
 })

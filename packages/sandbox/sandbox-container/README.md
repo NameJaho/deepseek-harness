@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Run Bash, terminals, and Node-backed execution in a disposable Docker or Podman container. Each confined call mounts only the authorized Session workspace at `/workspace`; the container has no network, a read-only root filesystem, no Linux capabilities, and explicit CPU, memory, and process limits. The provider fails closed when the runtime or image is unavailable.
+Run Bash, terminals, and Node-backed execution in a disposable Docker or Podman container. Each confined call mounts only the authorized Session workspace at its original absolute path; the container has no network, a read-only root filesystem, no Linux capabilities, and explicit CPU, memory, and process limits. The provider fails closed when the runtime or image is unavailable.
 
 ## Table of Contents
 
@@ -25,26 +25,28 @@ Run Bash, terminals, and Node-backed execution in a disposable Docker or Podman 
 <a id="use-this-package"></a>
 ## Use this package
 
-Set `DSH_CONTAINER_SANDBOX_IMAGE` to enable the provider in the shipped base bundle. The launcher also sets an allow-list of workspace roots; set `DSH_CONTAINER_WORKSPACE_ROOTS` explicitly when the deployment stores workspaces outside `DSH_BASE/workspaces` or `DSH_HOME`. The image must contain the executable paths used by the selected consumers, including Bash and the Node runtime used by PTC.
+Set `DSH_CONTAINER_SANDBOX_IMAGE` to enable the provider in the shipped base bundle. The launcher also sets an allow-list of workspace roots; set `DSH_CONTAINER_WORKSPACE_ROOTS` explicitly when the deployment stores workspaces outside `DSH_BASE/workspaces` or `DSH_HOME`. The image must provide Bash and its own Node runtime. `nodeExecutable` selects Node inside the image; it defaults to `/usr/local/bin/node` for the official Node image. Do not mount host system executable or library directories into the image.
 
 ```bash
 DSH_CONTAINER_SANDBOX_IMAGE=node:24-bookworm
 DSH_CONTAINER_RUNTIME=docker
 DSH_CONTAINER_WORKSPACE_ROOTS=/srv/dsh/workspaces:/srv/dsh/data
-DSH_CONTAINER_READONLY_ROOTS=/srv/dsh/app
+DSH_CONTAINER_READONLY_ROOTS=/srv/dsh/app/packages:/srv/dsh/app/vendor:/srv/dsh/app/node_modules
 ```
 
-The provider accepts `docker` or `podman`, mounts configured read-only runtime roots at their original paths, and mounts the Session workspace as `/workspace`. The test launcher adds the host Node executable directory to the read-only roots because PTC resolves its executable before the sandbox wraps the call. `read-only` adds `readonly` to the workspace `--mount` option; `workspace-write` uses the default read-write bind mount. Additional writable roots are rejected because the container must have one explicit workspace mount per call.
+The provider accepts `docker` or `podman`, mounts configured application roots read-only, and mounts the Session workspace at its original absolute path so PTC can use the same working directory on both sides. The launcher mounts only the repository’s `packages`, `vendor`, and `node_modules` directories, leaving root environment files outside the container. Every file under a configured read-only root is readable to session code; use roots containing runtime assets only. `read-only` adds `readonly` to the workspace `--mount` option; `workspace-write` uses the default read-write bind mount. Additional writable roots and mounts over image system executable or library directories are rejected. Mount paths cannot contain commas, double quotes, or line breaks.
 
 | Field | Default | Meaning |
 |---|---|---|
 | `runtime` | `docker` | Container runtime executable. |
 | `image` | required | Image used for every confined call. |
+| `nodeExecutable` | `/usr/local/bin/node` | Node executable installed inside the image. |
 | `workspaceRoots` | `[]` | Required allow-list for Session workspace roots. |
 | `readOnlyRoots` | `[]` | Host roots mounted read-only for runtime files. |
 | `memory` | `1g` | Container memory limit. |
 | `cpus` | `2` | Container CPU quota. |
 | `pidsLimit` | `256` | Maximum processes in one container. |
+| `probeTimeoutMs` | `5000` | Runtime probe and container cleanup timeout in milliseconds. |
 | `user` | DSH service uid:gid | Non-root numeric uid and gid inside the container; the workspace must be owned or writable by this identity. |
 
 -----
@@ -55,7 +57,7 @@ The provider accepts `docker` or `podman`, mounts configured read-only runtime r
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-The provider implements `ctx.sandbox`; existing Bash, terminal, and PTC consumers continue to resolve the shared Session policy. It emits `runtime run --rm --init --network=none --read-only` followed by the resource limits, capability drop, read-only runtime mounts, the one Session workspace mount, the image, and the original argv. The Session id is a container label for operator inspection. A new container is created for every confined call, so process state does not cross calls or users.
+The provider implements `ctx.sandbox`; existing Bash, terminal, and PTC consumers continue to resolve the shared Session policy. A host runner starts `runtime run --rm --init --network=none --read-only` with resource limits and the authorized mounts. The image uses its own executables and libraries. For PTC, a guest runner forwards Docker stdin/stdout to the worker’s private control pipe; program diagnostics go to stderr. Attachment closure kills the worker, and the host runner explicitly removes its named container after client exit. A new container is created for every confined call, so process state does not cross calls or users.
 
 The provider checks the runtime before service readiness and checks the workspace against the configured physical-root allow-list before creating argv. Container runtime failures are reported as `SANDBOX_UNAVAILABLE`; unsupported extra mounts are reported as `SANDBOX_UNSUPPORTED_POLICY`.
 
@@ -91,9 +93,10 @@ The provider does not change tool schemas or prompt sections.
 
 <a id="known-limitations-and-deferred-work"></a>
 
+- The provider supports POSIX hosts with Linux images; Windows host path translation is not implemented.
 - The container shares the host kernel. Use gVisor or a microVM when a kernel-level boundary is required.
-- Network access is disabled for the container. MCP and knowledge requests stay in the host process and are not available to code running inside the container.
-- The image must provide compatible executable paths and runtime libraries; the provider does not build or synchronize images.
+- Network access is disabled for the container. MCP and knowledge requests stay in the host process; approved PTC host tool bindings remain available to container programs.
+- The image must provide Node and compatible command executables. Host-native modules mounted with application files may require a build for the image; the provider does not build or synchronize images.
 - Filesystem tools still use their existing Host policy and do not run inside the container. The container protects code execution; the workspace allow-list and Remote authorization protect direct file operations.
 
 <a id="dev-note"></a>

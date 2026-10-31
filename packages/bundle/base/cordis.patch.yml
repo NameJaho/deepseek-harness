@@ -250,8 +250,9 @@
       config:
         runtime: !!js process.env.DSH_CONTAINER_RUNTIME ?? 'docker'
         image: !!js process.env.DSH_CONTAINER_SANDBOX_IMAGE ?? ''
+        nodeExecutable: !!js process.env.DSH_CONTAINER_NODE_EXECUTABLE ?? '/usr/local/bin/node'
         workspaceRoots: !!js "(process.env.DSH_CONTAINER_WORKSPACE_ROOTS ?? process.cwd()).split(':').map((value) => value.trim()).filter((value) => value !== '')"
-        readOnlyRoots: !!js "(process.env.DSH_CONTAINER_READONLY_ROOTS ?? process.cwd()).split(':').map((value) => value.trim()).filter((value) => value !== '')"
+        readOnlyRoots: !!js "(process.env.DSH_CONTAINER_READONLY_ROOTS ?? '').split(':').map((value) => value.trim()).filter((value) => value !== '')"
         memory: !!js process.env.DSH_CONTAINER_MEMORY ?? '1g'
         cpus: !!js process.env.DSH_CONTAINER_CPUS ?? '2'
         pidsLimit: !!js Number(process.env.DSH_CONTAINER_PIDS_LIMIT ?? 256)

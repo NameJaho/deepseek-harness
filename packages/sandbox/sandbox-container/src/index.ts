@@ -9,6 +9,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { stat } from 'node:fs/promises'
 import { isAbsolute, relative, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Service } from '@deepseek-ai/cordis'
 import schema from '@deepseek-ai/schemastery'
 import { SandboxProvider, SandboxUnavailableError, SandboxUnsupportedPolicyError, canonicalPath } from '@deepseek-ai/dsh-sandbox'
@@ -22,6 +23,8 @@ export interface Config {
   runtime?: string
   /** Image containing the command executables used by the selected profile. */
   image: string
+  /** Node executable inside the image, independent of the host installation. */
+  nodeExecutable?: string
   /** Physical deployment roots under which Session workspaces must exist. */
   workspaceRoots?: string[]
   /** Host roots mounted read-only so the container can run the shipped runtime. */
@@ -34,7 +37,7 @@ export interface Config {
   pidsLimit?: number
   /** Numeric uid:gid used inside the container; empty uses the non-root service uid:gid. */
   user?: string
-  /** Runtime probe timeout in milliseconds. */
+  /** Runtime probe and container cleanup timeout in milliseconds. */
   probeTimeoutMs?: number
 }
 
@@ -47,7 +50,9 @@ export interface ContainerSandboxInternals {
 }
 
 function validateRoot(path: string, label: string): string {
-  if (!isAbsolute(path) || path.includes('\0')) throw new Error(`sandbox-container: ${label} must be an absolute path without NUL bytes`)
+  if (!isAbsolute(path) || /[\0,"\r\n]/u.test(path)) {
+    throw new Error(`sandbox-container: ${label} must be an absolute path without NUL bytes, commas, double quotes, or line breaks`)
+  }
   const resolved = resolve(path)
   if (resolved === '/') throw new Error(`sandbox-container: ${label} must not be the host root`)
   return resolved
@@ -91,6 +96,7 @@ export class ContainerSandboxProvider extends SandboxProvider {
   static Config: schema<Config, ResolvedConfig> = schema.object({
     runtime: schema.string().default('docker'),
     image: schema.string().required(),
+    nodeExecutable: schema.string().default('/usr/local/bin/node'),
     workspaceRoots: schema.array(schema.string()).default([]),
     readOnlyRoots: schema.array(schema.string()).default([]),
     memory: schema.string().default('1g'),
@@ -117,6 +123,7 @@ export class ContainerSandboxProvider extends SandboxProvider {
       ...resolved,
       runtime: validateRuntime(resolved.runtime),
       image: validateImage(resolved.image),
+      nodeExecutable: validateRuntime(resolved.nodeExecutable),
       memory: resolved.memory.trim(),
       cpus: resolved.cpus.trim(),
       user: validateUser(resolved.user === '' ? processUser() : resolved.user),
@@ -124,7 +131,15 @@ export class ContainerSandboxProvider extends SandboxProvider {
     if (this.config.memory === '' || /\s/u.test(this.config.memory)) throw new Error('sandbox-container: memory must be a non-empty runtime value without whitespace')
     if (this.config.cpus === '' || /\s/u.test(this.config.cpus)) throw new Error('sandbox-container: cpus must be a non-empty runtime value without whitespace')
     this.allowedRoots = Object.freeze(this.config.workspaceRoots.map(path => canonicalPath(validateRoot(path, 'workspaceRoots entry'))))
-    this.readOnlyRoots = Object.freeze(this.config.readOnlyRoots.map(path => canonicalPath(validateRoot(path, 'readOnlyRoots entry'))))
+    this.readOnlyRoots = Object.freeze(this.config.readOnlyRoots.map((path) => {
+      const root = validateRoot(canonicalPath(validateRoot(path, 'readOnlyRoots entry')), 'readOnlyRoots entry')
+      for (const system of ['/bin', '/sbin', '/usr/bin', '/usr/sbin', '/usr/local/bin', '/lib', '/lib64', '/usr/lib']) {
+        if (isUnder(system, root) || isUnder(root, system)) {
+          throw new Error(`sandbox-container: readOnlyRoots must not replace image system executables or libraries: ${root}`)
+        }
+      }
+      return root
+    }))
     this.probe = internals.probe ?? (runtime => execFileAsync(runtime, ['version'], { timeout: this.config.probeTimeoutMs }).then(() => undefined))
     /* v8 ignore next 3 -- the rejection continuation is exercised by the
      * unavailable-runtime test; V8 attributes this async throw to the generated
@@ -153,7 +168,8 @@ export class ContainerSandboxProvider extends SandboxProvider {
     if (policy.additionalWritableRoots !== undefined && policy.additionalWritableRoots.length > 0) {
       throw new SandboxUnsupportedPolicyError('sandbox-container: additional writable roots are not supported; mount one Session workspace per call')
     }
-    const workspace = canonicalPath(validateRoot(policy.workspaceRoot, 'workspaceRoot'))
+    const destination = validateRoot(policy.workspaceRoot, 'workspaceRoot')
+    const workspace = validateRoot(canonicalPath(destination), 'workspaceRoot')
     if (workspace === '/' || this.allowedRoots.length === 0 || !this.allowedRoots.some(root => isUnder(workspace, root))) {
       throw new SandboxUnsupportedPolicyError(`sandbox-container: workspace ${JSON.stringify(workspace)} is outside the configured workspaceRoots`)
     }
@@ -162,17 +178,19 @@ export class ContainerSandboxProvider extends SandboxProvider {
 
     const mountMode = policy.mode === 'read-only' ? ',readonly' : ''
     const wrapped: string[] = [
-      this.config.runtime, 'run', '--rm', '--init', '--network=none', '--read-only',
+      'run', '--rm', '--init', '--network=none', '--read-only',
       '--tmpfs', '/tmp:rw,nosuid,nodev,noexec', '--cap-drop=ALL', '--security-opt=no-new-privileges',
       '--pids-limit', String(this.config.pidsLimit), '--memory', this.config.memory, '--cpus', this.config.cpus,
       '--user', this.config.user,
     ]
     for (const root of this.readOnlyRoots) wrapped.push('--mount', `type=bind,src=${root},dst=${root},readonly`)
-    wrapped.push('--mount', `type=bind,src=${workspace},dst=/workspace${mountMode}`, '--workdir', '/workspace')
+    wrapped.push('--mount', `type=bind,src=${workspace},dst=${destination}${mountMode}`, '--workdir', destination)
     if (policy.sessionId !== undefined) wrapped.push('--label', `com.deepseek.dsh.session=${policy.sessionId}`)
-    wrapped.push(this.config.image, ...argv)
+    /* v8 ignore next -- built-lib.e2e.ts executes the published runner-entry.js sibling under plain Node. */
+    const entry = fileURLToPath(new URL(import.meta.url.endsWith('.ts') ? './runner-entry.ts' : './runner-entry.js', import.meta.url))
+    const command = [argv[0] === process.execPath ? this.config.nodeExecutable : argv[0] as string, ...argv.slice(1)]
     return {
-      argv: wrapped,
+      argv: [process.execPath, entry, 'host', JSON.stringify({ runtime: this.config.runtime, timeoutMs: this.config.probeTimeoutMs, options: wrapped, image: this.config.image, nodeExecutable: this.config.nodeExecutable, entry, command })],
       enforcement: 'full',
       denialSignatures: ['read-only file system', 'permission denied', 'operation not permitted', 'read-only filesystem'],
       runnerFailureRules: [{ fatalSignatures: ['Unable to find image', 'pull access denied', 'Cannot connect to the Docker daemon', 'permission denied while trying to connect to the Docker daemon'] }],

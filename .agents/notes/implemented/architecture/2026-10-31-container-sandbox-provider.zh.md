@@ -10,9 +10,9 @@ Status: implemented
 
 ## Decision
 
-`@deepseek-ai/dsh-sandbox-container` 实现现有的 `ctx.sandbox` 提供方 seam。部署设置 `DSH_CONTAINER_SANDBOX_IMAGE` 后，base bundle 会停用宿主机提供方并启用容器提供方。每次受限调用都会创建一次性 Docker 或 Podman 容器，使用只读根文件系统、关闭网络、不保留 Linux capabilities，并设置 CPU、内存和进程上限；容器只为当前 Session 工作区提供一个可写挂载。配置的运行时根目录以只读方式挂载，使镜像能够执行 shipped Bash 和 Node 路径。提供方要求非 root 容器 uid:gid 和工作区根目录 allow-list；额外可写根目录会被拒绝，不会扩大挂载集合。
+`@deepseek-ai/dsh-sandbox-container` 实现现有的 `ctx.sandbox` 提供方 seam。部署设置 `DSH_CONTAINER_SANDBOX_IMAGE` 后，base bundle 会停用宿主机提供方并启用容器提供方。每次受限调用都会创建一次性 Docker 或 Podman 容器，使用只读根文件系统、关闭网络、不保留 Linux capabilities，并设置 CPU、内存和进程上限；容器只为当前 Session 工作区提供一个可写挂载。应用根目录以只读方式挂载以提供 bootstrap 文件。镜像提供自身的 Bash、Node 和系统库；宿主系统可执行文件或库目录的挂载会被拒绝。工作区保留原始绝对路径，使 PTC 在镜像内能够切换目录。提供方要求非 root 容器 uid:gid 和工作区根目录 allow-list；额外可写根目录会被拒绝，不会扩大挂载集合。
 
-容器边界保护代码执行。Host 文件工具继续使用现有策略和 Remote 授权，MCP 与知识库请求继续由 Host 进程发起。容器按调用创建而非作为用户常驻进程，因此进程状态不会跨调用或用户共享，清理由容器运行时的 `--rm` 生命周期负责。
+容器边界保护代码执行。Host 文件工具继续使用现有策略和 Remote 授权，MCP 与知识库请求继续由 Host 进程发起。容器按调用创建而非作为用户常驻进程，因此进程状态不会跨调用或用户共享，运行时使用 `--rm` 删除已退出容器。宿主 runner 也会在客户端退出后删除具名容器。对于 PTC，镜像内 runner 将 Docker 连接流转接到 worker 的专用 fd 7；worker 诊断输出使用 stderr，连接关闭会终止 worker。worker 专用管道与程序输出保持分离，遵循[子进程控制管道决策](2026-09-11-subprocess-control-pipe.zh.md)。
 
 ## Alternatives considered
 
@@ -21,6 +21,8 @@ Status: implemented
 **把 Docker 命令放进 Cloud Agent 或 Bash 消费者。** 这样会让终端、PTC 和未来的 subprocess 消费者走不同执行路径，并重复策略、取消和失败处理。提供方 seam 让现有消费者都走同一条隔离路径。
 
 **每个用户维护一个常驻容器。** 常驻容器可以保留 shell 状态，但需要第二个进程生命周期所有者、空闲回收、重启恢复和状态失效处理。当前先使用每次调用容器来提供隔离保证；持久交互状态仍属于终端提供方的独立职责。
+
+**把宿主 Node 安装目录挂载进镜像。** 这种方式保留可执行文件路径，但系统 Node 目录还可能包含链接了不同 libc 的 shell 程序。镜像自身的可执行文件避免将宿主发行版与镜像耦合。显式应用挂载仍然提供 JavaScript bootstrap。
 
 ## Consequences
 

@@ -3066,7 +3066,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-sandbox-container`
 
-- `source`: [`packages/sandbox/sandbox-container/src/index.ts:20`](../packages/sandbox/sandbox-container/src/index.ts)
+- `source`: [`packages/sandbox/sandbox-container/src/index.ts:21`](../packages/sandbox/sandbox-container/src/index.ts)
 
 ```ts config-catalog
 /** Deployment settings for the container runtime and its resource budget. */
@@ -3075,6 +3075,8 @@ export interface Config {
   runtime?: string
   /** Image containing the command executables used by the selected profile. */
   image: string
+  /** Node executable inside the image, independent of the host installation. */
+  nodeExecutable?: string
   /** Physical deployment roots under which Session workspaces must exist. */
   workspaceRoots?: string[]
   /** Host roots mounted read-only so the container can run the shipped runtime. */
@@ -3087,7 +3089,7 @@ export interface Config {
   pidsLimit?: number
   /** Numeric uid:gid used inside the container; empty uses the non-root service uid:gid. */
   user?: string
-  /** Runtime probe timeout in milliseconds. */
+  /** Runtime probe and container cleanup timeout in milliseconds. */
   probeTimeoutMs?: number
 }
 ```
