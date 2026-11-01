@@ -58,6 +58,7 @@ interface ConnectionRpcInterceptor {
 interface RegisteredFetchRoute {
   readonly methods: ReadonlySet<string>
   readonly requestBody: ConnectionFetchRoute['requestBody']
+  readonly allowNonOwner?: true
   readonly fetch: ConnectionFetchRoute['fetch']
 }
 
@@ -317,8 +318,10 @@ export class HostConnectionService extends Service implements HostConnectionHand
         if (route?.methods.has(request.method) === true) {
           // Exact routes bypass Gateway access checks, so only the owner reaches them.
           // oxlint-disable-next-line typescript/no-unnecessary-condition -- other packages merge non-owner kinds into PrincipalMap.
-          if (peer.principal.kind !== 'owner') return Promise.resolve(new Response('forbidden', { status: 403 }))
-          return route.fetch(request)
+          if (peer.principal.kind !== 'owner' && route.allowNonOwner !== true) {
+            return Promise.resolve(new Response('forbidden', { status: 403 }))
+          }
+          return route.fetch(request, peer)
         }
         const endpoint = endpointFromPath(channel, pathname)
         const interceptor = this.interceptors.get(channel)
@@ -338,6 +341,7 @@ export class HostConnectionService extends Service implements HostConnectionHand
     const registered: RegisteredFetchRoute = {
       methods: new Set(route.methods),
       requestBody: route.requestBody,
+      ...route.allowNonOwner === true ? { allowNonOwner: true as const } : {},
       fetch: route.fetch,
     }
     return owner.effect(() => {

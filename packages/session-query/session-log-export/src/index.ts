@@ -1,6 +1,8 @@
 /** Session export command and Host-owned ZIP download and Markdown copy routes. */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-api-remote-access'
+import type { PeerScope } from '@deepseek-ai/dsh-typert-protocol'
 import type { CommandDefinitionId } from '@deepseek-ai/dsh-commands/brand'
 import Schema from '@deepseek-ai/schemastery'
 import { brandString } from '@deepseek-ai/dsh-brand'
@@ -62,7 +64,8 @@ interface SessionLogConnection {
       readonly path: string
       readonly methods: readonly ('GET' | 'HEAD')[]
       readonly requestBody: 'buffered'
-      readonly fetch: (request: Request) => Promise<Response>
+      readonly allowNonOwner?: true
+      readonly fetch: (request: Request, peer: PeerScope) => Promise<Response>
     }): () => Promise<void>
   }
 }
@@ -90,9 +93,10 @@ export function apply(ctx: Context, config: Config = {}): void {
     path: SESSION_LOG_EXPORT_PATH,
     methods: ['GET', 'HEAD'],
     requestBody: 'buffered',
-    fetch: async (request) => {
+    allowNonOwner: true,
+    fetch: async (request, peer) => {
       const response = await sessionLogExportResponse(
-        ctx,
+        ctx, peer,
         request,
         config.compressionLevel ?? DEFAULT_SESSION_LOG_COMPRESSION_LEVEL,
       )
@@ -105,8 +109,9 @@ export function apply(ctx: Context, config: Config = {}): void {
     path: SESSION_MARKDOWN_EXPORT_PATH,
     methods: ['GET', 'HEAD'],
     requestBody: 'buffered',
-    fetch: async (request) => {
-      const response = await sessionMarkdownResponse(ctx, request)
+    allowNonOwner: true,
+    fetch: async (request, peer) => {
+      const response = await sessionMarkdownResponse(ctx, peer, request)
       if (request.method === 'GET') return response
       await response.body?.cancel()
       return new Response(null, { status: response.status, headers: response.headers })
@@ -129,7 +134,7 @@ function connectionOf(ctx: Context): SessionLogConnection {
  * @param request - authenticated Fetch request with a required `sessionId` query.
  * @returns the Markdown response, or a sanitized status for invalid, missing, or unavailable reads.
  */
-async function sessionMarkdownResponse(ctx: Context, request: Request): Promise<Response> {
+async function sessionMarkdownResponse(ctx: Context, peer: PeerScope, request: Request): Promise<Response> {
   const sessionIdValue = new URL(request.url).searchParams.get('sessionId')
   if (sessionIdValue === null || sessionIdValue.length === 0) {
     return new Response('missing or invalid sessionId query parameter', { status: 400 })
@@ -139,6 +144,10 @@ async function sessionMarkdownResponse(ctx: Context, request: Request): Promise<
     return new Response('session markdown export is unavailable: missing session-query service', { status: 500 })
   }
   const sessionId = brandString<SessionId>(sessionIdValue)
+  // oxlint-disable-next-line typescript/no-unnecessary-condition -- non-owner principals are merged by company auth.
+  if (peer.principal.kind !== 'owner' && ctx.remoteAccess.decide({ principal: peer.principal, action: 'cloudAgents/export', resources: [{ kind: 'session', id: sessionId }] }).kind !== 'allow') {
+    return new Response('forbidden', { status: 403 })
+  }
   try {
     request.signal.throwIfAborted()
     const snapshot = await sessionQuery.readSession(sessionId)
@@ -172,6 +181,7 @@ function isSessionNotFound(error: unknown): boolean {
 
 async function sessionLogExportResponse(
   ctx: Context,
+  peer: PeerScope,
   request: Request,
   compressionLevel: SessionLogCompressionLevel,
 ): Promise<Response> {
@@ -184,6 +194,10 @@ async function sessionLogExportResponse(
     return new Response('missing or invalid sessionId query parameter', { status: 400 })
   }
   const sessionId = brandString<SessionId>(sessionIdValue)
+  // oxlint-disable-next-line typescript/no-unnecessary-condition -- non-owner principals are merged by company auth.
+  if (peer.principal.kind !== 'owner' && ctx.remoteAccess.decide({ principal: peer.principal, action: 'cloudAgents/export', resources: [{ kind: 'session', id: sessionId }] }).kind !== 'allow') {
+    return new Response('forbidden', { status: 403 })
+  }
   const deps = sessionLogExportDeps(ctx)
   if (deps.sessionQuery === undefined
     || deps.sessionPersistence === undefined

@@ -195,12 +195,14 @@ export interface ConnectionFetchRoute {
   readonly methods: readonly ConnectionFetchMethod[]
   /** Buffered requests obey the configured JSON cap; streaming requests arrive with backpressure and no aggregate cap. */
   readonly requestBody: ConnectionRequestBodyMode
+  /** Allow the route to authenticate a non-owner Peer against its own resource. */
+  readonly allowNonOwner?: true
   /**
    * Handle one request after the physical carrier has applied its trust and
    * authentication policy. Only owner Peers reach an exact route; the shared
-   * handler answers 403 for every other principal.
+   * handler may apply feature-owned resource authorization for a non-owner.
    */
-  readonly fetch: (request: Request) => Promise<Response>
+  readonly fetch: (request: Request, peer: PeerScope) => Promise<Response>
 }
 
 /** Host registry for exact Fetch routes that cannot use JSON Remote invocation. */

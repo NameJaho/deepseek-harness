@@ -99,7 +99,7 @@ export class CloudAgentService extends TypertRemoteService {
           const editors = [...new Set([...ids, ...authCtx.companyWecomAuth.defaultWorkspaceSessions(principal)])]
           return [...authCtx.companyWecomAuth.sessionBindings(ids), ...editors.map(id => ({
             resource: { kind: 'session' as const, id }, role: { name: 'company:agent-edit', resource: 'session' as const,
-              actions: ['cloudAgents/catalog', 'cloudAgents/follow', 'cloudAgents/create', 'cloudAgents/update', 'cloudAgents/publish', 'cloudAgents/unpublish',
+              actions: ['cloudAgents/catalog', 'cloudAgents/follow', 'cloudAgents/export', 'cloudAgents/create', 'cloudAgents/update', 'cloudAgents/publish', 'cloudAgents/unpublish',
                 'cloudAgents/preview', 'cloudAgents/clone', 'cloudAgents/delete', 'cloudAgents/startAuthoring',
                 'cloudAgents/deleteUnboundAuthoringSessions', 'commands/execute'] as const },
             condition: ({ action, args }: { action: string; args?: Readonly<Record<string, unknown>> }) =>
