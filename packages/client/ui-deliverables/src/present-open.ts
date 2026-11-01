@@ -1,5 +1,7 @@
 /** Serve change summaries and comparisons, and open declared or changed workspace files verified by the viewed Session's filesystem. */
 import type { Context } from '@deepseek-ai/cordis'
+import type { PeerScope } from '@deepseek-ai/dsh-typert-protocol'
+import type {} from '@deepseek-ai/dsh-api-remote-access'
 import type {} from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-api-workspace-files'
 import type {} from '@deepseek-ai/dsh-fs'
@@ -20,12 +22,14 @@ import { isPresentedData, isPresentedFile, PRESENT_OPEN_PATH, PRESENT_HOST_PATH,
 export function registerPresentOpen(ctx: Context): void {
   ctx.connection.fetch.register({
     path: PRESENT_HOST_PATH, methods: ['GET'], requestBody: 'buffered',
+    allowNonOwner: true,
     fetch: () => Promise.resolve(Response.json(ctx.sessionController.workspaceDesktop() satisfies PresentedHost,
       { headers: { 'cache-control': 'no-store' } })),
   })
   ctx.connection.fetch.register({
     path: CHANGED_FILES_PATH, methods: ['GET'], requestBody: 'buffered',
-    fetch: request => Promise.resolve(handleChangesSummary(ctx, request)),
+    allowNonOwner: true,
+    fetch: (request, peer) => Promise.resolve(handleChangesSummary(ctx, peer, request)),
   })
   const lifetime = new AbortController()
   const pending = new Set<Promise<Response>>()
@@ -41,8 +45,11 @@ export function registerPresentOpen(ctx: Context): void {
       path,
       methods: [...methods],
       requestBody: 'buffered',
-      fetch: (request) => {
-        const task = handler(ctx, new Request(request, {
+      allowNonOwner: true,
+      fetch: (request, peer) => {
+        const id = new URL(request.url).searchParams.get('sessionId')
+        if (id !== null && !sessionReadable(ctx, peer, id as SessionId)) return Promise.resolve(new Response('forbidden', { status: 403 }))
+        const task = handler(ctx, peer, new Request(request, {
           signal: AbortSignal.any([request.signal, lifetime.signal]),
         }))
         pending.add(task)
@@ -59,6 +66,13 @@ function coordinate(value: string | null): number | undefined {
   return value !== null && NUMERIC.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : undefined
 }
 
+/** Apply the same Session page grant used by the Remote conversation view to exact Fetch routes. */
+function sessionReadable(ctx: Context, peer: PeerScope, sessionId: SessionId): boolean {
+  // oxlint-disable-next-line typescript/no-unnecessary-condition -- company principals merge into this map at the Host boundary.
+  if (peer.principal.kind === 'owner') return true
+  return ctx.remoteAccess.decide({ principal: peer.principal, action: 'session/page', resources: [{ kind: 'session', id: sessionId }] }).kind === 'allow'
+}
+
 /** Translate lookup and filesystem failures into the not-found or failure status the browser retries from. */
 function failureStatus(error: unknown): number {
   const remote = remoteErrorOf(error)
@@ -73,8 +87,9 @@ function failureStatus(error: unknown): number {
  * Read the addressed event once the Host desktop is known to be available.
  * @returns the event with its Session header, or the refusal to answer with.
  */
-async function readTarget(ctx: Context, request: Request, id: string, seq: number): Promise<Awaited<ReturnType<Context['sessionQuery']['readEvent']>> | Response> {
+async function readTarget(ctx: Context, peer: PeerScope, request: Request, id: string, seq: number): Promise<Awaited<ReturnType<Context['sessionQuery']['readEvent']>> | Response> {
   request.signal.throwIfAborted()
+  if (!sessionReadable(ctx, peer, id as SessionId)) return new Response('forbidden', { status: 403 })
   if (!ctx.sessionController.workspaceDesktop().available) return new Response('Host desktop unavailable.', { status: 409 })
   return ctx.sessionQuery.readEvent({ sessionId: id as SessionId, seq: seq as SessionSeq, before: 0, after: 0 }, request.signal)
 }
@@ -101,7 +116,7 @@ async function openVerified(ctx: Context, request: Request, path: string, action
   return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
 }
 
-async function handlePresentOpen(ctx: Context, request: Request): Promise<Response> {
+async function handlePresentOpen(ctx: Context, peer: PeerScope, request: Request): Promise<Response> {
   const query = new URL(request.url).searchParams
   const action = query.get('action') ?? 'open'
   if (action !== 'open' && action !== 'reveal') return new Response('Invalid file action.', { status: 400 })
@@ -110,7 +125,7 @@ async function handlePresentOpen(ctx: Context, request: Request): Promise<Respon
   const index = coordinate(query.get('index'))
   if (!id || seq === undefined || index === undefined) return new Response('Invalid Presented file coordinates.', { status: 400 })
   try {
-    const read = await readTarget(ctx, request, id, seq)
+    const read = await readTarget(ctx, peer, request, id, seq)
     if (read instanceof Response) return read
     const { target, session } = read
     const file = target.type === 'deliverables/presented' && isPresentedData(target.data) ? target.data.files[index] : undefined
@@ -128,11 +143,12 @@ async function handlePresentOpen(ctx: Context, request: Request): Promise<Respon
 }
 
 /** The summary one `workspace/changes` event announced, without the Host working directory; 404 once the Host no longer serves it. */
-function handleChangesSummary(ctx: Context, request: Request): Response {
+function handleChangesSummary(ctx: Context, peer: PeerScope, request: Request): Response {
   const query = new URL(request.url).searchParams
   const id = query.get('sessionId')
   const seq = coordinate(query.get('seq'))
   if (!id || seq === undefined) return new Response('Invalid change summary coordinates.', { status: 400 })
+  if (!sessionReadable(ctx, peer, id as SessionId)) return new Response('forbidden', { status: 403 })
   const summary = ctx.workspaceChanges.summary(id as SessionId, seq)
   if (summary === undefined) return new Response('Change summary unavailable.', { status: 404 })
   const { turn, files, total, added, deleted } = summary
@@ -150,10 +166,11 @@ function changedFileCoordinates(request: Request): { id: SessionId; seq: number;
 }
 
 /** One listed file's comparison; 404 once the Host no longer serves the summary or the index names no file. */
-async function handleChangesDiff(ctx: Context, request: Request): Promise<Response> {
+async function handleChangesDiff(ctx: Context, peer: PeerScope, request: Request): Promise<Response> {
   const coordinates = changedFileCoordinates(request)
   if (coordinates instanceof Response) return coordinates
   const { id, seq, index } = coordinates
+  if (!sessionReadable(ctx, peer, id)) return new Response('forbidden', { status: 403 })
   try {
     const diff = await ctx.workspaceChanges.diff(id, seq, index, request.signal)
     if (diff === undefined) return new Response('Change comparison unavailable.', { status: 404 })
@@ -164,12 +181,13 @@ async function handleChangesDiff(ctx: Context, request: Request): Promise<Respon
   }
 }
 
-async function handleChangesOpen(ctx: Context, request: Request): Promise<Response> {
+async function handleChangesOpen(ctx: Context, peer: PeerScope, request: Request): Promise<Response> {
   const action = new URL(request.url).searchParams.get('action') ?? 'open'
   if (action !== 'open' && action !== 'reveal') return new Response('Invalid file action.', { status: 400 })
   const coordinates = changedFileCoordinates(request)
   if (coordinates instanceof Response) return coordinates
   const { id, seq, index } = coordinates
+  if (!sessionReadable(ctx, peer, id)) return new Response('forbidden', { status: 403 })
   try {
     request.signal.throwIfAborted()
     if (!ctx.sessionController.workspaceDesktop().available) return new Response('Host desktop unavailable.', { status: 409 })
