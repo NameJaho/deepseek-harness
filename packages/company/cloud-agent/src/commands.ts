@@ -8,6 +8,7 @@ import type { CommandDefinitionId } from '@deepseek-ai/dsh-commands'
 import type { SessionPromptRequest } from '@deepseek-ai/dsh-api-session-controller'
 import { createScope, type Scope } from '@deepseek-ai/dsh-scope'
 import type { CloudAgentService } from './index.ts'
+import { explicitPublicationVisibility } from './publication.ts'
 
 /** Whether an ordinary mode supports conversational Agent authoring.
  * @param ctx - preset declaration owner.
@@ -76,7 +77,7 @@ export function registerAuthoringCommands(ctx: Context, service: CloudAgentServi
             await queueDraft(rawInput.trim(), signal, true)
             return { kind: 'success', text: '正在整理智能体，保存后将在会话中询问发布范围。' }
           }
-          const result = await service.requestPublication(agent, record.id, record.revision, signal, 'zh')
+          const result = await service.requestPublication(agent, record.id, record.revision, signal, 'zh', explicitPublicationVisibility(rawInput))
           return { kind: 'success', text: result.action === 'cancelled' ? '已保留草稿，暂不发布。'
             : result.action === 'already-published' ? `${record.draft.name} 已发布，无需重复发布。`
               : `${record.draft.name} 已发布${result.visibility === 'public' ? '到公共空间' : '为私有智能体'}。` }

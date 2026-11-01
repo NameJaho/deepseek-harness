@@ -56,3 +56,14 @@ export function publicationVisibility(selected: readonly string[], language: Pub
   if (selected[0] === copy[language].private) return 'private'
   return undefined
 }
+
+/** Parse an explicit audience from a command or model request without treating arbitrary prose as approval.
+ * @param input - optional command suffix or requested audience text.
+ * @returns the requested audience, or undefined when the user has not chosen one.
+ */
+export function explicitPublicationVisibility(input: string): CloudAgentVisibility | undefined {
+  const value = input.trim().toLocaleLowerCase()
+  if (/(?:^|\s)(?:public|公开|公共)(?:\s|$)/u.test(value)) return 'public'
+  if (/(?:^|\s)(?:private|私有|仅自己|仅我)(?:\s|$)/u.test(value)) return 'private'
+  return undefined
+}

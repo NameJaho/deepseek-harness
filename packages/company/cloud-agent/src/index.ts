@@ -478,6 +478,13 @@ export class CloudAgentService extends TypertRemoteService {
       return { action: 'already-published', id, revision: record.revision, releaseId: current.id,
         visibility: current.visibility ?? 'public', version: current.version }
     }
+    if (requestedVisibility !== undefined) {
+      authorize()
+      const saved = await this.publish({ id, expectedRevision: revision, authoringSessionId: agent.id, visibility: requestedVisibility })
+      const release = saved.releases.find(value => value.id === saved.publishedReleaseId)
+      if (release === undefined) throw new Error('Publication committed without its release')
+      return { action: 'published', id, revision: saved.revision, releaseId: release.id, visibility: requestedVisibility, version: release.version }
+    }
     const questions = this.owner.get('userQuestions')
     if (questions === undefined) throw new RemoteError('cloud-agent/unavailable', 'Publication confirmation is unavailable; reconnect and try again', {})
     const question = publicationQuestion(record, language)

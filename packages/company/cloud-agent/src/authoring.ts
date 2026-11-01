@@ -22,7 +22,7 @@ export function registerAuthoringTool(ctx: Context, service: CloudAgentService):
     parameters: {
       action: { type: 'string', required: true, enum: ['catalog', 'discover', 'save', 'publish', 'preview', 'clone'] },
       language: { type: 'string', enum: ['zh', 'en'], description: 'Human publication question language; defaults to Chinese.' },
-      visibility: { type: 'string', enum: ['public', 'private'], description: 'Requested publication audience; the human still confirms the actual audience.' },
+      visibility: { type: 'string', enum: ['public', 'private'], description: 'Explicit audience already chosen by the user; skips the confirmation question. Omit when the user has not chosen.' },
       agentId: { type: 'string', description: 'Exact draft or published Agent id; omission uses this conversation’s draft.' },
       expectedRevision: { type: 'number', description: 'Exact saved revision required for replacing or testing a draft.' },
       releaseId: { type: 'string', description: 'Exact accessible published release id, required for clone.' },

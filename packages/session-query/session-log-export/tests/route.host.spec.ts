@@ -88,7 +88,7 @@ describe('Session log export Fetch route', () => {
     const shared = connection.createSharedFetchHandler('/api')
     expect((await shared.fetch(new Request(`http://host${SESSION_LOG_EXPORT_PATH}`), connection.browserPeer)).status).toBe(400)
     expect((await shared.fetch(new Request(
-      `http://host${SESSION_LOG_EXPORT_PATH}?sessionId=session-1&includeDescendants=1`,
+      `http://host${SESSION_LOG_EXPORT_PATH}?sessionId=session-1&includeDescendants=maybe`,
     ), connection.browserPeer)).status).toBe(400)
     expect((await shared.fetch(new Request(
       `http://host${SESSION_LOG_EXPORT_PATH}?sessionId=session-1`,

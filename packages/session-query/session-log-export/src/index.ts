@@ -190,7 +190,7 @@ async function sessionLogExportResponse(
   const sessionIdValue = query['sessionId']
   const descendantsValue = query['includeDescendants']
   if (sessionIdValue === undefined || sessionIdValue.length === 0
-    || (descendantsValue !== undefined && descendantsValue !== 'true' && descendantsValue !== 'false')) {
+    || (descendantsValue !== undefined && !['true', 'false', '1', '0'].includes(descendantsValue))) {
     return new Response('missing or invalid sessionId query parameter', { status: 400 })
   }
   const sessionId = brandString<SessionId>(sessionIdValue)
@@ -233,7 +233,7 @@ async function sessionLogExportResponse(
       ready,
       rootContent,
       sessionId,
-      descendantsValue === 'true',
+      descendantsValue === 'true' || descendantsValue === '1',
       compressionLevel,
       request.signal,
     ),
