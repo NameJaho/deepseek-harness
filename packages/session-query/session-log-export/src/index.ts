@@ -145,7 +145,7 @@ async function sessionMarkdownResponse(ctx: Context, peer: PeerScope, request: R
   }
   const sessionId = brandString<SessionId>(sessionIdValue)
   // oxlint-disable-next-line typescript/no-unnecessary-condition -- non-owner principals are merged by company auth.
-  if (peer.principal.kind !== 'owner' && ctx.remoteAccess.decide({ principal: peer.principal, action: 'cloudAgents/export', resources: [{ kind: 'session', id: sessionId }] }).kind !== 'allow') {
+  if (peer.principal.kind !== 'owner' && ctx.remoteAccess.decide({ principal: peer.principal, action: 'session/page', resources: [{ kind: 'session', id: sessionId }] }).kind !== 'allow') {
     return new Response('forbidden', { status: 403 })
   }
   try {
@@ -195,7 +195,7 @@ async function sessionLogExportResponse(
   }
   const sessionId = brandString<SessionId>(sessionIdValue)
   // oxlint-disable-next-line typescript/no-unnecessary-condition -- non-owner principals are merged by company auth.
-  if (peer.principal.kind !== 'owner' && ctx.remoteAccess.decide({ principal: peer.principal, action: 'cloudAgents/export', resources: [{ kind: 'session', id: sessionId }] }).kind !== 'allow') {
+  if (peer.principal.kind !== 'owner' && ctx.remoteAccess.decide({ principal: peer.principal, action: 'session/page', resources: [{ kind: 'session', id: sessionId }] }).kind !== 'allow') {
     return new Response('forbidden', { status: 403 })
   }
   const deps = sessionLogExportDeps(ctx)
@@ -212,6 +212,18 @@ async function sessionLogExportResponse(
     sessionPersistence: deps.sessionPersistence,
     attachments: deps.attachments,
     sessions: deps.sessions,
+  }
+  // HEAD is a browser preflight for the subsequent anchor GET. It must not
+  // flush or open the session log: a member may be allowed to page a live
+  // Session while the persistence read is slow or temporarily unavailable.
+  if (request.method === 'HEAD') {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        'content-type': 'application/zip',
+        'content-disposition': `attachment; filename=\"${sessionLogZipFilename(sessionId)}\"`,
+      },
+    })
   }
   let rootContent: string | undefined
   try {

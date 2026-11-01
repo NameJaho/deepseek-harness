@@ -1,11 +1,12 @@
 import { Context } from '@deepseek-ai/cordis'
+import type { Principal } from '@deepseek-ai/dsh-typert-protocol'
 import { HostConnectionService } from '@deepseek-ai/dsh-client-connection'
 import type { BrowserAuth } from '@deepseek-ai/dsh-client-connection/src/browser-auth.ts'
 import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 import type { SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionHandle } from '@deepseek-ai/dsh-session-persistence'
 import { strFromU8, unzipSync } from 'fflate'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   Config,
   SESSION_LOG_FILENAME,
@@ -34,11 +35,14 @@ function readHandle(id: string): SessionHandle {
   } as unknown as SessionHandle
 }
 
-async function mounted(withServices: boolean): Promise<{
+async function mounted(withServices: boolean, memberAllowed = false): Promise<{
   readonly connection: HostConnectionService
+  readonly decide: ReturnType<typeof vi.fn>
   readonly dispose: () => Promise<void>
 }> {
   const ctx = new Context()
+  const decide = vi.fn(() => ({ kind: 'allow' as const }))
+  if (memberAllowed) ctx.provide('remoteAccess', { decide } as never)
   ctx.provide('commands', { register: () => () => {} } as never)
   if (withServices) {
     ctx.provide('sessionQuery', {
@@ -55,8 +59,17 @@ async function mounted(withServices: boolean): Promise<{
   const connection = new HostConnectionService(ctx, [], {} as BrowserAuth)
   const fiber = ctx.plugin({ inject: [...inject], apply })
   await fiber
-  return { connection, dispose: () => fiber.dispose() }
+  return { connection, decide, dispose: () => fiber.dispose() }
 }
+
+const MEMBER: Principal = { kind: 'test-member', member: 'route-spec' }
+
+declare module '@deepseek-ai/dsh-typert-protocol' {
+  interface PrincipalMap {
+    'test-member': { readonly kind: 'test-member'; readonly member: string }
+  }
+}
+
 
 describe('Session log export Fetch route', () => {
   it('registers one GET/HEAD route and removes it with the plugin fiber', async () => {
@@ -81,6 +94,20 @@ describe('Session log export Fetch route', () => {
     expect((await shared.fetch(new Request(
       `http://host${SESSION_LOG_EXPORT_PATH}?sessionId=session-1`,
     ), connection.browserPeer)).status).toBe(404)
+  })
+
+  it('authorizes a member with the Session page grant and answers HEAD without reading persistence', async () => {
+    const { connection, decide, dispose } = await mounted(true, true)
+    const guest = connection.createPeer({ principal: MEMBER })
+    const shared = connection.createSharedFetchHandler('/api')
+    const head = await shared.fetch(new Request(
+      `http://host${SESSION_LOG_EXPORT_PATH}?sessionId=session-1&includeDescendants=true`,
+      { method: 'HEAD' },
+    ), guest)
+    expect(head.status).toBe(200)
+    expect(head.body).toBeNull()
+    expect(decide).toHaveBeenCalledWith(expect.objectContaining({ action: 'session/page' }))
+    await dispose()
   })
 
   it('validates the query before reporting missing export services', async () => {
