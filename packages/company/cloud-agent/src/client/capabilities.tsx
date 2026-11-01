@@ -1,5 +1,5 @@
 /** Session-scoped MCP and skill editing; usage sessions display immutable release selections. */
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Button, Checkbox, IconCordisPluginOutlineRegular, Input, StateDot, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -32,17 +32,17 @@ export function CapabilityChoices({ catalog, selection, busy, t, onChange }: {
   readonly t: CapabilityProps['t']
   readonly onChange: (selection: CapabilitySelection) => void
 }) {
+  const sectionId = useId()
   const [query, setQuery] = useState('')
   const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)
   const servers = catalog.mcpServers.filter(server => terms.every(term => `${server.name} ${server.description} ${server.toolNames.map(name =>
     `${name} ${catalog.mcpTools.find(tool => tool.name === name)?.description ?? ''}`).join(' ')}`.toLocaleLowerCase().includes(term)))
-  const selectedTools = [...new Set([...(selection.mcpTools ?? []), ...catalog.mcpServers
-    .filter(server => selection.mcpServers?.includes(server.id)).flatMap(server => server.toolNames)])]
   const tools = [...new Set([...catalog.mcpTools.map(tool => tool.name), ...(selection.mcpTools ?? [])])]
   return <>
-    <p className={css.metadata}>{t('mcpServerCount', { count: String(selection.mcpServers?.length ?? 0) })} · {t('mcpToolCount', { count: String(selectedTools.length) })}</p>
+    <p className={css.metadata}>{t('capabilityDraftScope')}</p>
     <Input aria-label={t('mcpSearch')} placeholder={t('mcpSearch')} value={query} onChange={(event) => { setQuery(event.target.value) }} />
-    <fieldset className={css.capabilityPicker}><legend>{t('mcpServers')}</legend>
+    <section className={css.capabilityPicker} aria-labelledby={`${sectionId}-mcp`}>
+      <h3 id={`${sectionId}-mcp`} className={css.capabilityPickerTitle}>{t('mcpServers')}</h3>
       {servers.length === 0 && <p>{t('noMcpServers')}</p>}
       {servers.map(server => <div key={server.id} className={css.capabilityOption}>
         <Checkbox label={server.name} checked={selection.mcpServers?.includes(server.id) === true}
@@ -56,7 +56,7 @@ export function CapabilityChoices({ catalog, selection, busy, t, onChange }: {
         <Checkbox key={id} label={id} checked disabled={busy} onChange={(checked) => {
           onChange({ ...selection, mcpServers: toggle(selection.mcpServers, id, checked) })
         }} />)}
-    </fieldset>
+    </section>
     <details className={css.requirements}><summary>{t('mcpTools')}</summary><div className={css.capabilityList}>
       {tools.length === 0 && <p>{t('noMcpTools')}</p>}
       {tools.filter(name => terms.every(term => `${name} ${catalog.mcpTools.find(tool => tool.name === name)?.description ?? ''}`
@@ -68,7 +68,8 @@ export function CapabilityChoices({ catalog, selection, busy, t, onChange }: {
           <Tag key={server.id}>{server.name}{selection.mcpServers?.includes(server.id) ? ` · ${t('mcpServerSelected')}` : ''}</Tag>)}</div>
       </div>)}
     </div></details>
-    <fieldset className={css.capabilityPicker}><legend>{t('skills')}</legend>
+    <section className={css.capabilityPicker} aria-labelledby={`${sectionId}-skills`}>
+      <h3 id={`${sectionId}-skills`} className={css.capabilityPickerTitle}>{t('skills')}</h3>
       {catalog.skills.length === 0 && <p>{t('noSkills')}</p>}
       {[...new Set([...catalog.skills.map(skill => skill.name), ...(selection.skills ?? [])])].map(name =>
         <div key={name} className={css.capabilityOption}>
@@ -76,8 +77,9 @@ export function CapabilityChoices({ catalog, selection, busy, t, onChange }: {
             onChange={(checked) => { onChange({ ...selection, skills: toggle(selection.skills, name, checked) }) }} />
           <p>{catalog.skills.find(skill => skill.name === name)?.description ?? t('mcpListMissingDescription')}</p>
         </div>)}
-    </fieldset>
-    <fieldset className={css.capabilityPicker}><legend>{t('knowledgeSources')}</legend>
+    </section>
+    <section className={css.capabilityPicker} aria-labelledby={`${sectionId}-knowledge`}>
+      <h3 id={`${sectionId}-knowledge`} className={css.capabilityPickerTitle}>{t('knowledgeSources')}</h3>
       {catalog.knowledgeSources.length === 0 && <p>{t('noKnowledgeSources')}</p>}
       {[...new Set([...catalog.knowledgeSources.map(source => source.id), ...(selection.knowledgeSources ?? [])])].map((id) => {
         const source = catalog.knowledgeSources.find(item => item.id === id)
@@ -87,7 +89,7 @@ export function CapabilityChoices({ catalog, selection, busy, t, onChange }: {
           <p>{source?.description ?? t('knowledgeSourceMissing')}</p>
         </div>
       })}
-    </fieldset>
+    </section>
   </>
 }
 

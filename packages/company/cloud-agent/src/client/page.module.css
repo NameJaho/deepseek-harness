@@ -19,32 +19,36 @@
 @keyframes loading { 50% { opacity: .45; } }
 @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
 .progress { display: flex; justify-content: center; padding: 16px; }
-.modal { width: 640px; max-width: 100%; min-width: 0; }
-.form { display: flex; flex-direction: column; gap: 16px; min-width: 0; max-height: calc(100dvh - 96px); overflow: auto; padding: 24px; }
+.modal { width: 640px; max-width: 100%; max-height: 100%; min-width: 0; padding-bottom: 0; }
+.form { display: grid; gap: 20px; min-width: 0; box-sizing: border-box; max-height: calc(100dvh - 96px); overflow: auto; overscroll-behavior: contain; padding: 24px; }
+.editorForm { display: flex; flex-direction: column; min-height: 0; color: var(--dsw-alias-label-primary); font-size: 13px; }
+.editorTitle { flex: none; margin: 0; padding: 24px; font-size: 20px; font-weight: 500; }
+.editorBody { display: grid; gap: 20px; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 0 24px 24px; }
+.editorActions { flex: none; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; padding: 16px 24px; border-top: 0.5px solid var(--dsw-alias-border-l3); }
 .form h2 { margin: 0; font-size: 20px; font-weight: 500; }
+.formSection { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 16px; border: 0.5px solid var(--dsw-alias-border-l3); border-radius: 12px; }
+.formSection h3 { margin: 0; font-size: 14px; font-weight: 500; }
 .field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.form select, .form textarea { box-sizing: border-box; width: 100%; padding: 10px 12px; border: 0.5px solid var(--dsw-alias-border-l3); border-radius: 8px; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-base); font: inherit; }
-.form textarea { resize: vertical; min-height: 160px; }
-.form select:focus-visible, .form textarea:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 2px; }
+.form select, .form textarea, .editorForm select, .editorForm textarea { box-sizing: border-box; width: 100%; padding: 10px 12px; border: 0.5px solid var(--dsw-alias-border-l3); border-radius: 8px; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-base); font: inherit; }
+.form textarea, .editorForm textarea { resize: vertical; min-height: 160px; }
+.form select:focus-visible, .form textarea:focus-visible, .editorForm select:focus-visible, .editorForm textarea:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 2px; }
 .formActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; }
 .help { margin: 0; color: var(--dsw-alias-label-secondary); }
 .validation { margin: 0; color: var(--dsw-alias-label-primary); }
 .deleteAction:not(:disabled) { color: var(--dsw-alias-state-error-primary); }
 .capabilities { display: flex; flex-wrap: wrap; gap: 6px; max-width: 100%; overflow-wrap: anywhere; }
 .capabilities > * { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
-.capabilityPicker { display: flex; flex-direction: column; gap: 8px; min-width: 0; max-height: 200px; overflow: auto; border: 0.5px solid var(--dsw-alias-border-l3); border-radius: 8px; padding: 12px; }
+.capabilityPicker { display: flex; flex-direction: column; gap: 8px; width: 100%; min-width: 0; min-inline-size: 0; box-sizing: border-box; margin: 0; border: 0.5px solid var(--dsw-alias-border-l3); border-radius: 8px; padding: 12px; }
+.capabilityPickerTitle { margin: 0; font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
 .chatCard { display: flex; flex-direction: column; gap: 12px; min-width: 0; max-width: 100%; margin: 8px 0; padding: 16px; border: 0.5px solid var(--dsw-alias-border-l3); border-radius: 16px; font-size: 13px; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-base); }
 .requirements { width: 100%; min-width: 0; }
 .requirements summary { cursor: pointer; }
 .requirements pre { max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 .connected { display: flex; min-width: 0; max-width: 260px; overflow-wrap: anywhere; }
-.info { display: flex; flex-direction: column; gap: 16px; min-width: 0; height: 100%; overflow: auto; padding: 20px; box-sizing: border-box; font-size: 13px; color: var(--dsw-alias-label-primary); }
+.info { display: grid; align-content: start; gap: 16px; min-width: 0; height: 100%; overflow: auto; padding: 20px; box-sizing: border-box; font-size: 13px; color: var(--dsw-alias-label-primary); }
 .info h3 { margin: 0 0 8px; font-size: 14px; font-weight: 500; }
 .info p { margin: 8px 0; overflow-wrap: anywhere; }
 .info code { overflow-wrap: anywhere; }
-.infoFields { margin: 0; display: grid; gap: 8px; }
-.infoFields dt { color: var(--dsw-alias-label-secondary); }
-.infoFields dd { margin: 4px 0 0; overflow-wrap: anywhere; }
 .infoList { display: grid; gap: 8px; list-style: none; padding: 0; margin: 0; }
 .infoList li { padding: 12px; border: 0.5px solid var(--dsw-alias-border-l3); border-radius: 8px; overflow-wrap: anywhere; }
 .infoList p { color: var(--dsw-alias-label-secondary); }
@@ -52,10 +56,10 @@
 .capabilitySection h3 { margin: 0; font-size: 14px; font-weight: 500; }
 .capabilityHeading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .capabilityList { display: grid; gap: 8px; min-width: 0; }
-.capabilityOption { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 10px 12px; border: 0.5px solid var(--dsw-alias-border-l3); border-radius: 8px; }
+.capabilityOption { display: flex; flex: 0 0 auto; flex-direction: column; gap: 4px; min-width: 0; padding: 10px 12px; border: 0.5px solid var(--dsw-alias-border-l3); border-radius: 8px; }
 .capabilityOption p { margin: 0; padding-left: 28px; color: var(--dsw-alias-label-secondary); overflow-wrap: anywhere; }
 .capabilityMeta { display: flex; flex-wrap: wrap; gap: 6px; padding-left: 28px; }
-.capabilityFooter { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 12px; background: var(--dsw-alias-bg-base); }
+.capabilityFooter { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 0.5px solid var(--dsw-alias-border-l3); }
 .infoLoading { display: grid; place-items: center; height: 100%; }
 .mcpListSkeleton { min-height: 72px; margin-bottom: 12px; }
 .mcpTitleIcon { flex: none; }
@@ -100,7 +104,12 @@
   .grid, .mcpToolList, .mcpParameters { grid-template-columns: minmax(0, 1fr); }
   .toolbar { flex-direction: column; align-items: stretch; }
   .toolbar > :last-child { min-width: 0; }
-  .actions > button, .formActions > button, .capabilityFooter > button, .info button, .mcpPage button { min-height: 44px; }
+  .actions > button, .formActions > button, .editorActions > button, .capabilityFooter > button, .info button, .mcpPage button { min-height: 44px; }
   .capabilityOption label, .mcpCard label { min-height: 44px; }
   .form { padding: 16px; }
+  .editorTitle { padding: 16px; }
+  .editorBody { padding: 0 16px 16px; }
+  .editorActions { padding: 12px 16px; }
+  .formSection { padding: 12px; }
 }
+@media (pointer: coarse) { .editorForm input, .editorForm textarea, .editorForm select { font-size: 16px; } }

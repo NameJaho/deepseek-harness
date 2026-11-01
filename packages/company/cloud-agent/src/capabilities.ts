@@ -5,13 +5,23 @@ import { dirname, join } from 'node:path'
 import type { CompanyMarketSubject } from '@deepseek-ai/dsh-company-wecom-auth/types'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ToolSchema } from '@deepseek-ai/dsh-llm'
-import type {} from '@deepseek-ai/dsh-skill'
+import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import type {} from '@deepseek-ai/dsh-company-mcp-provider'
 import type {} from '@deepseek-ai/dsh-company-knowledge'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import type { Config } from './config.ts'
 import type { CloudAgentCapabilities, CloudAgentSkillSnapshot } from './types.ts'
+
+const internalSkillSources = new Set(['bundled', 'runtime', 'project-agents', 'user-agents'])
+
+/** Keep deployment-facing Agent skills separate from DSH's internal instruction packs. */
+function agentSelectableSkill(skill: SkillSummary): boolean {
+  if (!skill.invocation.modelInvocable || internalSkillSources.has(skill.source)) return false
+  const path = skill.path?.replaceAll('\\', '/')
+  const internalPath = /(?:^|\/)(?:\.agents|packages\/preset\/agent-preset|@deepseek-ai\/dsh-agent-preset)\/skills(?:\/|$)/u
+  return path === undefined || !internalPath.test(path)
+}
 
 /** Stable signature of the model-visible fields of a configured MCP tool.
  * @param schema - current registered tool schema.
@@ -39,7 +49,8 @@ export async function capabilityCatalog(ctx: Context, subject: CompanyMarketSubj
     mcpServers,
     knowledgeSources: ctx.get('companyKnowledge')?.sources() ?? [],
     skills: skills === undefined ? [] : (await skills.list({ cwd: process.cwd(), scope: lease.key }))
-      .filter(skill => skill.invocation.modelInvocable).map(skill => ({ name: skill.name, description: skill.description })),
+      .filter(agentSelectableSkill)
+      .map(skill => ({ name: skill.name, description: skill.description })),
   }
 }
 
@@ -55,7 +66,7 @@ export async function snapshotSkills(ctx: Context, names: readonly string[], con
   const snapshots: CloudAgentSkillSnapshot[] = []
   for (const name of names) {
     const skill = await registry?.get(name, { cwd: process.cwd(), scope: lease.key })
-    if (skill === undefined || !skill.invocation.modelInvocable) throw unavailableCapability(name)
+    if (skill === undefined || !agentSelectableSkill(skill)) throw unavailableCapability(name)
     let bytes = Buffer.byteLength(skill.content)
     const resources: { path: string; base64: string }[] = []
     const root = skill.resourceBase?.kind === 'directory' ? skill.resourceBase.path

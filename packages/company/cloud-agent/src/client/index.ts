@@ -13,7 +13,7 @@ import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry/remote'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { IconInfoOutlineRegular, IconCordisPluginOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCordisPluginOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import remote from '@deepseek-ai/dsh-company-cloud-agent/remote'
 import mcpRemote from '@deepseek-ai/dsh-company-mcp-provider/remote'
 import { CloudAgentController } from './controller.ts'
@@ -24,7 +24,6 @@ import { CloudAgentDraftCard, CloudAgentHeaderAction } from './conversation.tsx'
 import { McpController } from './mcp-controller.ts'
 import { CompanyMcpPage } from './mcp-page.tsx'
 import { CloudAgentReportCard } from './report.tsx'
-import { CloudAgentInfo, CloudAgentInfoNavigation } from './info.tsx'
 import { CloudAgentCapabilitiesNavigation, CloudAgentCapabilitiesPanel } from './capabilities.tsx'
 import './page-slots.ts'
 
@@ -61,12 +60,6 @@ function registerUi(ctx: Context): void {
     const unregister = ctx.uiWorkspace.registerGroups(groups)
     return () => { unregister(); groups.dispose() }
   }, 'cloud-agent: caller navigation groups')
-  ctx.effect(() => ctx.sidebarRightTabs.register({ id: 'cloud-agent-info', kind: 'cloud-agent-info',
-    title: () => t('agentInfo'), guide: [{ id: 'cloud-agent-info', order: 15, title: () => t('agentInfo'), icon: IconInfoOutlineRegular }],
-  }), 'cloud-agent: information tab')
-  ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: 'cloud-agent-info',
-    locale: 'company.cloudAgent', inject: () => ({ hooks: face.hooks, refresh: face.refresh, openConversation: face.openConversation }),
-  }, CloudAgentInfo))
   ctx.effect(() => ctx.sidebarRightTabs.register({ id: 'cloud-agent-capabilities', kind: 'cloud-agent-capabilities',
     title: () => t('capabilitiesTab'), guide: [{ id: 'cloud-agent-capabilities', order: 16, title: () => t('capabilitiesTab'),
       description: () => t('capabilitiesGuide'), icon: IconCordisPluginOutlineRegular }],
@@ -78,11 +71,6 @@ function registerUi(ctx: Context): void {
       manageMcp: () => { ctx.pluginNavigation.openItem('company-mcp') },
     }),
   }, CloudAgentCapabilitiesPanel))
-  ctx.slots.inject('conversation.input.right', () => ctx.slots.register({
-    name: 'conversation.input.right', id: 'cloud-agent-info', locale: 'company.cloudAgent',
-    inject: () => ({ hooks: face.hooks, refresh: face.refresh,
-      revealAgentInfo: (sessionId: SessionId) => { ctx.sidebarRight.openTabIn(sessionId, 'cloud-agent-info') } }),
-  }, CloudAgentInfoNavigation))
   ctx.slots.inject('conversation.input.right', () => ctx.slots.register({
     name: 'conversation.input.right', id: 'cloud-agent-capabilities', locale: 'company.cloudAgent',
     inject: () => ({ hooks: face.hooks, refresh: face.refresh,

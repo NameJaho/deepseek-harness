@@ -10,7 +10,6 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 import { CompanyMcpPage, ToolDisclosure } from '../src/client/mcp-page.tsx'
 import { CapabilityChoices, CloudAgentCapabilitiesPanel } from '../src/client/capabilities.tsx'
-import { CloudAgentInfo, CloudAgentInfoNavigation } from '../src/client/info.tsx'
 import { CloudAgentPage } from '../src/client/page.tsx'
 import { en, zh, type CloudAgentLocaleKey } from '../src/client/locales.ts'
 import type {} from '../src/client/index.ts'
@@ -132,7 +131,7 @@ describe('scoped Agent capabilities and information', () => {
   it('shows only pinned MCP and skill selections and enters controlled editing without editing the usage Session', async () => {
     const props = agentProps(viewOf(catalog))
     render(<CloudAgentCapabilitiesPanel {...props as ComponentProps<typeof CloudAgentCapabilitiesPanel>} />)
-    expect(screen.getByText('saved.missing')).toBeTruthy()
+    expect(screen.getAllByText('saved.missing').length).toBeGreaterThan(0)
     expect(screen.getByText('saved.skill')).toBeTruthy()
     expect(screen.queryByText('unselected.global')).toBe(null)
     expect(screen.queryByText('global.skill')).toBe(null)
@@ -182,35 +181,31 @@ describe('scoped Agent capabilities and information', () => {
   it('shows selected server and deduplicated tool counts, retaining names absent from the catalog', () => {
     render(<CapabilityChoices catalog={{ ...catalog.capabilities, mcpServers: [{ id: server.id, name: server.name, namespace: 'research', description: server.description,
       enabled: true, status: 'available', toolNames: ['research.search'] }] }} selection={{ mcpServers: [server.id], mcpTools: ['research.search', 'saved.missing'], skills: ['saved.skill'] }} busy={false} t={t} onChange={vi.fn()} />)
-    expect(screen.getByText('1 services selected · 2 tools selected')).toBeTruthy()
+    expect(screen.getByText(en.capabilityDraftScope)).toBeTruthy()
     expect(screen.getByRole<HTMLInputElement>('checkbox', { name: server.name }).checked).toBe(true)
     fireEvent.click(screen.getByText(en.mcpTools))
     expect(screen.getByRole('checkbox', { name: 'saved.missing' })).toBeTruthy()
     expect(screen.getByRole('checkbox', { name: 'saved.skill' })).toBeTruthy()
   })
-
-  it('shows owner, version, creation/run presets, actual model, availability and digests', () => {
-    const { t, sessionId, useCloudAgent, refresh, openConversation } = agentProps(viewOf(catalog))
-    const props = { t, sessionId, useCloudAgent, useProjection, refresh, openConversation }
-    render(<CloudAgentInfo {...props as ComponentProps<typeof CloudAgentInfo>} />)
-    for (const label of ['owner', 'Version 4', 'creation-mode', 'run-mode', 'runtime-provider', en.statusDisabled, 'release-digest', 'effective-digest']) expect(screen.getByText(label)).toBeTruthy()
-    expect(screen.getAllByText('runtime-model')).toHaveLength(2)
-    fireEvent.click(screen.getByRole('button', { name: en.sourceSession }))
-    expect(props.openConversation).toHaveBeenCalledWith('source')
-  })
-
-  it('never opens the sidebar automatically and reveals information only for its current Session on click', () => {
-    const revealAgentInfo = vi.fn()
-    const { t, sessionId, useCloudAgent, refresh } = agentProps(viewOf(catalog))
-    const props = { t, sessionId, useCloudAgent, useProjection, refresh }
-    render(<CloudAgentInfoNavigation {...props as ComponentProps<typeof CloudAgentInfoNavigation>} revealAgentInfo={revealAgentInfo} />)
-    expect(revealAgentInfo).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: en.agentInfo }))
-    expect(revealAgentInfo).toHaveBeenCalledWith(sessionId)
-  })
 })
 
 describe('publication form', () => {
+  it('groups draft fields and capabilities under one scrollable form', async () => {
+    const { sessionId: _sessionId, useProjection: _useProjection, manageMcp: _manageMcp, ...shared } =
+      agentProps(viewOf({ ...catalog, mine: [record] }))
+    const props = { ...shared, renderSlot: () => null, createInChat: vi.fn(), preview: vi.fn(),
+      publish: vi.fn(async () => true), unpublish: vi.fn(),
+      deleteAgent: vi.fn(), closeEditor: vi.fn(), save: vi.fn(), start: vi.fn(), manage: vi.fn(), fromConversation: vi.fn(),
+      dismissNotice: vi.fn() }
+    const componentProps = props as ComponentProps<typeof CloudAgentPage>
+    const { container } = render(<CloudAgentPage {...componentProps} />)
+    fireEvent.click(screen.getByText(en.mine))
+    fireEvent.click(screen.getByRole('button', { name: en.edit }))
+    await waitFor(() => { expect(screen.getByRole('heading', { name: en.basicSettings })).toBeTruthy() })
+    expect(screen.getByRole('heading', { name: en.capabilitySettings })).toBeTruthy()
+    expect(container.querySelectorAll('fieldset')).toHaveLength(0)
+  })
+
   it('confirms name, description and audience and retains the dialog on failed publication', async () => {
     const { sessionId: _sessionId, useProjection: _useProjection, manageMcp: _manageMcp, ...shared } =
       agentProps(viewOf({ ...catalog, mine: [record] }))

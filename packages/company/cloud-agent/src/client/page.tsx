@@ -130,26 +130,33 @@ export function CloudAgentPage(props: PageProps) {
       </div>}
   </div>
   {editor !== null && <Modal open headless title={t(editor.id === null ? 'create' : 'formTitle')} onClose={dismissEditor} className={css.modal as string}>
-    <form className={css.form} onSubmit={(event) => { event.preventDefault(); void commit() }}>
-      <h2>{t(editor.id === null ? 'create' : 'formTitle')}</h2>
-      <label className={css.field}>{t('name')}<Input value={editor.draft.name} maxLength={80} disabled={view.busy} onChange={(event) => { patch({ name: event.target.value }) }} /></label>
-      <label className={css.field}>{t('description')}<Input value={editor.draft.description} maxLength={500} disabled={view.busy} onChange={(event) => { patch({ description: event.target.value }) }} /></label>
-      <label className={css.field}>{t('model')}<select value={JSON.stringify([editor.draft.provider, editor.draft.model])} disabled={view.busy} onChange={(event) => {
-        const selected = models.find(model => model.value === event.target.value)
-        if (selected !== undefined) patch({ provider: selected.provider, model: selected.model })
-      }}><option value="">{t('chooseModel')}</option>{models.map(model => <option key={model.value} value={model.value}>{model.label}</option>)}</select></label>
-      <label className={css.field}>{t('instructions')}<textarea value={editor.draft.instructions} maxLength={32768} rows={8} disabled={view.busy} onChange={(event) => { patch({ instructions: event.target.value }) }} /></label>
-      {catalog !== null
-        && <CapabilityChoices catalog={catalog.capabilities} selection={editor.draft} busy={view.busy} t={t} onChange={patch} />}
-      {validation && <p role="alert">{t('validation')}</p>}
-      {stale && <div className={css.notice} role="alert"><span>{t('conflict')}</span>
-        <Button variant="outline" disabled={view.busy || currentRecord === undefined} onClick={() => {
-          if (currentRecord !== undefined) {
-            setEditor({ ...editor, revision: currentRecord.revision, draft: currentRecord.draft })
-            setConflict(false)
-          }
-        }}>{t('reloadDraft')}</Button></div>}
-      <div className={css.formActions}><Button variant="outline" disabled={view.busy} onClick={dismissEditor}>{t('cancel')}</Button>
+    <form className={css.editorForm} onSubmit={(event) => { event.preventDefault(); void commit() }}>
+      <h2 className={css.editorTitle}>{t(editor.id === null ? 'create' : 'formTitle')}</h2>
+      <div className={css.editorBody}>
+        <section className={css.formSection}>
+          <h3>{t('basicSettings')}</h3>
+          <label className={css.field}>{t('name')}<Input value={editor.draft.name} maxLength={80} disabled={view.busy} onChange={(event) => { patch({ name: event.target.value }) }} /></label>
+          <label className={css.field}>{t('description')}<Input value={editor.draft.description} maxLength={500} disabled={view.busy} onChange={(event) => { patch({ description: event.target.value }) }} /></label>
+          <label className={css.field}>{t('model')}<select value={JSON.stringify([editor.draft.provider, editor.draft.model])} disabled={view.busy} onChange={(event) => {
+            const selected = models.find(model => model.value === event.target.value)
+            if (selected !== undefined) patch({ provider: selected.provider, model: selected.model })
+          }}><option value="">{t('chooseModel')}</option>{models.map(model => <option key={model.value} value={model.value}>{model.label}</option>)}</select></label>
+          <label className={css.field}>{t('instructions')}<textarea value={editor.draft.instructions} maxLength={32768} rows={8} disabled={view.busy} onChange={(event) => { patch({ instructions: event.target.value }) }} /></label>
+        </section>
+        {catalog !== null && <section className={css.formSection}>
+          <h3>{t('capabilitySettings')}</h3>
+          <CapabilityChoices catalog={catalog.capabilities} selection={editor.draft} busy={view.busy} t={t} onChange={patch} />
+        </section>}
+        {validation && <p role="alert">{t('validation')}</p>}
+        {stale && <div className={css.notice} role="alert"><span>{t('conflict')}</span>
+          <Button variant="outline" disabled={view.busy || currentRecord === undefined} onClick={() => {
+            if (currentRecord !== undefined) {
+              setEditor({ ...editor, revision: currentRecord.revision, draft: currentRecord.draft })
+              setConflict(false)
+            }
+          }}>{t('reloadDraft')}</Button></div>}
+      </div>
+      <div className={css.editorActions}><Button variant="outline" disabled={view.busy} onClick={dismissEditor}>{t('cancel')}</Button>
         <Button variant="primary" type="submit" disabled={view.busy || stale}>{t('save')}</Button></div>
     </form>
   </Modal>}

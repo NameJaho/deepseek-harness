@@ -68,3 +68,28 @@ it('lists direct knowledge sources when no MCP provider is mounted', async () =>
   expect(catalog.mcpServers).toEqual([])
   expect(catalog.knowledgeSources).toEqual([{ id: 'operations', name: 'Operations', description: 'Approved' }])
 })
+
+it('keeps internal instruction packs out of the Agent skill catalog and draft snapshots', async (test) => {
+  const ctx = new Context()
+  test.onTestFinished(() => ctx.fiber.dispose())
+  await ctx.plugin(SkillRegistry)
+  ctx.provide('agentPresets', { acquireScope: async () => ({ key: {}, [Symbol.asyncDispose]: async () => undefined }) } as never)
+  const internal = [
+    { name: 'agent-experience', source: 'custom', path: '/repo/packages/preset/agent-preset/skills/agent-experience/SKILL.md' },
+    { name: 'installed-internal', source: 'custom', path: '/srv/node_modules/@deepseek-ai/dsh-agent-preset/skills/internal/SKILL.md' },
+    { name: 'review-rules', source: 'project-agents', path: '/repo/.agents/skills/review-rules/SKILL.md' },
+    { name: 'user-internal', source: 'user-agents' },
+    { name: 'bundled-internal', source: 'bundled' },
+    { name: 'runtime-internal', source: 'runtime' },
+    { name: 'custom-alias', source: 'custom', path: 'C:\\repo\\.agents\\skills\\internal\\SKILL.md' },
+  ]
+  for (const skill of internal) ctx.skills.register({ ...skill, description: 'Internal', content: 'Internal' })
+  ctx.skills.register({ name: 'customer-policy', description: 'Customer', source: 'custom', content: 'Customer' })
+  const catalog = await capabilityCatalog(ctx, { scope: 'scope', corpId: 'corp', sub: 'member' } as never)
+  expect(catalog.skills).toEqual([{ name: 'customer-policy', description: 'Customer' }])
+  const config = Config({ workspaceRoot: '/unused' } as Config)
+  for (const skill of internal) {
+    await expect(snapshotSkills(ctx, [skill.name], config)).rejects.toMatchObject({ code: 'cloud-agent/capability-unavailable' })
+  }
+  expect(await snapshotSkills(ctx, ['customer-policy'], config)).toMatchObject([{ name: 'customer-policy', content: 'Customer' }])
+})
