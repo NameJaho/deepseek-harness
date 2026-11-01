@@ -99,7 +99,6 @@ export class WecomController {
       setEnabled: (id, enabled) => { this.changeEnabled(id, enabled) },
       refresh: () => {
         this.run('refresh', async () => {
-          const before = this.view.snapshot
           const result = await this.api.snapshot()
           if (!result.ok) { this.set({ error: 'statusFailed' }); return }
           const stream = this.stream
@@ -107,9 +106,9 @@ export class WecomController {
           await stream?.dispose()
           await this.pump
           if (this.disposed) return
-          // A later stream frame takes precedence over an overlapping unary read.
-          const snapshot = this.view.snapshot === before ? result.value : this.view.snapshot
-          this.set({ snapshot, error: null, authorizationUncertain: null })
+          // The unary read is the refresh operation's authoritative baseline;
+          // the replacement stream will deliver any subsequent connection change.
+          this.set({ snapshot: result.value, error: null, authorizationUncertain: null })
           this.start()
           if (this.view.error === null) this.report('refreshed', true)
         }, () => { this.set({ error: 'statusFailed' }) })

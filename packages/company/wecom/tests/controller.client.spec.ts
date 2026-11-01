@@ -533,7 +533,7 @@ describe('WecomController', () => {
     expect(replacement.dispose).toHaveBeenCalledOnce()
   })
 
-  it('does not replace a newer stream frame with an overlapping refresh result', async () => {
+  it('uses the refresh result after an overlapping stream frame', async () => {
     const test = fixture()
     await seed(test)
     const result = Promise.withResolvers<Awaited<ReturnType<Api['snapshot']>>>()
@@ -546,7 +546,7 @@ describe('WecomController', () => {
     await observe(test.controller, () => test.controller.getSnapshot().snapshot === latest)
     result.resolve({ ok: true, value: snapshot() })
     await observe(test.controller, () => test.controller.getSnapshot().busy === null)
-    expect(test.controller.getSnapshot().snapshot).toBe(latest)
+    expect(test.controller.getSnapshot().snapshot).toEqual(snapshot())
   })
 
   it.each(['failure', 'frame'] as const)('ignores a retired stream %s while refreshing its replacement', async (outcome) => {
