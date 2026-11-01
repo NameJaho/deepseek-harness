@@ -47,7 +47,7 @@ export function registerAuthoringCommands(ctx: Context, service: CloudAgentServi
           requestId: brandString<SessionPromptRequest['requestId']>(randomUUID()), mode: 'queue', content: [{ type: 'text', text:
             'Create or update an Agent draft from the confirmed reusable requirements and current configuration in this conversation. '
             + 'Read cloud_agent catalog, then save a complete draft using only approved MCP tools, knowledge sources and skills. '
-            + (publish ? 'Then call cloud_agent publish so the system asks me whether to publish to the public space, only for myself, or cancel. '
+            + (publish ? 'Then call cloud_agent publish. Publish privately by default; use public only when I explicitly request the public space. '
               : 'Do not publish. Show the saved name and description; I can request publication in natural language. ')
             + 'Do not ask me to type a revision or confirmation command.'
             + (requirements === '' ? '' : `\n\nAdditional requirements:\n${requirements}`) }] }, signal)
@@ -75,12 +75,12 @@ export function registerAuthoringCommands(ctx: Context, service: CloudAgentServi
           const record = catalog.mine.find(item => item.id === binding?.agentId)
           if (record === undefined) {
             await queueDraft(rawInput.trim(), signal, true)
-            return { kind: 'success', text: '正在整理智能体，保存后将在会话中询问发布范围。' }
+            return { kind: 'success', text: '正在整理智能体，保存后默认发布为私有；如需公共空间，请继续明确说明。' }
           }
           const result = await service.requestPublication(agent, record.id, record.revision, signal, 'zh', explicitPublicationVisibility(rawInput))
           return { kind: 'success', text: result.action === 'cancelled' ? '已保留草稿，暂不发布。'
             : result.action === 'already-published' ? `${record.draft.name} 已发布，无需重复发布。`
-              : `${record.draft.name} 已发布${result.visibility === 'public' ? '到公共空间' : '为私有智能体'}。` }
+              : `${record.draft.name} 已发布${result.visibility === 'public' ? '到公共空间' : '为私有智能体'}。${result.nextAction ?? ''}` }
         }),
       }))
     }

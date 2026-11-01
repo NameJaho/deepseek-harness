@@ -17,7 +17,7 @@ import type { CompanyMarketSubject, CompanyOwnerScope } from '@deepseek-ai/dsh-c
 import type {} from '@deepseek-ai/dsh-company-knowledge'
 import type { CompanyKnowledgeDetailedSearchResult, CompanyKnowledgeRetrieveOptions } from '@deepseek-ai/dsh-company-knowledge/types'
 import type {} from '@deepseek-ai/dsh-user-questions'
-import { publicationQuestion, publicationVisibility, type PublicationLanguage } from './publication.ts'
+import type { PublicationLanguage } from './publication.ts'
 import type { ToolDefinition, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import type { FileAttachmentRef } from '@deepseek-ai/dsh-attachment'
@@ -446,23 +446,23 @@ export class CloudAgentService extends TypertRemoteService {
     })
   }
 
-  /** Ask the human to choose public/private visibility for an exact saved revision.
+  /** Publish an exact saved revision, defaulting to private visibility.
    * @param agent - live owning authoring Agent.
    * @param id - saved draft selected in this conversation.
-   * @param revision - exact revision shown by the authoritative question.
-   * @param signal - cancellation while waiting or committing.
-   * @param language - language of the user's conversation.
-   * @param requestedVisibility - requested audience; omission retains an already published audience.
-   * @returns cancelled, published, or unchanged publication metadata.
+   * @param revision - exact saved revision.
+   * @param signal - cancellation while committing.
+   * @param requestedVisibility - explicit audience; omission publishes privately.
+   * @returns published or unchanged publication metadata.
    */
   async requestPublication(agent: Agent, id: CloudAgentId, revision: number, signal: AbortSignal,
-    language: PublicationLanguage, requestedVisibility?: 'public' | 'private'): Promise<{
+    _language: PublicationLanguage, requestedVisibility?: 'public' | 'private'): Promise<{
     action: 'cancelled' | 'published' | 'already-published'
     id: CloudAgentId
     revision: number
     releaseId?: CloudAgentReleaseId
     visibility?: 'public' | 'private'
     version?: number
+    nextAction?: string
   }> {
     await this.initialized
     signal.throwIfAborted()
@@ -478,26 +478,13 @@ export class CloudAgentService extends TypertRemoteService {
       return { action: 'already-published', id, revision: record.revision, releaseId: current.id,
         visibility: current.visibility ?? 'public', version: current.version }
     }
-    if (requestedVisibility !== undefined) {
-      authorize()
-      const saved = await this.publish({ id, expectedRevision: revision, authoringSessionId: agent.id, visibility: requestedVisibility })
-      const release = saved.releases.find(value => value.id === saved.publishedReleaseId)
-      if (release === undefined) throw new Error('Publication committed without its release')
-      return { action: 'published', id, revision: saved.revision, releaseId: release.id, visibility: requestedVisibility, version: release.version }
-    }
-    const questions = this.owner.get('userQuestions')
-    if (questions === undefined) throw new RemoteError('cloud-agent/unavailable', 'Publication confirmation is unavailable; reconnect and try again', {})
-    const question = publicationQuestion(record, language)
-    const answer = await questions.ask({ agent, signal, questions: [question] })
-    signal.throwIfAborted()
-    const item = answer.answers.find(value => value.id === question.id)
-    const visibility = item?.custom === undefined ? publicationVisibility(item?.selected ?? [], language) : undefined
-    if (visibility === undefined) return { action: 'cancelled', id, revision: record.revision }
+    const visibility = requestedVisibility ?? 'private'
     authorize()
     const saved = await this.publish({ id, expectedRevision: revision, authoringSessionId: agent.id, visibility })
     const release = saved.releases.find(value => value.id === saved.publishedReleaseId)
     if (release === undefined) throw new Error('Publication committed without its release')
-    return { action: 'published', id, revision: saved.revision, releaseId: release.id, visibility, version: release.version }
+    return { action: 'published', id, revision: saved.revision, releaseId: release.id, visibility, version: release.version,
+      ...visibility === 'private' ? { nextAction: 'Private by default. Say “publish to the public space” or click Publish in Cloud Agent to change the audience.' } : {} }
   }
 
   /** Withdraw publication while preserving existing private Sessions and releases.

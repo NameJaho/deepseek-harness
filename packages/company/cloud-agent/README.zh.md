@@ -25,7 +25,7 @@ kind: "package-bundle"
 
 将 [cordis.patch.yml](cordis.patch.yml) 应用到已提供注入的 Host 服务和 MCP 提供方的 profile。该 patch 只挂载目录服务并设置绝对路径的私有 `workspaceRoot`，不会安装或配置提供方。[Config](src/config.ts) 定义发布、技能、附件分页和报告的上限。`capabilityPreset` 指定部署的技能目录作用域，与创建及运行 preset 分离。
 
-在本人拥有的 selectable/default 对话中，权限为 `workspace-write` 或 `danger-full-access` 时，可使用 `/create-agent [requirements]` 或 `/publish-agent [public|private]`。尚无已保存草稿时，命令将根据已确认对话提取需求的请求入队，不会发布。检查保存后的名称和描述后，直接用自然语言请求发布；已经明确选择公共或私有时会直接发布，否则模型发布动作会询问发布到公共空间、仅自己使用或取消。完全相同的重放返回已有 release；过期或冲突确认失败，不新增 release。结果未知时，重试前先查询目录。
+在本人拥有的 selectable/default 对话中，权限为 `workspace-write` 或 `danger-full-access` 时，可使用 `/create-agent [requirements]` 或 `/publish-agent [public|private]`。尚无已保存草稿时，命令将根据已确认对话提取需求的请求入队，不会发布。检查保存后的名称和描述后，直接用自然语言请求发布；未明确说明公共空间时默认发布为私有，结果会提醒你在 Cloud Agent 中点击发布，或继续明确说“发布到公共空间”。完全相同的重放返回已有 release；过期或冲突确认失败，不新增 release。结果未知时，重试前先查询目录。
 
 新编辑器会保留 profile 的 `danger-full-access` 默认权限；其他默认权限仍会请求 `workspace-write`。如果服务器没有可用沙箱，受控测试部署可在启动器的 `startup.env` 中显式设置 `DSH_PERMISSION_MODE=danger-full-access`；这会取消文件限制和审批提示。已有 Session 保留日志中的权限，因此修改默认值后应打开新编辑器。
 

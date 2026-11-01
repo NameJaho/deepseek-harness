@@ -17,7 +17,7 @@ export function registerAuthoringTool(ctx: Context, service: CloudAgentService):
       + 'Preserve confirmed rules and omit credentials, endpoints, temporary paths and one-off results. '
       + 'Use discover for a selected MCP server; select exact catalog or discovered tool and skill names. '
       + 'Knowledge uses a separate direct retrieval service: select knowledgeSources from catalog even when no MCP servers exist. '
-      + 'Saving does not publish. When the user asks to publish, call publish for the saved draft; the system asks the human to choose public space, private use, or cancel. '
+      + 'Saving does not publish. When the user asks to publish, call publish for the saved draft; publication is private by default, and only an explicit public-space request uses public visibility. '
       + 'Do not ask the user to type a revision or slash command. Preview opens a separate private test conversation.',
     parameters: {
       action: { type: 'string', required: true, enum: ['catalog', 'discover', 'save', 'publish', 'preview', 'clone'] },
