@@ -190,6 +190,18 @@ describe('scoped Agent capabilities and information', () => {
 })
 
 describe('publication form', () => {
+  it('keeps private releases out of the public-space tab', () => {
+    const { sessionId: _sessionId, useProjection: _useProjection, manageMcp: _manageMcp, ...shared } =
+      agentProps(viewOf({ ...catalog, published: [{ id: record.id, ownerId: record.ownerId, release: { ...release, visibility: 'private' } }] }))
+    const props = { ...shared, renderSlot: () => null, createInChat: vi.fn(), preview: vi.fn(),
+      publish: vi.fn(async () => true), unpublish: vi.fn(), deleteAgent: vi.fn(), closeEditor: vi.fn(), save: vi.fn(),
+      start: vi.fn(), manage: vi.fn(), fromConversation: vi.fn(), dismissNotice: vi.fn() }
+    render(<CloudAgentPage {...props as ComponentProps<typeof CloudAgentPage>} />)
+    expect(screen.getByText(en.public)).toBeTruthy()
+    fireEvent.click(screen.getByText(en.public))
+    expect(screen.queryByRole('heading', { name: release.definition.name })).toBe(null)
+  })
+
   it('groups draft fields and capabilities under one scrollable form', async () => {
     const { sessionId: _sessionId, useProjection: _useProjection, manageMcp: _manageMcp, ...shared } =
       agentProps(viewOf({ ...catalog, mine: [record] }))

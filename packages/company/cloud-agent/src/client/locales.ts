@@ -1,7 +1,7 @@
 /** Complete bilingual copy for Phase 2 Agent and sanitized MCP management. */
 export const zh = {
   panel: 'Cloud Agent', title: 'Cloud Agent', subtitle: '使用已发布的智能体，或通过对话创建并发布自己的智能体',
-  mine: '我的智能体', public: '已发布', tabs: '智能体空间', create: '创建智能体', search: '搜索智能体',
+  mine: '我的智能体', public: '公共空间', tabs: '智能体空间', create: '创建智能体', search: '搜索智能体',
   emptyMine: '还没有创建智能体', emptyPublic: '还没有已发布的智能体', noMatches: '没有匹配的智能体',
   newAgent: '新建智能体', editAgent: '进入受控编辑会话', edit: '编辑草稿', manualCreate: '手动配置', createInChat: '对话创建',
   fromChat: '发布 Agent', continueAuthoring: '继续创作', authoringSession: '智能体创作',
@@ -54,7 +54,7 @@ export type CloudAgentLocaleKey = keyof typeof zh
 /** English copy with the same keys and interpolation fields as Chinese. */
 export const en = {
   panel: 'Cloud Agent', title: 'Cloud Agent', subtitle: 'Use published agents or create and publish your own through conversation',
-  mine: 'My agents', public: 'Published', tabs: 'Agent space', create: 'Create agent', search: 'Search agents',
+  mine: 'My agents', public: 'Public space', tabs: 'Agent space', create: 'Create agent', search: 'Search agents',
   emptyMine: 'You have not created any agents', emptyPublic: 'No agents have been published', noMatches: 'No matching agents',
   newAgent: 'New agent', editAgent: 'Open controlled editing conversation', edit: 'Edit draft', manualCreate: 'Manual configuration', createInChat: 'Create through chat',
   fromChat: 'Publish agent', continueAuthoring: 'Continue authoring', authoringSession: 'Agent authoring',

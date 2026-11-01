@@ -51,7 +51,7 @@ export function CloudAgentPage(props: PageProps) {
   const terms = query.trim().toLocaleLowerCase()
   const matches = (draft: CloudAgentDraft): boolean => `${draft.name} ${draft.description}`.toLocaleLowerCase().includes(terms)
   const mine = catalog?.mine.filter(record => record.deletedAt === undefined && matches(record.draft)) ?? []
-  const published = catalog?.published.filter(entry => matches(entry.release.definition)) ?? []
+  const published = catalog?.published.filter(entry => (entry.release.visibility ?? 'public') === 'public' && matches(entry.release.definition)) ?? []
   const models = catalog?.models.groups.flatMap(group => group.models.map(model => ({
     value: JSON.stringify([group.id, model.id]), provider: group.id, model: model.id, label: `${group.name} / ${model.name}`,
   }))) ?? []
