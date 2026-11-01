@@ -29,17 +29,21 @@ export const inject = ['slots', 'locale', 'remote', 'pluginNavigation']
 export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const unmount = await ctx.remote.$mount(remote)
   const child = ctx.inject(['remote.companyWecom', 'slots', 'locale', 'pluginNavigation'], (ui) => {
-    ui.on('command/executed', (_sessionId, name, result) => {
-      if (result.kind === 'success' && (name === '发布企微' || name === 'publish-wecom')) {
-        ui.pluginNavigation.openItem('company-wecom')
-      }
-    })
     ui.effect(() => ui.locale.register('company.wecom', { en, zh }), 'wecom: dictionaries')
     const controller = new WecomController(ui.remote.companyWecom, () => ui.remote.$stream({
       name: 'company-wecom.snapshot', open: signal => ui.remote.companyWecom.follow(signal),
       ended: () => new Error('WeCom snapshot stream ended'),
     }))
     const face = controller.face()
+    ui.on('command/executed', (_sessionId, name, result) => {
+      if (result.kind === 'success' && (name === '发布企微' || name === 'publish-wecom')) {
+        // The command creates the request on the Host. Refresh before opening the
+        // page so the pending scan card is present even when the stream has not
+        // delivered its next frame yet.
+        face.refresh()
+        ui.pluginNavigation.openItem('company-wecom')
+      }
+    })
     ui.slots.inject('plugins.item', () => ui.slots.register({
       name: 'plugins.item', id: 'company-wecom', order: 26, locale: 'company.wecom',
       label: () => ui.locale.bind('company.wecom')('title'), inject: () => face,

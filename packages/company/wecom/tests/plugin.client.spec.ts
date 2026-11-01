@@ -31,7 +31,10 @@ async function fixture(test: { onTestFinished: (cleanup: () => Promise<void>) =>
   const cleanup = Promise.withResolvers<undefined>()
   test.onTestFinished(async () => { end.resolve(undefined); cleanup.resolve(undefined) })
   const unmount = vi.fn(async () => {})
-  const api = { follow: vi.fn(() => ({})) }
+  const api = {
+    follow: vi.fn(() => ({})),
+    snapshot: vi.fn(async () => ({ ok: true, value: snapshot })),
+  }
   const snapshot: WecomSnapshot = { source: 'test', requests: [], bindings: [] }
   const stream = {
     dispose: vi.fn(async () => { end.resolve(undefined); await cleanup.promise }),
@@ -96,6 +99,7 @@ it('opens the WeCom management page after a successful publication command', asy
   test.onTestFinished(async () => { h.cleanup.resolve(undefined); await dispose() })
   const sessionId = brandString<SessionId>('session-1')
   h.ctx.emit('command/executed', sessionId, '发布企微', { kind: 'success', text: 'created' })
+  await vi.waitFor(() => { expect(h.api.snapshot).toHaveBeenCalledOnce() })
   expect(h.pluginNavigation.openItem).toHaveBeenCalledExactlyOnceWith('company-wecom')
   h.ctx.emit('command/executed', sessionId, 'publish-wecom', { kind: 'success' })
   expect(h.pluginNavigation.openItem).toHaveBeenCalledTimes(2)
