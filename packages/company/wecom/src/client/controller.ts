@@ -205,7 +205,7 @@ export class WecomController {
     const current = this.view.snapshot
     if (current === null) return
     const previous = current.bindings.find(item => item.id === binding.id)
-    const next = { ...binding, status: previous?.status ?? 'connecting' as const }
+    const next: WecomSnapshot['bindings'][number] = { ...binding, status: previous?.status ?? 'connecting' }
     this.set({ snapshot: {
       ...current,
       requests: current.requests.map(request => request.id === binding.requestId
