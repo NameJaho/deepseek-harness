@@ -617,11 +617,16 @@ describe('WecomController', () => {
   it('keeps successful authorization feedback separate from actual connection state', async () => {
     const test = fixture()
     await seed(test)
+    test.api.snapshot.mockResolvedValueOnce({ ok: true, value: {
+      ...snapshot(), requests: [{ ...snapshot().requests[0]!, bindingId: BINDING_ID }],
+      bindings: [{ ...binding(), status: 'connecting' }],
+    } })
     test.face.authorize(REQUEST_ID)
     succeed()
     await observe(test.controller, () => test.controller.getSnapshot().busy === null)
     expect(test.controller.getSnapshot().notice).toMatchObject({ key: 'authorized', success: true })
-    expect(test.controller.getSnapshot().snapshot?.bindings).toEqual([])
+    expect(test.controller.getSnapshot().snapshot?.bindings).toEqual([{ ...binding(), status: 'connecting' }])
+    expect(test.controller.getSnapshot().snapshot?.requests[0]?.bindingId).toBe(BINDING_ID)
   })
 
   it('reserves teardown ownership before a busy observer disposes the controller', async () => {

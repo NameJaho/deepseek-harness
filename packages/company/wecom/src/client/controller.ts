@@ -4,7 +4,7 @@ import type { ClientRemote } from '@deepseek-ai/dsh-api-remotes/client'
 import type { RemoteStream } from '@deepseek-ai/dsh-api-gateway/client'
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-company-wecom/remote'
-import type { WecomBindingId, WecomRequestId, WecomSnapshot } from '../types.ts'
+import type { WecomBinding, WecomBindingId, WecomRequestId, WecomSnapshot } from '../types.ts'
 import { WecomAuthorizationError, WecomAuthorizationPopup } from './authorization.ts'
 import type { WecomAuthorizationErrorCode } from './authorization.ts'
 import type { WecomLocaleKey } from './locales.ts'
@@ -175,7 +175,12 @@ export class WecomController {
         this.uncertain(id)
         return
       }
-      if (result.ok) { this.report('authorized', true); return }
+      if (result.ok) {
+        this.setAuthorizedBinding(result.value)
+        await this.refreshAfterAuthorization()
+        this.report('authorized', true)
+        return
+      }
       switch (result.error.code) {
         case 'wecom/expired': this.report('expired'); break
         case 'wecom/release-changed': this.report('versionChanged'); break
@@ -193,6 +198,31 @@ export class WecomController {
   private uncertain(id: WecomRequestId): void {
     this.set({ authorizationUncertain: id })
     this.report('authorization-uncertain')
+  }
+
+  /** Show the committed binding immediately, then replace it with authoritative status. */
+  private setAuthorizedBinding(binding: WecomBinding): void {
+    const current = this.view.snapshot
+    if (current === null) return
+    const previous = current.bindings.find(item => item.id === binding.id)
+    const next = { ...binding, status: previous?.status ?? 'connecting' as const }
+    this.set({ snapshot: {
+      ...current,
+      requests: current.requests.map(request => request.id === binding.requestId
+        ? { ...request, bindingId: binding.id } : request),
+      bindings: [...current.bindings.filter(item => item.id !== binding.id), next],
+    } })
+  }
+
+  /** Confirm the durable binding after the credential exchange without restarting the live stream. */
+  private async refreshAfterAuthorization(): Promise<void> {
+    try {
+      const result = await this.api.snapshot()
+      if (result.ok) this.set({ snapshot: result.value, error: null, authorizationUncertain: null })
+      else this.set({ error: 'statusFailed' })
+    } catch (_error) {
+      this.set({ error: 'statusFailed' })
+    }
   }
 
   private changeEnabled(id: WecomBindingId, enabled: boolean): void {
