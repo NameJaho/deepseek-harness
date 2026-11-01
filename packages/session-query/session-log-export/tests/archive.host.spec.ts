@@ -456,10 +456,10 @@ describe('session.export download endpoint', () => {
     expect(response.status).toBe(400)
   })
 
-  it('answers 400 for an includeDescendants value other than true or false', async () => {
+  it('answers 400 for an invalid includeDescendants value', async () => {
     const api = await buildApi({ 'session-root': log('session-root') })
     const response = await toFetchHandler(api).fetch(
-      new Request('http://host/api/session.export?sessionId=session-root&includeDescendants=1'),
+      new Request('http://host/api/session.export?sessionId=session-root&includeDescendants=maybe'),
     )
     expect(response.status).toBe(400)
   })
