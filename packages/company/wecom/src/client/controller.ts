@@ -214,15 +214,30 @@ export class WecomController {
     } })
   }
 
-  /** Confirm the durable binding after the credential exchange without restarting the live stream. */
+  /** Confirm the durable binding after the credential exchange after retiring stale stream frames. */
   private async refreshAfterAuthorization(): Promise<void> {
     try {
+      // Retire the previous stream before reading the committed state. A frame
+      // captured before complete() must not overwrite the binding returned by
+      // the confirmation read.
+      await this.retireStream()
+      if (this.disposed) return
       const result = await this.api.snapshot()
       if (result.ok) this.set({ snapshot: result.value, error: null, authorizationUncertain: null })
       else this.set({ error: 'statusFailed' })
     } catch (_error) {
       this.set({ error: 'statusFailed' })
+    } finally {
+      if (!this.disposed) this.start()
     }
+  }
+
+  /** Retire the current stream before a unary snapshot read can be applied. */
+  private async retireStream(): Promise<void> {
+    const stream = this.stream
+    this.stream = undefined
+    await stream?.dispose()
+    await this.pump
   }
 
   private changeEnabled(id: WecomBindingId, enabled: boolean): void {

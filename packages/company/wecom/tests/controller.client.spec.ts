@@ -157,6 +157,7 @@ describe('WecomController', () => {
   it('opens during the gesture and sends credentials only to complete', async () => {
     const test = fixture()
     await seed(test)
+    test.open.mockReturnValueOnce(drivenStream().stream)
     const views: string[] = []
     test.controller.subscribe(() => { views.push(JSON.stringify(test.controller.getSnapshot())) })
     const settled = observe(test.controller, () => test.controller.getSnapshot().busy === null && test.api.complete.mock.calls.length > 0)
@@ -617,6 +618,8 @@ describe('WecomController', () => {
   it('keeps successful authorization feedback separate from actual connection state', async () => {
     const test = fixture()
     await seed(test)
+    const replacement = drivenStream()
+    test.open.mockReturnValueOnce(replacement.stream)
     test.api.snapshot.mockResolvedValueOnce({ ok: true, value: {
       ...snapshot(), requests: [{ ...snapshot().requests[0]!, bindingId: BINDING_ID }],
       bindings: [{ ...binding(), status: 'connecting' }],
@@ -627,6 +630,25 @@ describe('WecomController', () => {
     expect(test.controller.getSnapshot().notice).toMatchObject({ key: 'authorized', success: true })
     expect(test.controller.getSnapshot().snapshot?.bindings).toEqual([{ ...binding(), status: 'connecting' }])
     expect(test.controller.getSnapshot().snapshot?.requests[0]?.bindingId).toBe(BINDING_ID)
+    expect(test.open).toHaveBeenCalledTimes(2)
+  })
+
+  it('ignores a retired pending frame after authorization commits a binding', async () => {
+    const test = fixture()
+    await seed(test)
+    const replacement = drivenStream()
+    test.open.mockReturnValueOnce(replacement.stream)
+    test.api.snapshot.mockResolvedValueOnce({ ok: true, value: {
+      ...snapshot(), requests: [{ ...snapshot().requests[0]!, bindingId: BINDING_ID }],
+      bindings: [{ ...binding(), status: 'connecting' }],
+    } })
+    test.face.authorize(REQUEST_ID)
+    succeed()
+    await observe(test.controller, () => test.controller.getSnapshot().busy === null)
+    const stale = test.publish(snapshot(), 2)
+    await Promise.resolve()
+    expect(stale).not.toHaveBeenCalled()
+    expect(test.controller.getSnapshot().snapshot?.bindings).toEqual([{ ...binding(), status: 'connecting' }])
   })
 
   it('reserves teardown ownership before a busy observer disposes the controller', async () => {
