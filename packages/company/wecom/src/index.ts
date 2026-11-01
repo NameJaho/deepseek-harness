@@ -11,6 +11,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { WecomAdmission } from './channel.ts'
 import type { CloudAgentId, CloudAgentOwnerId, CloudAgentReleaseId } from '@deepseek-ai/dsh-company-cloud-agent/types'
 import type {} from '@deepseek-ai/dsh-company-cloud-agent'
+import type {} from '@deepseek-ai/dsh-company-wecom-auth'
 import type {} from '@deepseek-ai/dsh-api-session-controller'
 import { Config } from './config.ts'
 import { WecomChannel, routingHash } from './channel.ts'
@@ -33,7 +34,7 @@ const authorization = z.object({
 
 /** Owns robot credentials by reference, immutable publication bindings and connection teardown. */
 export class CompanyWecomService extends TypertRemoteService {
-  static inject = ['cloudAgents', 'agents', 'sessionController', 'credentials', 'storageDomain']
+  static inject = ['cloudAgents', 'agents', 'sessionController', 'credentials', 'storageDomain', 'companyWecomAuth']
   static Config = Config
   private readonly owner: Context
   private readonly config: Config
@@ -58,6 +59,18 @@ export class CompanyWecomService extends TypertRemoteService {
     this.ready = ctx.storageDomain.open(wecomDomain)
     this.initialized = this.restore()
     ctx.effect(() => () => this.close(), 'wecom: connections, callbacks and domain')
+    ctx.inject(['companyWecomAuth'], (authCtx) => {
+      authCtx.companyWecomAuth.registerResourceProvider({
+        sessionOwner: () => undefined,
+        bindings: () => [{
+          resource: { kind: 'global' },
+          role: { name: 'company:wecom', resource: 'global', actions: [
+            'companyWecom/snapshot', 'companyWecom/follow', 'companyWecom/complete',
+            'companyWecom/setEnabled', 'companyWecom/requestRelease',
+          ] },
+        }],
+      })
+    })
     ctx.inject(['commands'], (commandCtx) => {
       commandCtx.commands.register({
         definitionId: brandString<CommandDefinitionId>('@deepseek-ai/dsh-company-wecom/publish-wecom'),
