@@ -87,6 +87,7 @@ async function mounted(
   const ctx = new Context()
   onTestFinished(async () => { await ctx.fiber.dispose() })
   ctx.provide('commands', { register: () => () => {} } as never)
+  ctx.provide('remoteAccess', { decide: () => ({ kind: 'allow' as const }) } as never)
   if (sessionQuery !== undefined) ctx.provide('sessionQuery', sessionQuery as never)
   if (persistence !== undefined) ctx.provide('sessionPersistence', persistence as SessionPersistence)
   const connection = new HostConnectionService(ctx, [], {} as BrowserAuth)

@@ -41,8 +41,8 @@ async function mounted(withServices: boolean, memberAllowed = false): Promise<{
   readonly dispose: () => Promise<void>
 }> {
   const ctx = new Context()
-  const decide = vi.fn(() => ({ kind: 'allow' as const }))
-  if (memberAllowed) ctx.provide('remoteAccess', { decide } as never)
+  const decide = vi.fn(() => ({ kind: memberAllowed ? 'allow' as const : 'deny' as const, reason: 'fixture' }))
+  ctx.provide('remoteAccess', { decide } as never)
   ctx.provide('commands', { register: () => () => {} } as never)
   if (withServices) {
     ctx.provide('sessionQuery', {

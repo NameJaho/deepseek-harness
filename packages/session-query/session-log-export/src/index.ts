@@ -42,7 +42,7 @@ export type {
 export { formatSessionMarkdown } from './markdown.ts'
 
 export const name = 'session-log-download'
-export const inject = ['commands', 'connection']
+export const inject = ['commands', 'connection', 'remoteAccess']
 
 export { SESSION_LOG_EXPORT_PATH } from './routes.ts'
 

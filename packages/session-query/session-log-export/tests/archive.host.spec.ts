@@ -127,6 +127,7 @@ async function buildApi(
 ) {
   const ctx = new Context()
   ctx.provide('commands', { register: () => () => {} } as never)
+  ctx.provide('remoteAccess', { decide: () => ({ kind: 'allow' as const }) } as never)
   const query = services.query ?? true
   const persistence = services.persistence ?? true
   if (query) {
@@ -319,7 +320,7 @@ describe('session.export download endpoint', () => {
     expect(strFromU8(files[exportLogName] as Uint8Array)).toBe(logText(stored))
   })
 
-  it('preflights root preparation through HEAD without streaming a body', async () => {
+  it('answers a lightweight HEAD preflight without reading persistence', async () => {
     const open = vi.fn(async () => readHandle(log('session-root')))
     const api = await buildApi({}, [], { open })
     const response = await toFetchHandler(api).fetch(
@@ -330,16 +331,16 @@ describe('session.export download endpoint', () => {
     expect(response.headers.get('content-type')).toBe('application/zip')
     expect(response.headers.get('content-disposition')).toContain('dsh-session-session-root.zip')
     expect(response.body).toBeNull()
-    expect(open).toHaveBeenCalledOnce()
+    expect(open).not.toHaveBeenCalled()
   })
 
-  it('returns a bodyless preparation error from HEAD', async () => {
+  it('answers HEAD before checking whether the Session exists', async () => {
     const api = await buildApi({})
     const response = await toFetchHandler(api).fetch(
       new Request('http://host/api/session.export?sessionId=session-root', { method: 'HEAD' }),
     )
 
-    expect(response.status).toBe(404)
+    expect(response.status).toBe(200)
     expect(response.body).toBeNull()
   })
 
