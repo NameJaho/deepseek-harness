@@ -226,6 +226,19 @@ it('pins the saved revision, rejects changed schemas, and deduplicates explicit 
   expect((await f.ctx.cloudAgents.catalog()).mine[0]?.releases).toHaveLength(1)
 })
 
+it('reads an owned published release without requiring the member catalog context', async (test) => {
+  const f = await fixture(test)
+  const editor = await f.editor()
+  const saved = await f.ctx.cloudAgents.create(f.draft, editor)
+  const published = await f.ctx.cloudAgents.publish({ id: saved.id, expectedRevision: saved.revision, authoringSessionId: editor })
+  const releaseId = published.publishedReleaseId!
+
+  await expect(f.ctx.cloudAgents.findOwnedPublishedRelease(saved.id, releaseId, brandString<CloudAgentOwnerId>('wecom:corp:alice')))
+    .resolves.toMatchObject({ id: releaseId, kind: 'published' })
+  await expect(f.ctx.cloudAgents.findOwnedPublishedRelease(saved.id, releaseId, brandString<CloudAgentOwnerId>('wecom:corp:bob')))
+    .resolves.toBeUndefined()
+})
+
 it('filters public-or-own releases, retains caller ownership, and audits restricted selectable run presets', async (test) => {
   const f = await fixture(test)
   const editor = await f.editor()

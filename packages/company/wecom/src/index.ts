@@ -173,8 +173,8 @@ export class CompanyWecomService extends TypertRemoteService {
       const bindings = [...domain.table('bindings').entries()].map(([, value]) => value).filter(value => value.ownerId === ownerId)
       const completed = bindings.find(binding => binding.requestId === request.id)
       if (completed !== undefined) return completed
-      const record = (await this.owner.cloudAgents.catalog()).mine.find(entry => entry.id === request.agentId)
-      if (!record?.releases.some(release => release.id === request.releaseId && release.kind === 'published')) {
+      const release = await this.owner.cloudAgents.findOwnedPublishedRelease(request.agentId, request.releaseId, ownerId)
+      if (release === undefined) {
         throw new RemoteError('wecom/release-changed', 'The requested saved release is unavailable', {})
       }
       const id = brandString<WecomBindingId>(routingHash(parsed.data.botId))
@@ -231,10 +231,8 @@ export class CompanyWecomService extends TypertRemoteService {
   requestRelease(agentId: CloudAgentId, releaseId: CloudAgentReleaseId): Promise<WecomRequest> {
     const ownerId = this.ownerId()
     return this.serialize(async () => {
-      const record = (await this.owner.cloudAgents.catalog()).mine.find(item => item.id === agentId)
-      const release = record?.releases.find(item => item.id === releaseId && item.kind === 'published')
-      if (record === undefined || release === undefined) throw new RemoteError('wecom/release-changed', 'Refresh the Agent information before authorizing', {})
-      if (record.ownerId !== ownerId) throw new RemoteError('wecom/owner-required', 'Only the Agent owner can authorize a robot', {})
+      const release = await this.owner.cloudAgents.findOwnedPublishedRelease(agentId, releaseId, ownerId)
+      if (release === undefined) throw new RemoteError('wecom/release-changed', 'Refresh the Agent information before authorizing', {})
       return this.saveRequest(agentId, release.id, release.definition.name, ownerId, true)
     })
   }

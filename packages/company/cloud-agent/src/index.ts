@@ -537,6 +537,26 @@ export class CloudAgentService extends TypertRemoteService {
     })
   }
 
+  /** Read one exact published release for an owning internal channel.
+   *
+   * This deliberately reads the durable Agent record instead of calling the
+   * member-facing catalog. Channel callbacks may run outside the browser
+   * Remote invocation context, while the catalog also reads member-scoped
+   * MCP state and therefore requires that context.
+   *
+   * @param agentId - saved Agent identity.
+   * @param releaseId - exact immutable release identity.
+   * @param ownerId - verified owner scope retained by the caller.
+   * @returns the release when it is still published and owned by the scope.
+   */
+  async findOwnedPublishedRelease(agentId: CloudAgentId, releaseId: CloudAgentReleaseId,
+    ownerId: CloudAgentOwnerId): Promise<CloudAgentRelease | undefined> {
+    await this.initialized
+    const record = (await this.ready).table('agents').get(agentId)
+    if (record === undefined || record.deletedAt !== undefined || record.ownerId !== ownerId) return undefined
+    return record.releases.find(item => item.id === releaseId && item.kind === 'published')
+  }
+
   /** Snapshot and test an owned draft without publishing it.
    * @param request - exact draft revision and live editor.
    * @param signal - creation cancellation.
