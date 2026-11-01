@@ -42,6 +42,9 @@
       "path": "../../client/ui-tool"
     },
     {
+      "path": "../../client/ui-commands"
+    },
+    {
       "path": "../../client/ui-plugin-manager/tsconfig.client.json"
     }
   ]

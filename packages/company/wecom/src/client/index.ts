@@ -5,6 +5,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-tool/client'
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@deepseek-ai/dsh-client-ui-commands/client'
 import type {} from '@deepseek-ai/dsh-company-cloud-agent/client'
 import remote from '@deepseek-ai/dsh-company-wecom/remote'
 import { WecomController } from './controller.ts'
@@ -19,7 +20,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 /** Existing shell registration, localization and generated RPC services. */
-export const inject = ['slots', 'locale', 'remote']
+export const inject = ['slots', 'locale', 'remote', 'pluginNavigation']
 
 /** Mount all UI consumers before starting the snapshot stream.
  * @param ctx - browser plugin lifecycle.
@@ -27,7 +28,12 @@ export const inject = ['slots', 'locale', 'remote']
  */
 export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const unmount = await ctx.remote.$mount(remote)
-  const child = ctx.inject(['remote.companyWecom', 'slots', 'locale'], (ui) => {
+  const child = ctx.inject(['remote.companyWecom', 'slots', 'locale', 'pluginNavigation'], (ui) => {
+    ui.on('command/executed', (_sessionId, name, result) => {
+      if (result.kind === 'success' && (name === '发布企微' || name === 'publish-wecom')) {
+        ui.pluginNavigation.openItem('company-wecom')
+      }
+    })
     ui.effect(() => ui.locale.register('company.wecom', { en, zh }), 'wecom: dictionaries')
     const controller = new WecomController(ui.remote.companyWecom, () => ui.remote.$stream({
       name: 'company-wecom.snapshot', open: signal => ui.remote.companyWecom.follow(signal),

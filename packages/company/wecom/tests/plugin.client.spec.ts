@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 /** Client mount rollback and quiescent unload of all robot UI contributions. */
 import { Context } from '@deepseek-ai/cordis'
+import { brandString } from '@deepseek-ai/dsh-brand'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { expect, it, vi } from 'vitest'
 import { apply } from '../src/client/index.ts'
 import type { WecomInjected } from '../src/client/controller.ts'
@@ -50,7 +52,9 @@ async function fixture(test: { onTestFinished: (cleanup: () => Promise<void>) =>
   }
   ctx.provide('remote', remote)
   ctx.provide('remote.companyWecom', api)
-  return { ctx, slots, locale, remote, api, stream, snapshot, cleanup, unmount }
+  const pluginNavigation = { openItem: vi.fn() }
+  ctx.provide('pluginNavigation', pluginNavigation)
+  return { ctx, slots, locale, remote, api, stream, snapshot, cleanup, unmount, pluginNavigation }
 }
 
 it('removes every registration and waits for stream cleanup before unmounting Remote', async (test) => {
@@ -84,4 +88,17 @@ it('releases a mounted Remote contribution when UI initialization fails', async 
   expect(h.unmount).toHaveBeenCalledOnce()
   expect(h.remote.$stream).not.toHaveBeenCalled()
   expect(h.slots.entries('shell.overlay')).toEqual([])
+})
+
+it('opens the WeCom management page after a successful publication command', async (test) => {
+  const h = await fixture(test)
+  const dispose = await apply(h.ctx)
+  test.onTestFinished(async () => { h.cleanup.resolve(undefined); await dispose() })
+  const sessionId = brandString<SessionId>('session-1')
+  h.ctx.emit('command/executed', sessionId, '发布企微', { kind: 'success', text: 'created' })
+  expect(h.pluginNavigation.openItem).toHaveBeenCalledExactlyOnceWith('company-wecom')
+  h.ctx.emit('command/executed', sessionId, 'publish-wecom', { kind: 'success' })
+  expect(h.pluginNavigation.openItem).toHaveBeenCalledTimes(2)
+  h.ctx.emit('command/executed', sessionId, '发布企微', { kind: 'error', text: 'failed' })
+  expect(h.pluginNavigation.openItem).toHaveBeenCalledTimes(2)
 })
