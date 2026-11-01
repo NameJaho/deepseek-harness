@@ -763,6 +763,43 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'companyWecom',
+    summary: 'Owns robot credentials by reference, immutable publication bindings and connection teardown.',
+    description: 'Owns robot credentials by reference, immutable publication bindings and connection teardown.',
+    methods: [
+      {
+        signature: '@Remote async snapshot(): Promise<WecomSnapshot>',
+        description: 'Read sanitized requests and actual connection state.',
+        parameters: [],
+        returns: 'robot bindings without Secret values or conversation contents.',
+      },
+      {
+        signature: '@Remote({ mode: \'stream\' }) async *follow(signal: AbortSignal): AsyncIterable<WecomSnapshot>',
+        description: 'Follow sanitized publication and connection state, coalescing slow readers.',
+        parameters: [{ name: 'signal', description: 'stream cancellation.' }],
+        returns: 'initial snapshot and subsequent committed updates.',
+      },
+      {
+        signature: '@Remote complete(input: WecomAuthorization): Promise<WecomBinding>',
+        description: 'Save credentials returned by the official authorization window and bind the exact requested release.',
+        parameters: [{ name: 'input', description: 'one pending request and newly authorized robot credentials; never logged.' }],
+        returns: 'binding identity; online state follows only after the gateway authenticates.',
+      },
+      {
+        signature: '@Remote setEnabled(id: WecomBindingId, enabled: boolean): Promise<void>',
+        description: 'Enable/reconnect or disable an existing robot without changing its pinned release.',
+        parameters: [{ name: 'id', description: 'exact binding identity.' }, { name: 'enabled', description: 'false stops admission and drains the connection; true reconnects it.' }],
+        returns: 'after durable enablement and connection lifecycle reconciliation.',
+      },
+      {
+        signature: '@Remote requestRelease(agentId: CloudAgentId, releaseId: CloudAgentReleaseId): Promise<WecomRequest>',
+        description: 'Request scan authorization for one saved published release without publishing a draft.',
+        parameters: [{ name: 'agentId', description: 'saved Agent belonging to this deployment owner.' }, { name: 'releaseId', description: 'exact published release shown in the Agent information panel.' }],
+        returns: 'pending scan request; no robot credentials or binding exist until completion.',
+      },
+    ],
+  },
+  {
     key: 'computerUse',
     summary: 'Owns one optional provider registration in the shared computer-use service.',
     description: 'Owns one optional provider registration in the shared computer-use service.',
@@ -5796,12 +5833,24 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ClientArtifactBaseline {\n    readonly path: string;\n    readonly mtimeMs: number;\n    readonly ctimeMs: number;\n    readonly size: number;\n}',
   },
   {
+    name: 'CloudAgentId',
+    declaration: 'export type CloudAgentId = Branded<\'cloud-agent-id\'>;',
+  },
+  {
+    name: 'CloudAgentOwnerId',
+    declaration: 'export type CloudAgentOwnerId = Branded<\'cloud-agent-owner-id\'>;',
+  },
+  {
+    name: 'CloudAgentReleaseId',
+    declaration: 'export type CloudAgentReleaseId = Branded<\'cloud-agent-release-id\'>;',
+  },
+  {
     name: 'CollectedOutput',
     declaration: 'export interface CollectedOutput {\n    text: string;\n    truncated: boolean;\n    spillPath?: string;\n}',
   },
   {
     name: 'CommandDefinition',
-    declaration: 'export interface CommandDefinition {\n    readonly definitionId?: CommandDefinitionId;\n    readonly name: string;\n    readonly description: string;\n    readonly input?: CommandInputDescriptor;\n    readonly recordInput?: boolean;\n    readonly handler: (invocation: CommandInvocation) => CommandResult | Promise<CommandResult>;\n}',
+    declaration: 'export interface CommandDefinition {\n    readonly definitionId?: CommandDefinitionId;\n    readonly name: string;\n    readonly aliases?: readonly string[];\n    readonly description: string;\n    readonly input?: CommandInputDescriptor;\n    readonly recordInput?: boolean;\n    readonly handler: (invocation: CommandInvocation) => CommandResult | Promise<CommandResult>;\n}',
   },
   {
     name: 'CommandDefinitionId',
@@ -5905,7 +5954,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ConnectionFetchRoute',
-    declaration: 'export interface ConnectionFetchRoute {\n    readonly path: string;\n    readonly methods: readonly ConnectionFetchMethod[];\n    readonly requestBody: ConnectionRequestBodyMode;\n    readonly fetch: (request: Request) => Promise<Response>;\n}',
+    declaration: 'export interface ConnectionFetchRoute {\n    readonly path: string;\n    readonly methods: readonly ConnectionFetchMethod[];\n    readonly requestBody: ConnectionRequestBodyMode;\n    readonly allowNonOwner?: true;\n    readonly fetch: (request: Request, peer: PeerScope) => Promise<Response>;\n}',
   },
   {
     name: 'ConnectionIndexRequest',
@@ -9950,6 +9999,30 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WebUpgradeRoute',
     declaration: 'export interface WebUpgradeRoute {\n    path: string;\n    handler: (req: IncomingMessage, socket: Duplex, head: Buffer) => void | Promise<void>;\n}',
+  },
+  {
+    name: 'WecomAuthorization',
+    declaration: 'export interface WecomAuthorization {\n    requestId: WecomRequestId;\n    botId: string;\n    secret: string;\n}',
+  },
+  {
+    name: 'WecomBinding',
+    declaration: 'export interface WecomBinding {\n    id: WecomBindingId;\n    ownerId: CloudAgentOwnerId;\n    botId: string;\n    agentId: CloudAgentId;\n    releaseId: CloudAgentReleaseId;\n    name: string;\n    enabled: boolean;\n    requestId: WecomRequestId;\n}',
+  },
+  {
+    name: 'WecomBindingId',
+    declaration: 'export type WecomBindingId = Branded<\'wecom-binding-id\'>;',
+  },
+  {
+    name: 'WecomRequest',
+    declaration: 'export interface WecomRequest {\n    id: WecomRequestId;\n    ownerId: CloudAgentOwnerId;\n    agentId: CloudAgentId;\n    releaseId: CloudAgentReleaseId;\n    name: string;\n    expiresAt: number;\n    bindingId: WecomBindingId | null;\n}',
+  },
+  {
+    name: 'WecomRequestId',
+    declaration: 'export type WecomRequestId = Branded<\'wecom-request-id\'>;',
+  },
+  {
+    name: 'WecomSnapshot',
+    declaration: 'export interface WecomSnapshot {\n    source: string;\n    requests: WecomRequest[];\n    bindings: (WecomBinding & {\n        status: \'connecting\' | \'online\' | \'offline\' | \'disabled\';\n    })[];\n}',
   },
   {
     name: 'WeeklyInput',

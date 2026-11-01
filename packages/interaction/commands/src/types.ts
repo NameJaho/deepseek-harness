@@ -57,7 +57,7 @@ export interface CommandExecution {
 export interface CommandDescriptor {
   /** Stable plugin-owned identity; absent for definitions without identity-based client behavior. */
   readonly definitionId?: CommandDefinitionId
-  /** Lowercase command name without the leading slash. */
+  /** Unicode-letter command name without the leading slash. */
   readonly name: string
   /** Human-readable summary used in discovery UI. */
   readonly description: string

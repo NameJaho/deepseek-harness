@@ -26,6 +26,7 @@ kind: "package-group"
 | [`mcp-provider`](mcp-provider/README.zh.md) | 按成员授权的 MCP 市场 Provider 和目录 Remote | `companyMcpProvider`、`companyMcp` |
 | [`cloud-agent`](cloud-agent/README.zh.md) | Cloud Agent 草稿、不可变发布版本、目录和使用会话 | `cloudAgents` |
 | [`cloud-agent-runtime`](cloud-agent-runtime/README.zh.md) | 每个 Cloud Agent Session 中按发布版本固定的提示词和工具策略 | —（Agent 作用域插件） |
+| [`wecom`](wecom/README.zh.md) | 按成员隔离的企微机器人授权、release 绑定和文字会话 | `companyWecom` |
 
 <a id="related-documentation"></a>
 ## Related documentation

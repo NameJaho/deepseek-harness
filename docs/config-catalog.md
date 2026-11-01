@@ -965,6 +965,43 @@ export interface KnowledgeSourceConfig {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-company-knowledge -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-company-wecom -->
+<a id="deepseek-aidsh-company-wecom"></a>
+
+## `@deepseek-ai/dsh-company-wecom`
+
+- `inject`: `cloudAgents` · `agents` · `sessionController` · `credentials` · `storageDomain`
+- `source`: [`packages/company/wecom/src/config.ts:5`](../packages/company/wecom/src/config.ts)
+
+```ts config-catalog
+/** Trusted settings; robot Secrets are never plugin configuration. */
+export interface Config {
+  /** Source identifier passed to the official authorization window. */
+  source: string
+  /** Official WebSocket endpoint; override only for a private WeCom deployment. */
+  wsUrl: string
+  /** Authorization request lifetime in milliseconds. */
+  authorizationTimeoutMs: number
+  /** Maximum duration of one admitted conversation interval. */
+  responseTimeoutMs: number
+  /** Maximum retained bindings and simultaneously connected robots. */
+  maxBindings: number
+  /** Maximum waiting messages for one robot. */
+  maxQueuedMessages: number
+  /** Maximum inbound text length. */
+  maxInputChars: number
+  /** UTF-8 reply ceiling including the truncation notice. */
+  maxReplyBytes: number
+  /** Maximum authorization records retained, with expired requests pruned first. */
+  maxRequests: number
+  /** Maximum retained conversation routes. */
+  maxConversations: number
+  /** Maximum delivery receipts retained for duplicate suppression. */
+  maxReceipts: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-company-wecom -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-company-wecom-auth -->
 <a id="deepseek-aidsh-company-wecom-auth"></a>
 
@@ -3263,7 +3300,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-session-log-export`
 
 - `inject`: `commands` · `connection`
-- `source`: [`packages/session-query/session-log-export/src/index.ts:48`](../packages/session-query/session-log-export/src/index.ts)
+- `source`: [`packages/session-query/session-log-export/src/index.ts:50`](../packages/session-query/session-log-export/src/index.ts)
 
 ```ts config-catalog
 /** Session-log archive policy. */

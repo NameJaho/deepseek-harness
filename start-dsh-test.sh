@@ -284,6 +284,7 @@ if [[ -n "${DSH_COMPANY_KNOWLEDGE_SOURCES:-}" ]]; then
   DSH_COMMAND+=(--patch "$DSH_REPO/packages/company/knowledge/cordis.patch.yml")
 fi
 DSH_COMMAND+=(--patch "$DSH_REPO/packages/company/cloud-agent/cordis.patch.yml")
+DSH_COMMAND+=(--patch "$DSH_REPO/packages/company/wecom/cordis.patch.yml")
 if [[ -n "${DSH_COMPANY_EXTERNAL_AGENTS:-}" ]]; then
   DSH_COMMAND+=(--patch "$DSH_REPO/packages/company/external-agent-subagent/cordis.patch.yml")
 fi

@@ -8,7 +8,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { CapabilityChoices } from './capabilities.tsx'
 import css from './page.module.css'
 
-type PageProps = PropsRuntime<'main'> & InjectFace<CloudAgentInjected> & PropsLocale<'company.cloudAgent'> & PropsRenderSlots<'company.cloudAgent.page.actions'>
+type PageProps = PropsRuntime<'main'> & InjectFace<CloudAgentInjected> & PropsLocale<'company.cloudAgent'> & PropsRenderSlots<'company.cloudAgent.page.actions' | 'company.cloudAgent.page.release.actions'>
 type ToastProps = InjectFace<Pick<CloudAgentInjected, 'hooks' | 'dismissNotice'>> & PropsLocale<'company.cloudAgent'>
 interface Editor {
   readonly id: CloudAgentId | null
@@ -115,6 +115,10 @@ export function CloudAgentPage(props: PageProps) {
             {record.publishedReleaseId !== null && <Button variant="ghost" disabled={view.busy} onClick={() => { void props.unpublish(record) }}>{t('unpublish')}</Button>}
             <Button variant="ghost" disabled={view.busy} onClick={() => { setDeleteTarget(record) }}>{t('deleteAgent')}</Button>
             {props.renderSlot('company.cloudAgent.page.actions', { record })}
+            {record.publishedReleaseId !== null && (() => {
+              const release = record.releases.find(item => item.id === record.publishedReleaseId)
+              return release === undefined ? null : props.renderSlot('company.cloudAgent.page.release.actions', { record, release })
+            })()}
           </div>
         </article>) : published.map(entry => <article key={entry.release.id} className={css.card}>
           <header className={css.cardHeading}><h2>{entry.release.definition.name}</h2><Tag>{t('version', { version: String(entry.release.version) })}</Tag></header>

@@ -44,7 +44,7 @@ function registerUi(ctx: Context): void {
     name: 'cloud-agent.catalog', open: signal => ctx.remote.cloudAgents.follow(signal),
     ended: () => new Error('Cloud Agent catalog stream ended'),
   }), (session) => { ctx.uiWorkspace.openSession(session.sessionId) }, () => { ctx.uiWorkspace.startSession() }, async (sessionId) => {
-    const result = await ctx.remote.commands.execute(sessionId, '/create-agent', [])
+    const result = await ctx.remote.commands.execute(sessionId, '/创建智能体', [])
     if (!result.ok) throw result.error
     return result.value?.result.kind === 'success'
   }, () => { ctx.layout.selectPanel(id) }, async () => {
@@ -86,7 +86,10 @@ function registerUi(ctx: Context): void {
   }, CompanyMcpPage))
   ctx.slots.inject('main', () => ctx.slots.register({
     name: 'main', key: id, locale: 'company.cloudAgent', inject: () => face,
-    children: { 'company.cloudAgent.page.actions': { kind: 'list', scope: 'root' } },
+    children: {
+      'company.cloudAgent.page.actions': { kind: 'list', scope: 'root' },
+      'company.cloudAgent.page.release.actions': { kind: 'list', scope: 'root' },
+    },
   }, CloudAgentPage))
   ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
     name: 'sidebar.panellist', id, order: 5, locale: 'company.cloudAgent', label: () => t('panel'),

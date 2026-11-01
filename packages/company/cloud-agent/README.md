@@ -24,7 +24,7 @@ An opt-in Host and Web bundle for saving reusable conversation requirements and 
 
 Apply [cordis.patch.yml](cordis.patch.yml) to a profile that supplies the injected Host services and an MCP provider. The patch mounts only the catalog service and sets an absolute private `workspaceRoot`; it does not install or configure a provider. [Config](src/config.ts) owns publication, skill, attachment-page and report bounds. `capabilityPreset` identifies the deployment's skill catalog scope; it is separate from creation and run presets.
 
-In an owned, selectable/default conversation with `workspace-write` or `danger-full-access`, use `/create-agent [requirements]` or `/publish-agent [public|private]`. Without a saved draft, the command queues extraction from the confirmed conversation; it does not publish. Review the saved name and description, then ask to publish in natural language. Publication defaults to private; the result reminds you to click Publish in Cloud Agent or explicitly request the public space. An exact replay returns the existing release; a stale or conflicting confirmation fails without another release. After an unknown outcome, inspect the catalog before retrying.
+In an owned, selectable/default conversation with `workspace-write` or `danger-full-access`, use `/创建智能体 [requirements]` or `/发布智能体 [public|private]`. Without a saved draft, the command queues extraction from the confirmed conversation; it does not publish. Review the saved name and description, then ask to publish in natural language. Publication defaults to private; the result reminds you to click Publish in Cloud Agent or explicitly request the public space. An exact replay returns the existing release; a stale or conflicting confirmation fails without another release. After an unknown outcome, inspect the catalog before retrying.
 
 New editors keep a profile default of `danger-full-access`; otherwise they request `workspace-write`. On a host without a usable sandbox, a controlled test deployment can explicitly set `DSH_PERMISSION_MODE=danger-full-access` in the launcher's `startup.env`; this removes file restrictions and approval prompts. Existing Sessions retain their recorded permissions, so open a new editor after changing the default.
 
@@ -36,7 +36,7 @@ The catalog exposes owned drafts, current public-or-owned releases and only the 
 
 `creationPreset` and `runPreset` must be selectable. Creation mounts its preset in the editor. A usage Session mounts only its retained release preset: `runPreset` is validated and recorded, not mounted, so it cannot add tools or permissions. Optional provider/model overrides are validated. Binding audit records creation/run presets and an effective digest including the release, run preset, actual model and enforced `read-only` permission. The runtime supplies only approved MCP tools, direct knowledge retrieval, pinned skills, downloadable text reports and conversation-owned file reads; see [runtime](../cloud-agent-runtime/README.md).
 
-The optional WeCom resource provider grants the package's Remote actions and exactly `/create-agent` and `/publish-agent` in member default Workspaces. It invalidates access snapshots after committed catalog changes. Session owners are resolved from durable bindings or the member default Workspace, never from publication ownership. Creation-provider routing handles current retained releases; fork placement allocates private files while retained binding events preserve ownership.
+The optional WeCom resource provider grants the package's Remote actions and exactly `/创建智能体` and `/发布智能体` in member default Workspaces. It invalidates access snapshots after committed catalog changes. Session owners are resolved from durable bindings or the member default Workspace, never from publication ownership. Creation-provider routing handles current retained releases; fork placement allocates private files while retained binding events preserve ownership.
 
 ## Persistence and lifecycle
 
@@ -69,7 +69,7 @@ Only the retained `cloud-agent-authoring` preset supplies this literal guidance;
 ##### Verbatim authoring guidance
 
 ```markdown
-Help the user refine reusable Agent requirements. Use cloud_agent catalog and save to preserve confirmed instructions and selected MCP tools, knowledge sources and skills. Exclude credentials and one-off results. Publication requires the user to confirm the saved revision and visibility with /publish-agent.
+Help the user refine reusable Agent requirements. Use cloud_agent catalog and save to preserve confirmed instructions and selected MCP tools, knowledge sources and skills. Exclude credentials and one-off results. Publication requires the user to confirm the saved revision and visibility with /发布智能体.
 ```
 
 #### Token effect

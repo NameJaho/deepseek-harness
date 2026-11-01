@@ -29,7 +29,7 @@ Compose this service when an interactive UI should let users drive agent-side be
 
 ### Registering a command
 
-A plugin registers a command with `ctx.commands.register()`: a lowercase name, a discovery description, an optional `input` hint, and a handler. An optional branded `definitionId` gives the definition a stable, plugin-namespaced identity for adapters; it is independent of display copy and execution `commandId`. The effective descriptor carries only the selected definition's identity, so a scoped override never inherits the shadowed registration's identity.
+A plugin registers a command with `ctx.commands.register()`: a Unicode-letter name; `aliases` adds execution-only compatibility names that stay out of discovery, a discovery description, an optional `input` hint, and a handler. An optional branded `definitionId` gives the definition a stable, plugin-namespaced identity for adapters; it is independent of display copy and execution `commandId`. The effective descriptor carries only the selected definition's identity, so a scoped override never inherits the shadowed registration's identity.
 
 ```text
 ctx.commands.register({
@@ -47,7 +47,7 @@ The handler returns `success` or `error` plus optional UI text that the adapter 
 
 ### Command syntax
 
-A command line starts with a slash at byte zero, a lowercase name containing letters, digits, `_` or `-`, and then either end-of-input or whitespace. Everything after the name — including separator whitespace — is the command's `rawInput`, and the command owns its own grammar for it. Lines that are not syntactically a command, or that name an unknown command, are rejected by the adapter instead of becoming a model prompt.
+A command line starts with a slash at byte zero, a Unicode-letter name; `aliases` adds execution-only compatibility names that stay out of discovery containing letters, digits, `_` or `-`, and then either end-of-input or whitespace. Everything after the name — including separator whitespace — is the command's `rawInput`, and the command owns its own grammar for it. Lines that are not syntactically a command, or that name an unknown command, are rejected by the adapter instead of becoming a model prompt.
 
 ### Agent-scoped commands
 

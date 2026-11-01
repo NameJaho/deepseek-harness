@@ -29,7 +29,7 @@ export type * from './types.ts'
 
 export const name = 'commands'
 
-const COMMAND_NAME = /^[a-z][a-z0-9_-]*$/u
+const COMMAND_NAME = /^[\p{Ll}\p{Lo}\p{Lt}][\p{L}\p{N}_-]*$/u
 
 /** Shared frozen attachments value for attachment-free invocations. */
 const NO_ATTACHMENTS: readonly (ImageBlock | FileBlock)[] = Object.freeze([])
@@ -61,8 +61,10 @@ export interface CommandInvocation {
 export interface CommandDefinition {
   /** Stable plugin-owned identity; absent for definitions without identity-based client behavior. */
   readonly definitionId?: CommandDefinitionId
-  /** Lowercase command name without the leading slash. */
+  /** Unicode-letter command name without the leading slash. */
   readonly name: string
+  /** Alternate names accepted by execution but omitted from discovery. */
+  readonly aliases?: readonly string[]
   /** Human-readable summary used in discovery UI. */
   readonly description: string
   /** Optional free-form input hint advertised to capable clients. */
@@ -79,7 +81,7 @@ export interface CommandDefinition {
 
 /** Syntactically valid slash command before registry resolution. */
 export interface ParsedCommand {
-  /** Lowercase command name without the leading slash. */
+  /** Unicode-letter command name without the leading slash. */
   readonly name: string
   /** Exact text following the command name. */
   readonly rawInput: string
@@ -123,7 +125,7 @@ declare module '@deepseek-ai/cordis' {
  * @returns The parsed command, or `undefined` when the line is not a command.
  */
 export function parseCommand(line: string): ParsedCommand | undefined {
-  const match = /^\/([a-z][a-z0-9_-]*)(?=$|[\t\n\r ])/u.exec(line)
+  const match = /^\/((?:\p{Ll}|\p{Lo}|\p{Lt})[\p{L}\p{N}_-]*)(?=$|[\t\n\r ])/u.exec(line)
   if (match === null) return undefined
   const name = match[1]
   /* v8 ignore next -- the first capture is required whenever the regular expression matches */
@@ -183,6 +185,10 @@ function normalizeDefinition(definition: CommandDefinition): RegisteredCommand {
   if (typeof definition.description !== 'string') {
     throw new TypeError(`command "${definition.name}" description must be a string`)
   }
+  const aliases = [...new Set(definition.aliases ?? [])]
+  if (aliases.some(alias => alias === definition.name || !COMMAND_NAME.test(alias))) {
+    throw new TypeError(`command "${definition.name}" aliases must be unique valid command names`)
+  }
   if (definition.description.trim().length === 0) {
     throw new TypeError(`command "${definition.name}" description must not be empty`)
   }
@@ -210,6 +216,7 @@ function normalizeDefinition(definition: CommandDefinition): RegisteredCommand {
   const normalized = Object.freeze({
     ...definition.definitionId === undefined ? {} : { definitionId: definition.definitionId },
     name: definition.name,
+    ...aliases.length === 0 ? {} : { aliases: Object.freeze(aliases) },
     description: definition.description,
     ...input === undefined ? {} : { input },
     ...definition.recordInput === undefined ? {} : { recordInput: definition.recordInput },
@@ -286,7 +293,11 @@ export class CommandRuntime extends TypertRemoteService {
     const registered = normalizeDefinition(definition)
     return this.layers.effect(
       this.ctx,
-      layer => layer.commands.insert(registered.definition.name, registered),
+      (layer) => {
+        const removers = [layer.commands.insert(registered.definition.name, registered),
+          ...(registered.definition.aliases ?? []).map(alias => layer.commands.insert(alias, registered))]
+        return () => { for (const remove of removers) remove() }
+      },
       { label: 'commands.register()' },
     )
   }
@@ -313,8 +324,9 @@ export class CommandRuntime extends TypertRemoteService {
    */
   @Remote
   list(agent: Agent): readonly CommandDescriptor[] {
-    return Object.freeze([...this.view(agent).values()]
-      .map(command => command.descriptor)
+    const unique = new Map<string, CommandDescriptor>()
+    for (const command of this.view(agent).values()) unique.set(command.definition.name, command.descriptor)
+    return Object.freeze([...unique.values()]
       // Names are unique in the effective view, so equality is impossible.
       .sort((left, right) => left.name < right.name ? -1 : 1))
   }

@@ -1,0 +1,3 @@
+- insert:
+    - id: company-wecom
+      name: '@deepseek-ai/dsh-company-wecom'

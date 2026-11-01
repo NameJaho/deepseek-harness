@@ -25,7 +25,7 @@ kind: "package-bundle"
 
 将 [cordis.patch.yml](cordis.patch.yml) 应用到已提供注入的 Host 服务和 MCP 提供方的 profile。该 patch 只挂载目录服务并设置绝对路径的私有 `workspaceRoot`，不会安装或配置提供方。[Config](src/config.ts) 定义发布、技能、附件分页和报告的上限。`capabilityPreset` 指定部署的技能目录作用域，与创建及运行 preset 分离。
 
-在本人拥有的 selectable/default 对话中，权限为 `workspace-write` 或 `danger-full-access` 时，可使用 `/create-agent [requirements]` 或 `/publish-agent [public|private]`。尚无已保存草稿时，命令将根据已确认对话提取需求的请求入队，不会发布。检查保存后的名称和描述后，直接用自然语言请求发布；未明确说明公共空间时默认发布为私有，结果会提醒你在 Cloud Agent 中点击发布，或继续明确说“发布到公共空间”。完全相同的重放返回已有 release；过期或冲突确认失败，不新增 release。结果未知时，重试前先查询目录。
+在本人拥有的 selectable/default 对话中，权限为 `workspace-write` 或 `danger-full-access` 时，可使用 `/创建智能体 [requirements]` 或 `/发布智能体 [public|private]`。尚无已保存草稿时，命令将根据已确认对话提取需求的请求入队，不会发布。检查保存后的名称和描述后，直接用自然语言请求发布；未明确说明公共空间时默认发布为私有，结果会提醒你在 Cloud Agent 中点击发布，或继续明确说“发布到公共空间”。完全相同的重放返回已有 release；过期或冲突确认失败，不新增 release。结果未知时，重试前先查询目录。
 
 新编辑器会保留 profile 的 `danger-full-access` 默认权限；其他默认权限仍会请求 `workspace-write`。如果服务器没有可用沙箱，受控测试部署可在启动器的 `startup.env` 中显式设置 `DSH_PERMISSION_MODE=danger-full-access`；这会取消文件限制和审批提示。已有 Session 保留日志中的权限，因此修改默认值后应打开新编辑器。
 
@@ -38,7 +38,7 @@ kind: "package-bundle"
 
 `creationPreset` 和 `runPreset` 必须可选。创建在编辑器中挂载所选 preset。usage Session 只挂载其保留的 release preset：`runPreset` 仅验证并记录，不挂载，因此不能增加工具或权限。可选 provider/model 覆盖值会经过验证。绑定审计记录创建/运行 preset，以及包含 release、run preset、实际模型和强制 `read-only` 权限的生效摘要。运行时只提供批准的 MCP 工具、直连知识检索、固定技能、可下载文本报告和本对话文件读取；见[运行时](../cloud-agent-runtime/README.zh.md)。
 
-可选企微资源提供方授予本包的 Remote 操作，以及成员 default Workspace 中精确的 `/create-agent` 和 `/publish-agent` 命令。目录变更提交后会使访问快照失效。Session 所有者从持久化绑定或成员 default Workspace 解析，不从发布所有权推断。创建提供方路由处理当前保留 release；fork 放置负责分配私有文件，保留的绑定事件维持所有权。
+可选企微资源提供方授予本包的 Remote 操作，以及成员 default Workspace 中精确的 `/创建智能体` 和 `/发布智能体` 命令。目录变更提交后会使访问快照失效。Session 所有者从持久化绑定或成员 default Workspace 解析，不从发布所有权推断。创建提供方路由处理当前保留 release；fork 放置负责分配私有文件，保留的绑定事件维持所有权。
 
 <a id="persistence-and-lifecycle"></a>
 ## 持久化与生命周期
@@ -73,7 +73,7 @@ kind: "package-bundle"
 ##### 编写指引原文
 
 ```markdown
-Help the user refine reusable Agent requirements. Use cloud_agent catalog and save to preserve confirmed instructions and selected MCP tools, knowledge sources and skills. Exclude credentials and one-off results. Publication requires the user to confirm the saved revision and visibility with /publish-agent.
+Help the user refine reusable Agent requirements. Use cloud_agent catalog and save to preserve confirmed instructions and selected MCP tools, knowledge sources and skills. Exclude credentials and one-off results. Publication requires the user to confirm the saved revision and visibility with /发布智能体.
 ```
 
 #### Token 影响

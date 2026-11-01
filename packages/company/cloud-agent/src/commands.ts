@@ -54,7 +54,7 @@ export function registerAuthoringCommands(ctx: Context, service: CloudAgentServi
       }
       entry.stops.push(scoped.commands.register({
         definitionId: brandString<CommandDefinitionId>('@deepseek-ai/dsh-company-cloud-agent/create-agent'),
-        name: 'create-agent', description: 'Save reusable Agent requirements from this conversation', input: { hint: '[requirements]' },
+        name: '创建智能体', aliases: ['create-agent'], description: '从当前对话保存可复用智能体需求', input: { hint: '[需求]' },
         handler: ({ rawInput, signal }) => ctx.agents.withInitiator(agent, async () => {
           signal.throwIfAborted()
           if (ctx.agents.get(agent.id) !== agent) return { kind: 'error', text: 'This conversation is no longer active.' }
@@ -65,7 +65,7 @@ export function registerAuthoringCommands(ctx: Context, service: CloudAgentServi
       }))
       entry.stops.push(scoped.commands.register({
         definitionId: brandString<CommandDefinitionId>('@deepseek-ai/dsh-company-cloud-agent/publish-agent'),
-        name: 'publish-agent', description: 'Publish this conversation’s Agent after asking for the audience', input: { hint: '[optional]' },
+        name: '发布智能体', aliases: ['publish-agent'], description: '确认发布当前对话中的智能体并选择可见范围', input: { hint: '[可见范围]' },
         handler: ({ rawInput, signal }) => ctx.agents.withInitiator(agent, async () => {
           signal.throwIfAborted()
           if (ctx.agents.get(agent.id) !== agent) return { kind: 'error', text: 'This conversation is no longer active.' }

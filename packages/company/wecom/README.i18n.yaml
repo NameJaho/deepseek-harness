@@ -1,0 +1,52 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/company/wecom/README.md
+/:
+  en: 26ceb3f1ee55e646
+  zh: 407d55a410fa15a3
+/deepseek-ai-dsh-company-wecom:
+  en: c692b22f33f8269a
+  zh: da4e1ac79d71077c
+/deepseek-ai-dsh-company-wecom/summary:
+  en: 30dda9f9bc80c41d
+  zh: 5f74dece9d257fc4
+/deepseek-ai-dsh-company-wecom/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: ef6805c80e17a904
+/deepseek-ai-dsh-company-wecom/use-this-package:
+  en: bbff250eba0f1b89
+  zh: b20a47f82d8ab6e0
+/deepseek-ai-dsh-company-wecom/use-this-package/load-the-company-profile-layers:
+  en: 731ae4697c3fdba9
+  zh: 4814b610d720422f
+/deepseek-ai-dsh-company-wecom/use-this-package/configuration-and-recovery:
+  en: 3afd6946d323270b
+  zh: aa93c34b75c95bc3
+/deepseek-ai-dsh-company-wecom/understand-the-implementation:
+  en: 40c601645c183543
+  zh: 1bb5ec84ba9e3460
+/deepseek-ai-dsh-company-wecom/further-exploration:
+  en: 1bc5d96640d8425c
+  zh: 3c36227d06a5bf4e
+/deepseek-ai-dsh-company-wecom/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-company-wecom/model-experience/publication-command:
+  en: 7a48401ae578f73f
+  zh: 8a36a8c9cee719d2
+/deepseek-ai-dsh-company-wecom/model-experience/publication-command/what-the-model-sees:
+  en: 9d9a25d72573ba33
+  zh: 56db3f65e93bc4d0
+/deepseek-ai-dsh-company-wecom/model-experience/publication-command/token-effect:
+  en: e73c56a39b5bb872
+  zh: 8b23e30e30870b35
+/deepseek-ai-dsh-company-wecom/model-experience/publication-command/kv-cache-effect:
+  en: 3664caf84c9d22f1
+  zh: bd41aed8de4b9c49
+/deepseek-ai-dsh-company-wecom/known-limitations-and-deferred-work:
+  en: f0b450e3daf2b814
+  zh: af2cfa6b6d163c26
+/deepseek-ai-dsh-company-wecom/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: e88aeb617ffb74ea

@@ -269,6 +269,7 @@
   ],
   "references": [
     { "path": "./packages/company/cloud-agent/tsconfig.host.json" },
+    { "path": "./packages/company/wecom/tsconfig.host.json" },
     { "path": "./packages/company/mcp-provider" },
     { "path": "./packages/company/cloud-agent-runtime" },
 
@@ -587,6 +588,7 @@
     { "path": "./packages/company/mcp-provider" },
     { "path": "./packages/company/knowledge/tsconfig.host.json" },
     { "path": "./packages/company/cloud-agent/tsconfig.host.json" },
+    { "path": "./packages/company/wecom/tsconfig.host.json" },
     { "path": "./packages/company/cloud-agent-runtime" },
     { "path": "./packages/company/external-agent-subagent" },
     { "path": "./packages/sandbox/sandbox-container" },

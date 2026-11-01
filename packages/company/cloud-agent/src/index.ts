@@ -91,7 +91,7 @@ export class CloudAgentService extends TypertRemoteService {
     owner.effect(() => () => this.close(), 'cloud-agent: retained releases and Sessions')
     owner.inject(['companyWecomAuth'], (authCtx) => {
       authCtx.companyWecomAuth.registerResourceProvider({
-        defaultWorkspaceCommands: ['create-agent', 'publish-agent'],
+        defaultWorkspaceCommands: ['创建智能体', '发布智能体', 'create-agent', 'publish-agent', '发布企微', 'publish-wecom'],
         bindings: (principal) => {
           const ownerId = authCtx.companyWecomAuth.ownerScope(principal)
           const ids = [...this.domain?.table('conversations').entries() ?? []]
@@ -104,7 +104,7 @@ export class CloudAgentService extends TypertRemoteService {
                 'cloudAgents/deleteUnboundAuthoringSessions', 'commands/execute'] as const },
             condition: ({ action, args }: { action: string; args?: Readonly<Record<string, unknown>> }) =>
               action !== 'commands/execute' || args === undefined
-                || (typeof args.line === 'string' && /^\/(?:create-agent|publish-agent)(?:\s|$)/u.test(args.line))
+                || (typeof args.line === 'string' && /^\/(?:创建智能体|发布智能体|发布企微|create-agent|publish-agent|publish-wecom)(?:\s|$)/u.test(args.line))
                 ? { kind: 'allow' as const } : { kind: 'deny' as const, reason: 'command-not-granted' },
           })), { resource: { kind: 'global' as const }, role: { name: 'company:agents', resource: 'global' as const,
             actions: ['cloudAgents/catalog', 'cloudAgents/follow', 'cloudAgents/startAuthoring', 'cloudAgents/startSession',
@@ -167,7 +167,7 @@ export class CloudAgentService extends TypertRemoteService {
         mode: 'authoring', releaseId: 'authoring', instructions: 'Help the user refine reusable Agent requirements. '
           + 'Use cloud_agent catalog and save to preserve confirmed instructions and selected MCP tools, skills and knowledgeSources. '
           + 'Knowledge sources use direct HTTP retrieval independently of MCP; zero MCP servers does not mean knowledge is unavailable. '
-          + 'Exclude credentials and one-off results. Publication requires the user to confirm the saved revision and visibility with /publish-agent.',
+          + 'Exclude credentials and one-off results. Publication requires the user to confirm the saved revision and visibility with /发布智能体.',
       } }, cloudAgentCompaction()],
     })
     for (const [id, record] of domain.table('agents').entries()) {
@@ -451,6 +451,7 @@ export class CloudAgentService extends TypertRemoteService {
    * @param id - saved draft selected in this conversation.
    * @param revision - exact saved revision.
    * @param signal - cancellation while committing.
+   * @param _language - publication question language retained for compatibility.
    * @param requestedVisibility - explicit audience; omission publishes privately.
    * @returns published or unchanged publication metadata.
    */
@@ -513,6 +514,27 @@ export class CloudAgentService extends TypertRemoteService {
   startSession(request: CloudAgentStartRequest, signal: AbortSignal): Promise<CloudAgentSession> {
     const ownerId = this.ownerId()
     return this.serialize(async () => this.start(await this.publicRelease(request, ownerId), request, signal, ownerId))
+  }
+
+  /** Start a retained release for a trusted company channel owner.
+   * @param request - exact Agent and immutable release selected by the channel binding.
+   * @param ownerId - verified owner scope retained by the channel binding.
+   * @param signal - channel cancellation.
+   * @returns the new usage Session bound to the requested release.
+   */
+  async startRetainedSession(request: CloudAgentStartRequest, ownerId: CloudAgentOwnerId, signal: AbortSignal): Promise<CloudAgentSession> {
+    await this.initialized
+    return this.serialize(async () => {
+      const record = (await this.ready).table('agents').get(request.id)
+      if (record === undefined) {
+        throw new RemoteError('cloud-agent/not-published', 'This release is no longer accessible; refresh the directory', { id: request.id })
+      }
+      const release = record.releases.find(item => item.id === request.releaseId && item.kind === 'published')
+      if (release === undefined || !this.visible(record, release, ownerId)) {
+        throw new RemoteError('cloud-agent/not-published', 'This release is no longer accessible; refresh the directory', { id: request.id })
+      }
+      return this.start(release, request, signal, ownerId)
+    })
   }
 
   /** Snapshot and test an owned draft without publishing it.
@@ -958,7 +980,6 @@ export class CloudAgentService extends TypertRemoteService {
     let workspace: Workspace | undefined
     const sharedWorkspace = true
     try {
-      await this.validateCapabilities(release.id)
       const cwd = await this.workspaces.agentWorkspace(String(request.id), String(ownerId))
       await this.workspaces.materializeSkillsAt(cwd, release.skillSnapshots ?? [])
       workspace = await this.owner.workspaceRegistry.create(cwd, release.definition.name)
@@ -973,6 +994,7 @@ export class CloudAgentService extends TypertRemoteService {
         } })
       await workspace.attachSession(sessionId)
       await (await this.ready).table('conversations').put(sessionId, binding)
+      await this.validateCapabilities(release.id, sessionId)
     } catch (error) { return this.rollbackSession(error, sessionId, workspace, handle, !sharedWorkspace, !sharedWorkspace) }
     this.handles.add(handle)
     return { sessionId, releaseId: release.id }

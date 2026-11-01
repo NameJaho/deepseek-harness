@@ -950,6 +950,17 @@ saveFromConversation(agent: Agent, requestId: string, draft: CloudAgentDraft, id
  */
 @Remote({ resources: { session: request => request.authoringSessionId } }) publish(request: CloudAgentPublishRequest): Promise<CloudAgentRecord>
 
+/** Publish an exact saved revision, defaulting to private visibility.
+ * @param agent - live owning authoring Agent.
+ * @param id - saved draft selected in this conversation.
+ * @param revision - exact saved revision.
+ * @param signal - cancellation while committing.
+ * @param _language - publication question language retained for compatibility.
+ * @param requestedVisibility - explicit audience; omission publishes privately.
+ * @returns published or unchanged publication metadata.
+ */
+async requestPublication(agent: Agent, id: CloudAgentId, revision: number, signal: AbortSignal, _language: PublicationLanguage, requestedVisibility?: 'public' | 'private'): Promise<{ action: 'cancelled' | 'published' | 'already-published' id: CloudAgentId revision: number releaseId?: CloudAgentReleaseId visibility?: 'public' | 'private' version?: number nextAction?: string }>
+
 /** Withdraw publication while preserving existing private Sessions and releases.
  * @param request - owning editor and exact record revision.
  * @returns updated record.
@@ -962,6 +973,14 @@ saveFromConversation(agent: Agent, requestId: string, draft: CloudAgentDraft, id
  * @returns fresh owner-private ordinary Session.
  */
 @Remote startSession(request: CloudAgentStartRequest, signal: AbortSignal): Promise<CloudAgentSession>
+
+/** Start a retained release for a trusted company channel owner.
+ * @param request - exact Agent and immutable release selected by the channel binding.
+ * @param ownerId - verified owner scope retained by the channel binding.
+ * @param signal - channel cancellation.
+ * @returns the new usage Session bound to the requested release.
+ */
+async startRetainedSession(request: CloudAgentStartRequest, ownerId: CloudAgentOwnerId, signal: AbortSignal): Promise<CloudAgentSession>
 
 /** Snapshot and test an owned draft without publishing it.
  * @param request - exact draft revision and live editor.
@@ -1085,6 +1104,47 @@ async search(binding: CompanyKnowledgeBinding, query: string, signal: AbortSigna
 ```
 
 Source: [`packages/company/knowledge/src/index.ts`](../../packages/company/knowledge/src/index.ts)
+
+<a id="ctxcompanywecom--companywecomservice"></a>
+
+### `ctx.companyWecom` — `CompanyWecomService`
+
+Owns robot credentials by reference, immutable publication bindings and connection teardown.
+
+```ts cordis-catalog
+/** Read sanitized requests and actual connection state.
+ * @returns robot bindings without Secret values or conversation contents.
+ */
+@Remote async snapshot(): Promise<WecomSnapshot>
+
+/** Follow sanitized publication and connection state, coalescing slow readers.
+ * @param signal - stream cancellation.
+ * @returns initial snapshot and subsequent committed updates.
+ */
+@Remote({ mode: 'stream' }) async *follow(signal: AbortSignal): AsyncIterable<WecomSnapshot>
+
+/** Save credentials returned by the official authorization window and bind the exact requested release.
+ * @param input - one pending request and newly authorized robot credentials; never logged.
+ * @returns binding identity; online state follows only after the gateway authenticates.
+ */
+@Remote complete(input: WecomAuthorization): Promise<WecomBinding>
+
+/** Enable/reconnect or disable an existing robot without changing its pinned release.
+ * @param id - exact binding identity.
+ * @param enabled - false stops admission and drains the connection; true reconnects it.
+ * @returns after durable enablement and connection lifecycle reconciliation.
+ */
+@Remote setEnabled(id: WecomBindingId, enabled: boolean): Promise<void>
+
+/** Request scan authorization for one saved published release without publishing a draft.
+ * @param agentId - saved Agent belonging to this deployment owner.
+ * @param releaseId - exact published release shown in the Agent information panel.
+ * @returns pending scan request; no robot credentials or binding exist until completion.
+ */
+@Remote requestRelease(agentId: CloudAgentId, releaseId: CloudAgentReleaseId): Promise<WecomRequest>
+```
+
+Source: [`packages/company/wecom/src/index.ts`](../../packages/company/wecom/src/index.ts)
 
 <a id="agent-events"></a>
 

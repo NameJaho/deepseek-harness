@@ -44,6 +44,7 @@ describe('parseCommand()', () => {
     ['/goal create the thing', { name: 'goal', rawInput: ' create the thing' }],
     ['/goal\ncreate the thing', { name: 'goal', rawInput: '\ncreate the thing' }],
     ['/goal_name-2\t x ', { name: 'goal_name-2', rawInput: '\t x ' }],
+    ['/创建智能体 需求', { name: '创建智能体', rawInput: ' 需求' }],
   ] as const)('parses %j without normalizing trailing input', (line, expected) => {
     expect(parseCommand(line)).toEqual(expected)
   })
@@ -54,6 +55,14 @@ describe('parseCommand()', () => {
 })
 
 describe('CommandRuntime', () => {
+  it('executes aliases without exposing them in discovery', async () => {
+    const ctx = await mount()
+    const { agent } = await mintAgentScope(ctx, 'alias')
+    ctx.commands.register({ ...command('创建智能体', 'created'), aliases: ['create-agent'] })
+    expect(ctx.commands.list(agent).map(item => item.name)).toEqual(['创建智能体'])
+    expect((await ctx.commands.execute(agent, '/create-agent', [], new AbortController().signal))?.result)
+      .toEqual({ kind: 'success', text: 'created' })
+  })
   it('lists immutable global descriptors with input metadata', async () => {
     const ctx = await mount()
     const { agent } = await mintAgentScope(ctx, 'a')

@@ -35,8 +35,10 @@ interface CommandInputDescriptor {
 interface CommandDefinition {
   /** Stable plugin-owned identity; absent for definitions without identity-based client behavior. */
   readonly definitionId?: CommandDefinitionId
-  /** Lowercase command name without the leading slash. */
+  /** Unicode-letter command name without the leading slash. */
   readonly name: string
+  /** Alternate names accepted by execution but omitted from discovery. */
+  readonly aliases?: readonly string[]
   /** Human-readable summary used in discovery UI. */
   readonly description: string
   /** Optional free-form input hint advertised to capable clients. */
@@ -101,7 +103,7 @@ Adapters receive handler-free immutable descriptors after scope resolution. `par
 interface CommandDescriptor {
   /** Stable plugin-owned identity; absent for definitions without identity-based client behavior. */
   readonly definitionId?: CommandDefinitionId
-  /** Lowercase command name without the leading slash. */
+  /** Unicode-letter command name without the leading slash. */
   readonly name: string
   /** Human-readable summary used in discovery UI. */
   readonly description: string
@@ -113,7 +115,7 @@ interface CommandDescriptor {
 ```ts type-equiv
 /** Syntactically valid slash command before registry resolution. */
 interface ParsedCommand {
-  /** Lowercase command name without the leading slash. */
+  /** Unicode-letter command name without the leading slash. */
   readonly name: string
   /** Exact text following the command name. */
   readonly rawInput: string

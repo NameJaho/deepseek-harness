@@ -26,6 +26,7 @@ This group contains opt-in integrations for a company Web deployment. WeCom logi
 | [`mcp-provider`](mcp-provider/README.md) | Member-authorized MCP Market provider and catalog Remote | `companyMcpProvider`, `companyMcp` |
 | [`cloud-agent`](cloud-agent/README.md) | Cloud Agent drafts, immutable releases, directory and use groups | `cloudAgents` |
 | [`cloud-agent-runtime`](cloud-agent-runtime/README.md) | Release-pinned prompt and tool policy inside each Cloud Agent Session | — (Agent-scoped plugin) |
+| [`wecom`](wecom/README.md) | Member-scoped WeCom robot authorization, release bindings and text conversations | `companyWecom` |
 
 <a id="related-documentation"></a>
 ## Related documentation

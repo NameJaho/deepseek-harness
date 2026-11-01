@@ -1,0 +1,22 @@
+.page { display: flex; flex-direction: column; gap: 16px; min-width: 0; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 20px; }
+.card { display: grid; gap: 12px; padding: 16px; border: 0.5px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-md); min-width: 0; max-width: 100%; overflow-wrap: anywhere; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 20px; }
+.card p, .page p, .card h3 { margin: 0; }
+.card h3 { font-size: inherit; line-height: inherit; font-weight: 500; }
+.heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.heading strong { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.card strong { font-weight: 500; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.actions > button { max-width: 100%; height: auto; min-height: 36px; padding-block: 6px; white-space: normal; overflow-wrap: anywhere; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px; min-width: 0; }
+.publication { display: grid; gap: 12px; min-width: 0; }
+.notice { min-height: 36px; min-width: 0; }
+.noticeLine { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; color: var(--dsw-alias-label-primary); }
+.noticeLine span { flex: 1 1 200px; overflow-wrap: anywhere; }
+.loading { display: grid; place-items: center; min-height: 220px; flex: 1; }
+.loadingCard { display: grid; place-items: center; min-height: 80px; }
+.list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; min-width: 0; }
+.record { display: grid; gap: 8px; min-width: 0; }
+.metadata { display: grid; gap: 4px; margin: 0; color: var(--dsw-alias-label-secondary); }
+.metadata > div { display: flex; flex-wrap: wrap; column-gap: 8px; min-width: 0; }
+.metadata dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.raw { margin: 0; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }

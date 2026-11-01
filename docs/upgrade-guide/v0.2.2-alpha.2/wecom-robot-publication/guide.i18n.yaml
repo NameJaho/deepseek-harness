@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.2-alpha.2/wecom-robot-publication/guide.md
+/:
+  en: 57d413f3c4ca638d
+  zh: 389fdbbaf66d1e38
+/wecom-robot-publication-uses-member-scoped-releases:
+  en: bb1dab00c352ab23
+  zh: 2eb9c9ff2d061ddf
+/wecom-robot-publication-uses-member-scoped-releases/change:
+  en: 0c0f14e0310cf11b
+  zh: 8813ed6c703944a1
+/wecom-robot-publication-uses-member-scoped-releases/migration:
+  en: 10c1c5c979a7b4d1
+  zh: 97a073761b48d454

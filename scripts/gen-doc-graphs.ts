@@ -123,6 +123,11 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Verifies official WeCom identities and resolves private Session ownership and business resource grants.',
   },
   {
+    key: 'companyWecom', pkg: 'company-wecom', title: 'WeCom robot publication', mode: 'service',
+    consumers: ['company-cloud-agent'],
+    note: 'Creates member-scoped scan requests, binds immutable Cloud Agent releases, and routes durable text conversations through the WeCom gateway.',
+  },
+  {
     key: 'cloudAgents', pkg: 'company-cloud-agent', title: 'Reusable company Agents', mode: 'service',
     consumers: ['company-cloud-agent-runtime'],
     note: 'Retains member-owned drafts and immutable releases and authorizes MCP execution for the member running the release.',

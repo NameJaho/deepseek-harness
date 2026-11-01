@@ -15,6 +15,8 @@ flowchart LR
   svc_companyMcp["ctx.companyMcp<br/>Member MCP catalog Remote"]
   pkg_company_wecom_auth["company-wecom-auth"]
   svc_companyWecomAuth["ctx.companyWecomAuth<br/>Company member authentication"]
+  pkg_company_wecom["company-wecom"]
+  svc_companyWecom["ctx.companyWecom<br/>WeCom robot publication"]
   svc_cloudAgents["ctx.cloudAgents<br/>Reusable company Agents"]
   pkg_company_cloud_agent_runtime["company-cloud-agent-runtime"]
   pkg_action_cards["action-cards"]
@@ -367,6 +369,7 @@ flowchart LR
   pkg_company_knowledge --> svc_companyKnowledge
   pkg_company_mcp_provider --> svc_companyMcp
   pkg_company_mcp_provider --> svc_companyMcpProvider
+  pkg_company_wecom --> svc_companyWecom
   pkg_company_wecom_auth --> svc_companyWecomAuth
   pkg_computer_use --> svc_computerUse
   pkg_config_editor --> svc_configEditor
@@ -528,6 +531,7 @@ flowchart LR
   svc_companyMcp --> pkg_company_cloud_agent
   svc_companyMcpProvider --> pkg_company_cloud_agent
   svc_companyMcpProvider --> pkg_company_mcp_provider
+  svc_companyWecom --> pkg_company_cloud_agent
   svc_companyWecomAuth --> pkg_company_cloud_agent
   svc_companyWecomAuth --> pkg_company_mcp_provider
   svc_computerUse --> pkg_experimental_computer_use_cua_driver_mcp
@@ -678,6 +682,7 @@ flowchart LR
 | `ctx.companyMcpProvider` | `seam` | [`company-mcp-provider`](../packages/company/mcp-provider) | [`company-mcp-provider`](../packages/company/mcp-provider) | [`company-mcp-provider`](../packages/company/mcp-provider), [`company-cloud-agent`](../packages/company/cloud-agent) | - | 按已验证成员查询市场已有接口，提供有使用权限的 MCP 目录及可选工具发现；实际调用暂未接入。 |
 | `ctx.companyMcp` | `service` | [`company-mcp-provider`](../packages/company/mcp-provider) | - | [`company-cloud-agent`](../packages/company/cloud-agent) | - | 在 Host 解析登录身份，仅提供成员目录和工具发现。 |
 | `ctx.companyWecomAuth` | `service` | [`company-wecom-auth`](../packages/company/wecom-auth) | - | [`company-cloud-agent`](../packages/company/cloud-agent), [`company-mcp-provider`](../packages/company/mcp-provider) | - | Verifies official WeCom identities and resolves private Session ownership and business resource grants. |
+| `ctx.companyWecom` | `service` | [`company-wecom`](../packages/company/wecom) | - | [`company-cloud-agent`](../packages/company/cloud-agent) | - | Creates member-scoped scan requests, binds immutable Cloud Agent releases, and routes durable text conversations through the WeCom gateway. |
 | `ctx.cloudAgents` | `service` | [`company-cloud-agent`](../packages/company/cloud-agent) | - | [`company-cloud-agent-runtime`](../packages/company/cloud-agent-runtime) | - | Retains member-owned drafts and immutable releases and authorizes MCP execution for the member running the release. |
 | `ctx.actionCards` | `service` | [`action-cards`](../packages/experimental/action-cards) | - | [`creation-recommendations`](../packages/experimental/creation-recommendations), [`client-ui-action-cards`](../packages/experimental/client-ui-action-cards) | - | Owns the card tool, card state, user actions and status notices; card kinds register their actions and handlers. |
 | `ctx.pluginRecommendations` | `service` | [`plugin-recommendations`](../packages/experimental/plugin-recommendations) | - | [`client-ui-plugin-recommendations`](../packages/experimental/client-ui-plugin-recommendations) | - | Reads the current catalog text of an official plugin card and enables the plugin through the profile plugin manager after a click. |

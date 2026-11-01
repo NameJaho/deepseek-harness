@@ -294,7 +294,7 @@ it('queues an ordinary-session draft and asks for visibility in natural language
   const sessionId = await f.editor()
   const agent = f.agents.get(sessionId)!
   expect(agent.session.header.agentPreset).toBe('standard')
-  expect(f.ctx.commands.list(agent).map(command => command.name)).toEqual(['create-agent', 'publish-agent'])
+  expect(f.ctx.commands.list(agent).map(command => command.name)).toEqual(['创建智能体', '发布智能体'])
   const run = (line: string) => f.ctx.commands.execute(agent, line, [], new AbortController().signal)
   expect((await run('/publish-agent'))?.result.kind).toBe('success')
   expect(f.queued).toHaveBeenCalledWith(expect.objectContaining({ sessionId, mode: 'queue', content: [expect.objectContaining({
