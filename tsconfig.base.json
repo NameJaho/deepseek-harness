@@ -308,6 +308,8 @@
       "@deepseek-ai/dsh-company-external-agent-subagent": ["./packages/company/external-agent-subagent/src/index.ts"],
       "@deepseek-ai/dsh-company-external-agent-subagent/types": ["./packages/company/external-agent-subagent/src/types.ts"],
       "@deepseek-ai/dsh-company-wecom-auth/client": ["./packages/company/wecom-auth/src/client/index.ts"],
+      "@deepseek-ai/dsh-company-user-mcp": ["./packages/company/user-mcp/src"],
+      "@deepseek-ai/dsh-company-user-mcp/types": ["./packages/company/user-mcp/src/types.ts"],
       "@deepseek-ai/dsh-client-connection": ["./packages/client/connection/src"],
       "@deepseek-ai/dsh-client-file-upload": ["./packages/client/file-upload/src"],
       "@deepseek-ai/dsh-client-file-upload/client": ["./packages/client/file-upload/src/client/index.ts"],

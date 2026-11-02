@@ -592,6 +592,7 @@
     { "path": "./packages/company/cloud-agent-runtime" },
     { "path": "./packages/company/external-agent-subagent" },
     { "path": "./packages/sandbox/sandbox-container" },
+    { "path": "./packages/company/user-mcp" },
     { "path": "./packages/sdk/client" },
     { "path": "./packages/sdk/protocol" },
     { "path": "./packages/lsp/lsp" },

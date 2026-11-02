@@ -37,6 +37,7 @@
     "@deepseek-ai/dsh-company-knowledge": "workspace:*",
     "@deepseek-ai/dsh-company-mcp-provider": "workspace:*",
     "@deepseek-ai/dsh-company-wecom-auth": "workspace:*",
+    "@deepseek-ai/dsh-company-user-mcp": "workspace:*",
     "@deepseek-ai/dsh-client-ui-agent-preset": "workspace:*",
     "@deepseek-ai/dsh-client-ui-cordis": "workspace:*",
     "@deepseek-ai/dsh-cmdline": "workspace:*",

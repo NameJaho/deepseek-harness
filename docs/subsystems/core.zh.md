@@ -982,6 +982,20 @@ async requestPublication(agent: Agent, id: CloudAgentId, revision: number, signa
  */
 async startRetainedSession(request: CloudAgentStartRequest, ownerId: CloudAgentOwnerId, signal: AbortSignal): Promise<CloudAgentSession>
 
+/** Read one exact published release for an owning internal channel.
+ *
+ * This deliberately reads the durable Agent record instead of calling the
+ * member-facing catalog. Channel callbacks may run outside the browser
+ * Remote invocation context, while the catalog also reads member-scoped
+ * MCP state and therefore requires that context.
+ *
+ * @param agentId - saved Agent identity.
+ * @param releaseId - exact immutable release identity.
+ * @param ownerId - verified owner scope retained by the caller.
+ * @returns the release when it is still published and owned by the scope.
+ */
+async findOwnedPublishedRelease(agentId: CloudAgentId, releaseId: CloudAgentReleaseId, ownerId: CloudAgentOwnerId): Promise<CloudAgentRelease | undefined>
+
 /** Snapshot and test an owned draft without publishing it.
  * @param request - exact draft revision and live editor.
  * @param signal - creation cancellation.

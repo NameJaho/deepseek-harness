@@ -967,12 +967,51 @@ export interface KnowledgeSourceConfig {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-company-knowledge -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-company-user-mcp -->
+<a id="deepseek-aidsh-company-user-mcp"></a>
+
+## `@deepseek-ai/dsh-company-user-mcp`
+
+- `inject`: `tools` · `agents` · `sessionProjections`
+- `source`: [`packages/company/user-mcp/src/config.ts:5`](../packages/company/user-mcp/src/config.ts)
+
+```ts config-catalog
+/** URLs, platform identity and bounded upstream operation deadlines. Secrets are read from the process environment. */
+export interface Config {
+  /** Enables the bridge when set for a deployment. */
+  enabled: boolean
+  /** Streamable HTTP MCP endpoint exposing `queryUserAvailableMcp`. */
+  listUrl: string
+  /** Platform token-exchange endpoint. */
+  exchangeUrl: string
+  /** Platform identifier used in the HMAC request headers. */
+  platformId: string
+  /** Target MCP environment passed to the exchange endpoint. */
+  environment: string
+  /** Process environment variable containing the list-service API key. */
+  listApiKeyEnv: string
+  /** Process environment variable containing the platform HMAC secret. */
+  platformSecretEnv: string
+  /** Timeout for one catalog or token-exchange request, in milliseconds. */
+  requestTimeoutMs: number
+  /** Timeout for MCP initialization and tool discovery, in milliseconds. */
+  connectionTimeoutMs: number
+  /** Timeout for one user MCP tool call, in milliseconds. */
+  toolCallTimeoutMs: number
+  /** Maximum number of servers returned by one catalog request. */
+  maxServers: number
+  /** How long one Agent reuses its loaded catalog before the next step refreshes it, in milliseconds. */
+  catalogTtlMs: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-company-user-mcp -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-company-wecom -->
 <a id="deepseek-aidsh-company-wecom"></a>
 
 ## `@deepseek-ai/dsh-company-wecom`
 
-- `inject`: `cloudAgents` · `agents` · `sessionController` · `credentials` · `storageDomain`
+- `inject`: `cloudAgents` · `agents` · `sessionController` · `credentials` · `storageDomain` · `companyWecomAuth`
 - `source`: [`packages/company/wecom/src/config.ts:5`](../packages/company/wecom/src/config.ts)
 
 ```ts config-catalog
@@ -2622,7 +2661,7 @@ export interface LspLocalServerConfig {
 ## `@deepseek-ai/dsh-mcp-client`
 
 - `inject`: `tools`
-- `source`: [`packages/mcp/mcp-client/src/index.ts:104`](../packages/mcp/mcp-client/src/index.ts)
+- `source`: [`packages/mcp/mcp-client/src/index.ts:105`](../packages/mcp/mcp-client/src/index.ts)
 
 ```ts config-catalog
 /** Configuration for one stdio or Streamable HTTP MCP server. */
@@ -3301,7 +3340,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-session-log-export`
 
-- `inject`: `commands` · `connection`
+- `inject`: `commands` · `connection` · `remoteAccess`
 - `source`: [`packages/session-query/session-log-export/src/index.ts:50`](../packages/session-query/session-log-export/src/index.ts)
 
 ```ts config-catalog
@@ -5103,7 +5142,7 @@ export interface Config {
 | `@deepseek-ai/dsh-api-remotes` | `typertGateway` | [`packages/api/remotes/src/index.ts`](../packages/api/remotes/src/index.ts) |
 | `@deepseek-ai/dsh-authorization` | `credentials` | [`packages/credentials/authorization/src/index.ts`](../packages/credentials/authorization/src/index.ts) |
 | `@deepseek-ai/dsh-browser-use` | — | [`packages/browser-use/browser-use/src/index.ts`](../packages/browser-use/browser-use/src/index.ts) |
-| `@deepseek-ai/dsh-client-file-upload` | `agents` · `attachments` · `commands` · `connection` | [`packages/client/file-upload/src/index.ts`](../packages/client/file-upload/src/index.ts) |
+| `@deepseek-ai/dsh-client-file-upload` | `agents` · `attachments` · `commands` · `connection` · `remoteAccess` | [`packages/client/file-upload/src/index.ts`](../packages/client/file-upload/src/index.ts) |
 | `@deepseek-ai/dsh-client-locale` | — | [`packages/client/locale/src/index.ts`](../packages/client/locale/src/index.ts) |
 | `@deepseek-ai/dsh-client-modules` | `loader` | [`packages/client/modules/src/index.ts`](../packages/client/modules/src/index.ts) |
 | `@deepseek-ai/dsh-client-resources` | — | [`packages/client/resources/src/index.ts`](../packages/client/resources/src/index.ts) |
@@ -5117,7 +5156,7 @@ export interface Config {
 | `@deepseek-ai/dsh-client-ui-conversation` | — | [`packages/client/ui-conversation/src/index.ts`](../packages/client/ui-conversation/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-cordis` | — | [`packages/extensions/ui-cordis/src/index.ts`](../packages/extensions/ui-cordis/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-creation-recommendations` | — | [`packages/experimental/client-ui-creation-recommendations/src/index.ts`](../packages/experimental/client-ui-creation-recommendations/src/index.ts) |
-| `@deepseek-ai/dsh-client-ui-deliverables` | `connection` · `sessionQuery` · `sessionController` · `workspaceFiles` · `fs` · `sandboxPolicy` · `workspaceChanges` | [`packages/client/ui-deliverables/src/index.ts`](../packages/client/ui-deliverables/src/index.ts) |
+| `@deepseek-ai/dsh-client-ui-deliverables` | `connection` · `sessionQuery` · `sessionController` · `workspaceFiles` · `fs` · `sandboxPolicy` · `workspaceChanges` · `remoteAccess` | [`packages/client/ui-deliverables/src/index.ts`](../packages/client/ui-deliverables/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-directory-picker-browse` | — | [`packages/client/ui-directory-picker-browse/src/index.ts`](../packages/client/ui-directory-picker-browse/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-directory-picker-native` | — | [`packages/client/ui-directory-picker-native/src/index.ts`](../packages/client/ui-directory-picker-native/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-entry-customization` | — | [`packages/client/ui-entry-customization/src/index.ts`](../packages/client/ui-entry-customization/src/index.ts) |

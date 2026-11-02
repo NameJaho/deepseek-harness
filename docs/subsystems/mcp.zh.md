@@ -223,6 +223,21 @@ async *follow(subject: CompanyMarketSubject, signal: AbortSignal): AsyncIterable
 
 Source: [`packages/company/mcp-provider/src/provider.ts`](../../packages/company/mcp-provider/src/provider.ts)
 
+<a id="ctxcompanyusermcp--companyusermcpservice"></a>
+
+### `ctx.companyUserMcp` — `CompanyUserMcpService`
+
+Authenticate one platform-backed user MCP service.
+
+```ts cordis-catalog
+/** Return the logged-in caller's authorized MCP catalog without credentials or endpoints.
+ * @returns credential-free MCP summaries for the authenticated caller.
+ */
+@Remote async catalog(): Promise<UserMcpCatalog>
+```
+
+Source: [`packages/company/user-mcp/src/index.ts`](../../packages/company/user-mcp/src/index.ts)
+
 <a id="ctxmcpresources--mcpresourceruntime"></a>
 
 ### `ctx.mcpResources` — `McpResourceRuntime`

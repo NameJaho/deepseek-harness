@@ -763,6 +763,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'companyUserMcp',
+    summary: 'Authenticate one platform-backed user MCP service.',
+    description: 'Authenticate one platform-backed user MCP service.',
+    methods: [
+      {
+        signature: '@Remote async catalog(): Promise<UserMcpCatalog>',
+        description: 'Return the logged-in caller\'s authorized MCP catalog without credentials or endpoints.',
+        parameters: [],
+        returns: 'credential-free MCP summaries for the authenticated caller.',
+      },
+    ],
+  },
+  {
     key: 'companyWecom',
     summary: 'Owns robot credentials by reference, immutable publication bindings and connection teardown.',
     description: 'Owns robot credentials by reference, immutable publication bindings and connection teardown.',
@@ -9863,6 +9876,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'UpdateTeamTaskRequest',
     declaration: 'export interface UpdateTeamTaskRequest {\n    readonly taskId: TeamTaskId;\n    readonly expectedRevision: number;\n    readonly action: TeamTaskAction;\n    readonly subject?: string;\n    readonly description?: string;\n    readonly blockedBy?: readonly TeamTaskId[];\n    readonly writeScopes?: readonly string[];\n    readonly owner?: string;\n}',
+  },
+  {
+    name: 'UserMcpCatalog',
+    declaration: 'export interface UserMcpCatalog {\n    readonly userId: string;\n    readonly entries: readonly UserMcpSummary[];\n}',
+  },
+  {
+    name: 'UserMcpId',
+    declaration: 'export type UserMcpId = Branded<\'user-mcp-id\'>;',
+  },
+  {
+    name: 'UserMcpSummary',
+    declaration: 'export interface UserMcpSummary {\n    readonly id: UserMcpId;\n    readonly displayName: string;\n    readonly description: string;\n    readonly environment: string;\n    readonly accessType: \'open\' | \'authorized\' | \'unknown\';\n}',
   },
   {
     name: 'UserMessage',

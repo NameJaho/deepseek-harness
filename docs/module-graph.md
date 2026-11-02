@@ -231,6 +231,8 @@ flowchart TD
     pkg_company_external_agent_subagent["company-external-agent-subagent"]
     pkg_company_knowledge["company-knowledge"]
     pkg_company_mcp_provider["company-mcp-provider"]
+    pkg_company_user_mcp["company-user-mcp"]
+    pkg_company_wecom["company-wecom"]
     pkg_company_wecom_auth["company-wecom-auth"]
   end
   subgraph group_computer_use["packages/computer-use"]
@@ -387,6 +389,7 @@ flowchart TD
   end
   subgraph group_sandbox["packages/sandbox"]
     pkg_sandbox["sandbox"]
+    pkg_sandbox_container["sandbox-container"]
     pkg_sandbox_local["sandbox-local"]
     pkg_sandbox_policy["sandbox-policy"]
     pkg_sandbox_windows_acl["sandbox-windows-acl"]
@@ -500,7 +503,6 @@ flowchart TD
   pkg_app_boot --> pkg_launch_environment
   pkg_browser_use --> pkg_brand
   pkg_client_connection --> pkg_scope
-  pkg_company_knowledge --> pkg_credentials
   pkg_company_knowledge --> pkg_timeout
   pkg_computer_use --> pkg_brand
   pkg_authorization --> pkg_credentials
@@ -592,6 +594,9 @@ flowchart TD
   pkg_experimental_translator --> pkg_util_values
   pkg_host_product_telemetry_otel --> pkg_otel
   pkg_ptc_runtime --> pkg_sandbox
+  pkg_sandbox_container --> pkg_sandbox
+  pkg_sandbox_container --> pkg_session
+  pkg_sandbox_container --> pkg_subprocess
   pkg_sandbox_local --> pkg_llm
   pkg_sandbox_local --> pkg_sandbox
   pkg_sandbox_local --> pkg_session
@@ -933,11 +938,17 @@ flowchart TD
   pkg_company_cloud_agent_runtime --> pkg_system_prompt
   pkg_company_cloud_agent_runtime --> pkg_tools
   pkg_company_mcp_provider --> pkg_company_wecom_auth
-  pkg_company_mcp_provider --> pkg_credentials
   pkg_company_mcp_provider --> pkg_llm
-  pkg_company_mcp_provider --> pkg_storage_domain
   pkg_company_mcp_provider --> pkg_tools
   pkg_company_mcp_provider --> pkg_typert_protocol
+  pkg_company_user_mcp --> pkg_agent
+  pkg_company_user_mcp --> pkg_llm
+  pkg_company_user_mcp --> pkg_session_projection
+  pkg_company_user_mcp --> pkg_tools
+  pkg_company_wecom --> pkg_commands
+  pkg_company_wecom --> pkg_credentials
+  pkg_company_wecom --> pkg_storage_domain
+  pkg_company_wecom --> pkg_tools
   pkg_agent_instructions --> pkg_agent
   pkg_agent_instructions --> pkg_fs
   pkg_agent_instructions --> pkg_home_paths
@@ -1682,7 +1693,7 @@ flowchart TD
 | [`app-boot`](../packages/boot/app-boot) | `boot` | [`home-paths`](../packages/util/home-paths), [`launch-environment`](../packages/util/launch-environment) |
 | [`browser-use`](../packages/browser-use/browser-use) | `browser-use` | [`brand`](../packages/util/brand) |
 | [`client-connection`](../packages/client/connection) | `client` | [`scope`](../packages/core/scope) |
-| [`company-knowledge`](../packages/company/knowledge) | `company` | [`credentials`](../packages/credentials/credentials), [`timeout`](../packages/util/timeout) |
+| [`company-knowledge`](../packages/company/knowledge) | `company` | [`timeout`](../packages/util/timeout) |
 | [`computer-use`](../packages/computer-use/computer-use) | `computer-use` | [`brand`](../packages/util/brand) |
 | [`authorization`](../packages/credentials/authorization) | `credentials` | [`credentials`](../packages/credentials/credentials), [`llm`](../packages/llm/llm) |
 | [`credentials-local`](../packages/credentials/credentials-local) | `credentials` | [`atomic-write`](../packages/util/atomic-write), [`credentials`](../packages/credentials/credentials), [`home-paths`](../packages/util/home-paths), [`launch-environment`](../packages/util/launch-environment) |
@@ -1731,6 +1742,7 @@ flowchart TD
 | [`experimental-translator`](../packages/experimental/translator) | `experimental` | [`credentials`](../packages/credentials/credentials), [`launch-environment`](../packages/util/launch-environment), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence), [`timeout`](../packages/util/timeout), [`util-values`](../packages/util/values) |
 | [`host-product-telemetry-otel`](../packages/host/product-telemetry-otel) | `host` | [`otel`](../packages/telemetry/otel) |
 | [`ptc-runtime`](../packages/ptc-runtime/ptc-runtime) | `ptc-runtime` | [`sandbox`](../packages/sandbox/sandbox) |
+| [`sandbox-container`](../packages/sandbox/sandbox-container) | `sandbox` | [`sandbox`](../packages/sandbox/sandbox), [`session`](../packages/core/session), [`subprocess`](../packages/subprocess/subprocess) |
 | [`sandbox-local`](../packages/sandbox/sandbox-local) | `sandbox` | [`llm`](../packages/llm/llm), [`sandbox`](../packages/sandbox/sandbox), [`session`](../packages/core/session) |
 | [`session-persistence-jsonl`](../packages/session/session-persistence-jsonl) | `session` | [`session`](../packages/core/session), [`session-persistence`](../packages/session/session-persistence) |
 | [`session-projection-cache`](../packages/session/session-projection-cache) | `session` | [`session`](../packages/core/session), [`session-projection`](../packages/session/session-projection), [`storage-domain`](../packages/storage/storage-domain) |
@@ -1807,7 +1819,9 @@ flowchart TD
 | [`command-compact`](../packages/compaction/command-compact) | `compaction` | [`commands`](../packages/interaction/commands), [`compaction`](../packages/compaction/compaction) |
 | [`compaction-image-offload`](../packages/compaction/compaction-image-offload) | `compaction` | [`agent`](../packages/core/agent), [`compaction`](../packages/compaction/compaction), [`llm`](../packages/llm/llm), [`session`](../packages/core/session) |
 | [`company-cloud-agent-runtime`](../packages/company/cloud-agent-runtime) | `company` | [`scope`](../packages/core/scope), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools) |
-| [`company-mcp-provider`](../packages/company/mcp-provider) | `company` | [`company-wecom-auth`](../packages/company/wecom-auth), [`credentials`](../packages/credentials/credentials), [`llm`](../packages/llm/llm), [`storage-domain`](../packages/storage/storage-domain), [`tools`](../packages/core/tools), [`typert-protocol`](../packages/typert/protocol) |
+| [`company-mcp-provider`](../packages/company/mcp-provider) | `company` | [`company-wecom-auth`](../packages/company/wecom-auth), [`llm`](../packages/llm/llm), [`tools`](../packages/core/tools), [`typert-protocol`](../packages/typert/protocol) |
+| [`company-user-mcp`](../packages/company/user-mcp) | `company` | [`agent`](../packages/core/agent), [`llm`](../packages/llm/llm), [`session-projection`](../packages/session/session-projection), [`tools`](../packages/core/tools) |
+| [`company-wecom`](../packages/company/wecom) | `company` | [`commands`](../packages/interaction/commands), [`credentials`](../packages/credentials/credentials), [`storage-domain`](../packages/storage/storage-domain), [`tools`](../packages/core/tools) |
 | [`agent-instructions`](../packages/context/agent-instructions) | `context` | [`agent`](../packages/core/agent), [`fs`](../packages/fs/fs), [`home-paths`](../packages/util/home-paths), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`tools`](../packages/core/tools), [`working-directory`](../packages/session/working-directory) |
 | [`file-reference-local`](../packages/context/file-reference-local) | `context` | [`agent`](../packages/core/agent), [`file-reference`](../packages/context/file-reference), [`system-prompt`](../packages/core/system-prompt), [`tools`](../packages/core/tools), [`working-directory`](../packages/session/working-directory) |
 | [`tool-present`](../packages/deliverables/tool-present) | `deliverables` | [`agent`](../packages/core/agent), [`fs`](../packages/fs/fs), [`llm`](../packages/llm/llm), [`session`](../packages/core/session), [`tools`](../packages/core/tools), [`working-directory`](../packages/session/working-directory) |
