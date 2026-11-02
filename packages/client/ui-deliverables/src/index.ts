@@ -6,10 +6,11 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-workspace-changes/types'
+import type {} from '@deepseek-ai/dsh-api-remote-access'
 import { registerPresentOpen } from './present-open.ts'
 
 /** Services required for change summaries and authenticated native opens. */
-export const inject = ['connection', 'sessionQuery', 'sessionController', 'workspaceFiles', 'fs', 'sandboxPolicy', 'workspaceChanges']
+export const inject = ['connection', 'sessionQuery', 'sessionController', 'workspaceFiles', 'fs', 'sandboxPolicy', 'workspaceChanges', 'remoteAccess']
 
 /**
  * Register native opens for declared files.

@@ -52,6 +52,7 @@ async function fixture() {
     throw new SessionQueryError('missing', 'SESSION_QUERY_EVENT_NOT_FOUND')
   })
   ctx.provide('sessionQuery', { readEvent } as never)
+  ctx.provide('remoteAccess', { decide: () => ({ kind: 'allow' as const }) } as never)
   const summary = vi.fn((sessionId: SessionId, seq: number) => sessionId === 'owner' && seq === 9 ? data : undefined)
   const comparison: WorkspaceFileDiff = {
     kind: 'text', path: 'src/lib/a.ts', display: 'src/lib/a.ts', before: true, after: true, coarse: false,

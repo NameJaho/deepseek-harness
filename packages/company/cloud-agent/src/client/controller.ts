@@ -271,15 +271,14 @@ export class CloudAgentController {
         if (result !== undefined) this.openSession(result)
       },
       clone: async (id, releaseId) => {
-        await this.mutate(async () => {
+        const result = await this.mutate(async () => {
           const authoringSessionId = await this.editor()
           const result = await this.api.clone({ id, releaseId, authoringSessionId })
-          if (result.ok && !this.disposed) {
-            this.editors.set(result.value.id, authoringSessionId)
-            this.openSession({ sessionId: authoringSessionId })
-          }
-          return result
+          if (!result.ok) return result
+          if (!this.disposed) this.editors.set(result.value.id, authoringSessionId)
+          return { ok: true as const, value: { record: result.value, sessionId: authoringSessionId } }
         }, 'clonedNotice')
+        if (result !== undefined && !this.disposed) this.openSession({ sessionId: result.sessionId })
       },
       createInChat: async (id, creationPreset) => {
         if (id === undefined && creationPreset === undefined) {

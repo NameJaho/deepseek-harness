@@ -172,6 +172,13 @@ describe('Cloud Agent controller', () => {
     expect(controller.getSnapshot().notice).toBe(null)
   })
 
+  it('opens the newly created authoring Session after cloning a public release', async () => {
+    const { controller, api, open } = setup()
+    await controller.face().clone(record.id, release.id)
+    expect(api.clone).toHaveBeenCalledWith({ id: record.id, releaseId: release.id, authoringSessionId: sessionId })
+    expect(open).toHaveBeenCalledWith({ sessionId })
+  })
+
   it('does not publish late results after disposal', async () => {
     const { controller, api, open } = setup()
     const pending = deferred<{ ok: true; value: { sessionId: SessionId; releaseId: CloudAgentRelease['id'] } }>()

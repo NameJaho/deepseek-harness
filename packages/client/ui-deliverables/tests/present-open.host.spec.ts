@@ -45,11 +45,12 @@ async function fixture() {
     return { session, target: { type: 'deliverables/presented', data: { turn: 1, callId: 'present-call', files: [file] } } as SessionEvent }
   })
   ctx.provide('sessionQuery', { readEvent } as never)
+  ctx.provide('remoteAccess', { decide: () => ({ kind: 'allow' as const }) } as never)
   const opener = vi.fn(async (_request: { path: string; action?: 'reveal' }, _signal: AbortSignal) => ({ opened: true as const }))
   const applications = vi.fn(async () => [{ id: 'player', name: 'Player', default: true, icon: null }])
   ctx.provide('sessionController', { workspacePathApplications: applications, resolveAgent, openWorkspacePath: opener, workspaceDesktop: () => ({ name: 'desktop', available: true, fileManager: 'finder' }) } as never)
   const connection = new HostConnectionService(ctx, [], {} as BrowserAuth)
-  const fiber = ctx.plugin({ inject: ['connection', 'sessionQuery', 'sessionController', 'workspaceFiles', 'fs', 'sandboxPolicy'], apply: registerPresentOpen })
+  const fiber = ctx.plugin({ inject: ['connection', 'sessionQuery', 'sessionController', 'workspaceFiles', 'fs', 'sandboxPolicy', 'remoteAccess'], apply: registerPresentOpen })
   await fiber
   const handler = connection.createSharedFetchHandler('/api')
   const open = (query = '?sessionId=owner&seq=7&index=0', signal?: AbortSignal) => handler.fetch(new Request(

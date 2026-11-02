@@ -43,7 +43,14 @@ function registerUi(ctx: Context): void {
   const controller = new CloudAgentController(ctx.remote.cloudAgents, () => ctx.remote.$stream({
     name: 'cloud-agent.catalog', open: signal => ctx.remote.cloudAgents.follow(signal),
     ended: () => new Error('Cloud Agent catalog stream ended'),
-  }), (session) => { ctx.uiWorkspace.openSession(session.sessionId) }, () => { ctx.uiWorkspace.startSession() }, async (sessionId) => {
+  }), (session) => {
+    void (async () => {
+      const id = session.sessionId
+      if (ctx.sessions.list.getSnapshot().byId[id] === undefined) await ctx.sessions.refresh()
+      if (ctx.sessions.list.getSnapshot().byId[id] === undefined) throw new Error(`Created Session is not visible: ${id}`)
+      ctx.uiWorkspace.openSession(id)
+    })().catch((error: unknown) => { console.error('Cloud Agent Session navigation failed', error) })
+  }, () => { ctx.uiWorkspace.startSession() }, async (sessionId) => {
     const result = await ctx.remote.commands.execute(sessionId, '/创建智能体', [])
     if (!result.ok) throw result.error
     return result.value?.result.kind === 'success'
@@ -143,7 +150,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   let unmountMcp: (() => Promise<void>) | undefined
   try { unmountMcp = await ctx.remote.$mount(mcpRemote) } catch (error) { await unmountRemote(); throw error }
   ctx.effect(() => ctx.locale.register('company.cloudAgent', { zh, en }), 'cloud-agent: dictionaries')
-  const ui = ctx.inject(['remote.cloudAgents', 'remote.companyMcp', 'remote.commands', 'remote.agentPresets', 'connection',
+  const ui = ctx.inject(['remote.cloudAgents', 'remote.companyMcp', 'remote.commands', 'remote.agentPresets', 'connection', 'sessions',
     'slots', 'locale', 'uiWorkspace', 'layout', 'sidebarRight', 'sidebarRightTabs', 'pluginNavigation'], registerConnectedUi)
   try { await ui } catch (error) { await ui.dispose(); await unmountMcp(); await unmountRemote(); throw error }
   return async () => { await ui.dispose(); await unmountMcp(); await unmountRemote() }
