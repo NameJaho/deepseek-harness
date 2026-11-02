@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-02-agent-navigation-generation-gate.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-02-agent-navigation-generation-gate.md
+/agent-note-keep-caller-scoped-agent-navigation-registered-across-connection-generations:
+  en: 0a093806fa80c8ae
+  zh: 9231a7028568eea0
+/agent-note-keep-caller-scoped-agent-navigation-registered-across-connection-generations/problem:
+  en: 8affc96cc190de0d
+  zh: cc00ffd741ca63bb
+/agent-note-keep-caller-scoped-agent-navigation-registered-across-connection-generations/decision:
+  en: dc22f274bc6c6307
+  zh: 3ae9604323008905
+/agent-note-keep-caller-scoped-agent-navigation-registered-across-connection-generations/alternatives-considered:
+  en: 50749a62dd33846f
+  zh: b1d9560eff7558ae
+/agent-note-keep-caller-scoped-agent-navigation-registered-across-connection-generations/consequences:
+  en: cb6fa40d08aa48f0
+  zh: 60437703096243c7
+/agent-note-keep-caller-scoped-agent-navigation-registered-across-connection-generations/verification:
+  en: d348f11faf97bd5a
+  zh: 2b02df5b5afe9257

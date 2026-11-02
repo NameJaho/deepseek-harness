@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { CloudAgentCatalog, CloudAgentRecord, CloudAgentRelease, CloudAgentUsageStatus } from '../src/types.ts'
 import type { CloudAgentView } from '../src/client/controller.ts'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { AgentNavigationGroups } from '../src/client/navigation.ts'
+import { AgentNavigationGroups, AgentNavigationGroupsGate } from '../src/client/navigation.ts'
 import { agentMcpSelection, connectedAgent } from '../src/client/agent-mcp.ts'
 import { en, zh } from '../src/client/locales.ts'
 
@@ -28,6 +28,27 @@ function source(initial: CloudAgentCatalog | null, loading = false) {
 }
 
 describe('caller-scoped logical Agent navigation', () => {
+  it('keeps the provider pending while a connection generation is replaced', () => {
+    const gate = new AgentNavigationGroupsGate()
+    const first = new AgentNavigationGroups(source(catalog), vi.fn())
+    const second = new AgentNavigationGroups(source({ ...catalog, mine: [], usage: [] }), vi.fn())
+    const notified = vi.fn()
+    gate.subscribe(notified)
+
+    expect(gate.getSnapshot()).toBeUndefined()
+    gate.set(first)
+    expect(gate.getSnapshot()).toHaveLength(1)
+    gate.set(undefined)
+    expect(gate.getSnapshot()).toBeUndefined()
+    gate.set(second)
+    expect(gate.getSnapshot()).toEqual([])
+    expect(notified).toHaveBeenCalledTimes(3)
+
+    gate.dispose()
+    first.dispose()
+    second.dispose()
+  })
+
   it.each(['available', 'updated', 'deleted', 'withdrawn', 'access-lost', 'disabled'] as CloudAgentUsageStatus[])('coalesces owned and used Agent into one stable group with status %s', async (status) => {
     const input = source({ ...catalog, usage: [{ agentId: record.id, ownerId: record.ownerId, name: 'Stable Agent', status }],
       conversations: [{ agentId: record.id, role: 'usage', sessionId: session }, { agentId: record.id, role: 'authoring', sessionId: 'editor' as SessionId },

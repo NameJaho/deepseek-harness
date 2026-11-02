@@ -2,10 +2,53 @@
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { notifySubscribers } from '@deepseek-ai/dsh-client-store'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
-import type { WorkspaceNavigationGroup, WorkspaceNavigationGroupSource } from '@deepseek-ai/dsh-client-ui-workspace/client'
+import type {
+  WorkspaceNavigationGroup, WorkspaceNavigationGroupSource,
+} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { CloudAgentCatalog, CloudAgentId } from '../types.ts'
 import type { CloudAgentView } from './controller.ts'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+
+/**
+ * Keeps the Agent navigation provider registered while a connection generation is replaced.
+ * `undefined` withholds physical Workspace rows until the replacement catalog is known.
+ */
+export class AgentNavigationGroupsGate implements WorkspaceNavigationGroupSource {
+  private source: WorkspaceNavigationGroupSource | undefined
+  private sourceStop: (() => void) | undefined
+  private readonly listeners = new Set<() => void>()
+
+  /** @returns the current generation's groups, or `undefined` while it is unavailable. */
+  getSnapshot = (): readonly WorkspaceNavigationGroup[] | undefined => this.source?.getSnapshot()
+  /** @param listener - observer of source replacement and catalog changes.
+   * @returns subscription disposer.
+   */
+  subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener)
+    return () => { this.listeners.delete(listener) }
+  }
+  /** Replace the active connection generation's source.
+   * @param source - the current connection generation's groups, or `undefined` during replacement.
+   */
+  set(source: WorkspaceNavigationGroupSource | undefined): void {
+    if (this.source === source) return
+    this.sourceStop?.()
+    this.sourceStop = undefined
+    this.source = source
+    if (source !== undefined) this.sourceStop = source.subscribe(this.notify)
+    notifySubscribers(this.listeners, 'Agent navigation lifecycle')
+  }
+  /** Release the source and all observers. */
+  dispose(): void {
+    this.sourceStop?.()
+    this.sourceStop = undefined
+    this.source = undefined
+    this.listeners.clear()
+  }
+  private notify = (): void => {
+    notifySubscribers(this.listeners, 'Agent navigation')
+  }
+}
 
 /** One reactive provider per authenticated Agent catalog lifecycle; it persists no member state. */
 export class AgentNavigationGroups implements WorkspaceNavigationGroupSource {

@@ -17,7 +17,7 @@ import { IconCordisPluginOutlineRegular } from '@deepseek-ai/dsh-client-ui-primi
 import remote from '@deepseek-ai/dsh-company-cloud-agent/remote'
 import mcpRemote from '@deepseek-ai/dsh-company-mcp-provider/remote'
 import { CloudAgentController } from './controller.ts'
-import { AgentNavigationGroups } from './navigation.ts'
+import { AgentNavigationGroups, AgentNavigationGroupsGate } from './navigation.ts'
 import { CloudAgentIcon, CloudAgentPage, CloudAgentToast } from './page.tsx'
 import { en, zh, type CloudAgentLocaleKey } from './locales.ts'
 import { CloudAgentDraftCard, CloudAgentHeaderAction } from './conversation.tsx'
@@ -37,7 +37,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 /** Transport readiness and existing shell extension services. */
 export const inject = ['slots', 'locale', 'remote', 'connection', 'uiWorkspace', 'layout', 'sidebarRight', 'sidebarRightTabs', 'pluginNavigation']
 
-function registerUi(ctx: Context): void {
+function registerUi(ctx: Context, navigation: AgentNavigationGroupsGate): void {
   const id = 'company-cloud-agent' as MainPanelId
   const t = ctx.locale.bind('company.cloudAgent')
   const controller = new CloudAgentController(ctx.remote.cloudAgents, () => ctx.remote.$stream({
@@ -64,8 +64,8 @@ function registerUi(ctx: Context): void {
   const face = controller.face()
   ctx.effect(() => {
     const groups = new AgentNavigationGroups(controller, controller.startGroupedSession)
-    const unregister = ctx.uiWorkspace.registerGroups(groups)
-    return () => { unregister(); groups.dispose() }
+    navigation.set(groups)
+    return () => { navigation.set(undefined); groups.dispose() }
   }, 'cloud-agent: caller navigation groups')
   ctx.effect(() => ctx.sidebarRightTabs.register({ id: 'cloud-agent-capabilities', kind: 'cloud-agent-capabilities',
     title: () => t('capabilitiesTab'), guide: [{ id: 'cloud-agent-capabilities', order: 16, title: () => t('capabilitiesTab'),
@@ -123,6 +123,9 @@ function registerUi(ctx: Context): void {
 /** Scope private catalogs and editor state to one authenticated transport generation. */
 function registerConnectedUi(ctx: Context): void {
   const connection = ctx.get('connection') as ConnectionHandle
+  const navigation = new AgentNavigationGroupsGate()
+  const unregister = ctx.uiWorkspace.registerGroups(navigation)
+  const registerCurrentUi = (uiCtx: Context): void => { registerUi(uiCtx, navigation) }
   let ui: ReturnType<Context['plugin']> | undefined
   let pending = Promise.resolve()
   let revision = 0
@@ -131,13 +134,23 @@ function registerConnectedUi(ctx: Context): void {
     const current = ++revision
     const previous = ui
     ui = undefined
+    navigation.set(undefined)
     const draining = previous?.dispose()
     pending = Promise.all([pending, draining]).then(() => {
-      if (!stopped && current === revision && connection.generation.getSnapshot() !== undefined) ui = ctx.plugin(registerUi)
+      if (!stopped && current === revision && connection.generation.getSnapshot() !== undefined) {
+        ui = ctx.plugin(registerCurrentUi)
+      }
     })
   }
   ctx.effect(() => connection.generation.subscribe(changed), 'cloud-agent: connection generation')
-  ctx.effect(() => async () => { stopped = true; revision++; await ui?.dispose(); await pending }, 'cloud-agent: private UI lifecycle')
+  ctx.effect(() => async () => {
+    stopped = true
+    revision++
+    await ui?.dispose()
+    await pending
+    unregister()
+    navigation.dispose()
+  }, 'cloud-agent: private UI lifecycle')
   changed()
 }
 
