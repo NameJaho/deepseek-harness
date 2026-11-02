@@ -537,7 +537,8 @@ export class CompanyWecomAuthService extends Service {
         if (/wxwork/i.test(header(req, 'user-agent') ?? '')) {
           res.writeHead(302, { ...headers, location: oauth.toString(), 'set-cookie': bindingCookie }); res.end(); return
         }
-        res.writeHead(200, { ...headers, 'set-cookie': bindingCookie, 'content-type': 'text/html; charset=utf-8',
+        // The WeCom QR iframe verifies the embedding origin from Referer; Safari exposes no other source.
+        res.writeHead(200, { ...headers, 'referrer-policy': 'strict-origin', 'set-cookie': bindingCookie, 'content-type': 'text/html; charset=utf-8',
           'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}' https://wwcdn.weixin.qq.com; style-src 'unsafe-inline'; img-src data:; frame-src https://*.work.weixin.qq.com https://*.weixin.qq.com; base-uri 'none'; frame-ancestors 'none'` })
         res.end(loginPage(attempt, nonce, /^zh\b/i.test(header(req, 'accept-language') ?? '') ? 'zh' : 'en')); return
       }
