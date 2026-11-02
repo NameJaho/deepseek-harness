@@ -2,14 +2,14 @@
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { notifySubscribers } from '@deepseek-ai/dsh-client-store'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
-import type { WorkspaceNavigationGroup } from '@deepseek-ai/dsh-client-ui-workspace/client'
+import type { WorkspaceNavigationGroup, WorkspaceNavigationGroupSource } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { CloudAgentCatalog, CloudAgentId } from '../types.ts'
 import type { CloudAgentView } from './controller.ts'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 
 /** One reactive provider per authenticated Agent catalog lifecycle; it persists no member state. */
-export class AgentNavigationGroups implements ObservableSnapshot<readonly WorkspaceNavigationGroup[]> {
-  private groups: readonly WorkspaceNavigationGroup[] = []
+export class AgentNavigationGroups implements WorkspaceNavigationGroupSource {
+  private groups: readonly WorkspaceNavigationGroup[] | undefined
   private catalog: CloudAgentCatalog | null | undefined
   private readonly listeners = new Set<() => void>()
   private readonly stop: () => void
@@ -23,8 +23,8 @@ export class AgentNavigationGroups implements ObservableSnapshot<readonly Worksp
     this.stop = source.subscribe(this.refresh)
     this.refresh()
   }
-  /** @returns stable logical navigation groups. */
-  getSnapshot = (): readonly WorkspaceNavigationGroup[] => this.groups
+  /** @returns stable logical navigation groups, or `undefined` before the first catalog read settles. */
+  getSnapshot = (): readonly WorkspaceNavigationGroup[] | undefined => this.groups
   /** @param listener - navigation observer.
    * @returns subscription disposer.
    */
@@ -32,9 +32,12 @@ export class AgentNavigationGroups implements ObservableSnapshot<readonly Worksp
   /** Release subscriptions and cached memberships at authentication teardown. */
   dispose(): void { this.stop(); this.groups = []; this.catalog = undefined; this.listeners.clear() }
   private refresh = (): void => {
-    const catalog = this.source.getSnapshot().catalog
+    const view = this.source.getSnapshot()
+    // A failed read settles to no groups, so physical rows are not withheld indefinitely.
+    const catalog = view.catalog === null && view.loading ? undefined : view.catalog
     if (catalog === this.catalog) return
     this.catalog = catalog
+    if (catalog === undefined) { this.groups = undefined; notifySubscribers(this.listeners, 'Agent navigation'); return }
     if (catalog === null) { this.groups = []; notifySubscribers(this.listeners, 'Agent navigation'); return }
     const entries = new Map<CloudAgentId, { readonly title: string; readonly status: NonNullable<WorkspaceNavigationGroup['status']> }>()
     for (const record of catalog.mine) entries.set(record.id, { title: record.draft.name, status: record.deletedAt === undefined ? 'available' : 'deleted' })

@@ -15,12 +15,15 @@ const latest: CloudAgentRelease = { ...old, id: 'latest' as CloudAgentRelease['i
 const session = 'usage' as SessionId
 const catalog: CloudAgentCatalog = { mine: [record], published: [], usage: [], conversations: [], models: { groups: [], default: { provider: 'p', model: 'm' }, routableProviders: [], failures: [] },
   capabilities: { mcpTools: [{ name: 'unselected.global', description: 'Do not show' }], mcpServers: [], skills: [], knowledgeSources: [] } }
-function source(initial: CloudAgentCatalog | null) {
-  let view: CloudAgentView = { catalog: initial, presets: [], loading: false, busy: false, error: null, notice: null, editorRequest: null }
+function source(initial: CloudAgentCatalog | null, loading = false) {
+  let view: CloudAgentView = { catalog: initial, presets: [], loading, busy: false, error: null, notice: null, editorRequest: null }
   const listeners = new Set<() => void>()
   return { getSnapshot: () => view,
     subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } },
-    update: (catalog: CloudAgentCatalog | null) => { view = { ...view, catalog }; for (const listener of listeners) listener() },
+    update: (catalog: CloudAgentCatalog | null, loading = false) => {
+      view = { ...view, catalog, loading }
+      for (const listener of listeners) listener()
+    },
     listeners }
 }
 
@@ -32,9 +35,9 @@ describe('caller-scoped logical Agent navigation', () => {
     const start = vi.fn(async () => 'new-session' as SessionId)
     const groups = new AgentNavigationGroups(input, start)
     expect(groups.getSnapshot()).toHaveLength(1)
-    const group = groups.getSnapshot()[0]!
+    const group = groups.getSnapshot()?.[0]
     expect(group).toMatchObject({ key: 'cloud-agent:agent', title: 'Stable Agent', status: status === 'updated' ? 'available' : status, sessionIds: ['usage', 'editor'] })
-    expect(await group.newSession?.()).toBe('new-session')
+    expect(await group?.newSession?.()).toBe('new-session')
     expect(start).toHaveBeenCalledWith(record.id)
     groups.dispose()
     expect(groups.getSnapshot()).toEqual([])
@@ -51,6 +54,22 @@ describe('caller-scoped logical Agent navigation', () => {
     expect(groups.getSnapshot()).toEqual([])
     input.update({ ...catalog, mine: [], usage: [] })
     expect(groups.getSnapshot()).toEqual([])
+    groups.dispose()
+  })
+
+  it('reports unknown membership until the first catalog read settles', () => {
+    const input = source(null, true)
+    const groups = new AgentNavigationGroups(input, vi.fn())
+    const notified = vi.fn()
+    groups.subscribe(notified)
+    expect(groups.getSnapshot()).toBeUndefined()
+    input.update(catalog)
+    expect(groups.getSnapshot()).toHaveLength(1)
+    input.update(null, true)
+    expect(groups.getSnapshot()).toBeUndefined()
+    input.update(null)
+    expect(groups.getSnapshot()).toEqual([])
+    expect(notified).toHaveBeenCalledTimes(3)
     groups.dispose()
   })
 })

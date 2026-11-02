@@ -75,6 +75,23 @@ describe('capability-owned navigation groups', () => {
     unregister()
   })
 
+  it('keeps navigation pending without rows while a provider membership is unknown', () => {
+    const physical = createSnapshotStore(snapshot([workspace('one', ['chat']), workspace('two', ['editor'])]))
+    const navigation = new WorkspaceNavigationGroups(physical)
+    const provider = createSnapshotStore<readonly WorkspaceNavigationGroup[] | undefined>(undefined)
+    const unregister = navigation.register(provider)
+    expect(navigation.getSnapshot()).toMatchObject({ phase: 'pending', items: [] })
+    expect(navigation.start(wid('one'), 'new-session')).toBeUndefined()
+    expect(navigation.backingWorkspace(wid('one'))).toBeUndefined()
+    provider.set([{ key: wid('agent:a'), title: 'Agent', sessionIds: ['chat', 'editor'].map(SessionId), start: async () => SessionId('new') }])
+    expect(navigation.getSnapshot()).toMatchObject({ phase: 'ready', items: [{ workspaceId: 'agent:a' }] })
+    provider.set(undefined)
+    expect(navigation.getSnapshot().items).toEqual([])
+    unregister()
+    expect(navigation.getSnapshot().items).toEqual(physical.getSnapshot().items)
+    navigation.dispose()
+  })
+
   it('backs a group with its earliest physical Workspace and lists a group with no listed member on its own', () => {
     const physical = createSnapshotStore(snapshot([
       workspace('late', ['b'], '2026-10-02T00:00:00.000Z'),

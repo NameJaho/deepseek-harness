@@ -344,6 +344,15 @@ describe('WorkspaceBrowser', () => {
     })
   })
 
+  it('withholds tree rows until the first Workspace baseline, unless that baseline fails', () => {
+    const pending = { ...workspaceState([workspace('alpha', ['first'])]), phase: 'pending' as const, state: 'loading' as const }
+    const b = mount({ useSessions: hook(sessionState([summary('first', 1)])), useWorkspaces: hook(pending) })
+    expect(screen.queryAllByRole('treeitem')).toEqual([])
+    expect(screen.queryByText(zh['empty.none'])).toBeNull()
+    rerender(b, { useWorkspaces: hook({ ...pending, items: [], state: 'error' as const }) })
+    expect(screen.getByRole('treeitem', { name: new RegExp(zh['group.ungrouped']) })).toBeTruthy()
+  })
+
   it.each(['workspace', 'flat', 'ungrouped'] as const)('retains the new Session position through a %s Workspace reconnect', (mode) => {
     const account = mode === 'flat' ? FLAT_SESSION_ORDER_KEY : mode === 'ungrouped' ? UNGROUPED_KEY : 'alpha'
     const old = summary('old', 10)

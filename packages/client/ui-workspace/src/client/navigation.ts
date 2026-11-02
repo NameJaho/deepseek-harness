@@ -21,10 +21,9 @@ import type {
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { DraftInitializationOptions } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { RowToast } from './contract/slots.ts'
 import { WorkspaceNavigationGroups } from './groups.ts'
-import type { WorkspaceNavigationGroup } from './groups.ts'
+import type { WorkspaceNavigationGroupSource } from './groups.ts'
 import { pinOrderAccounts, pinOrderSource } from './pin-order.ts'
 import type { WorkspaceViewStoreActions } from './stores.ts'
 
@@ -45,11 +44,12 @@ export interface UiWorkspace {
    * Register capability-owned logical groups without changing physical directory membership. The
    * sidebar and the Workspace picker list each group as one entry, and its Sessions leave the
    * ordinary Workspace rows; a new conversation in the group starts through the capability.
-   * @param provider - observable titles, Session members, availability and start callbacks.
+   * @param provider - observable titles, Session members, availability and start callbacks; `undefined`
+   *   while membership is unknown keeps the navigation projection `pending` and empty.
    * @returns idempotent registration disposer, restoring the physical rows.
    * @throws when the provider is already registered, or when a Session belongs to two groups.
    */
-  registerGroups(provider: ObservableSnapshot<readonly WorkspaceNavigationGroup[]>): () => void
+  registerGroups(provider: WorkspaceNavigationGroupSource): () => void
   /**
    * Select a Session and show its Conversation as one UI navigation action.
    * @param target - known Session identity or durable direct-parent subagent address to display.
@@ -221,7 +221,7 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     }, 'ui-workspace: Workspace navigation policy')
   }
 
-  registerGroups(provider: ObservableSnapshot<readonly WorkspaceNavigationGroup[]>): () => void {
+  registerGroups(provider: WorkspaceNavigationGroupSource): () => void {
     return this.navigation.register(provider)
   }
 

@@ -58,9 +58,15 @@ interface ListedGroup {
   readonly backing: WorkspaceView | undefined
 }
 
+/**
+ * One capability's reactive groups; `undefined` means its Session membership is not yet known, and
+ * the projection stays `pending` without rows until every provider resolves it.
+ */
+export type WorkspaceNavigationGroupSource = ObservableSnapshot<readonly WorkspaceNavigationGroup[] | undefined>
+
 /** Maintains a navigation-only projection without changing physical Workspace membership. */
 export class WorkspaceNavigationGroups {
-  private readonly providers = new Map<ObservableSnapshot<readonly WorkspaceNavigationGroup[]>, () => void>()
+  private readonly providers = new Map<WorkspaceNavigationGroupSource, () => void>()
   private readonly listeners = new Set<() => void>()
   private snapshot: NavigationWorkspaceSnapshot
   private readonly listed = new Map<WorkspaceId, ListedGroup>()
@@ -83,10 +89,10 @@ export class WorkspaceNavigationGroups {
     return () => { this.listeners.delete(listener) }
   }
   /** Contribute groups for one capability's lifetime.
-   * @param provider - reactive groups.
+   * @param provider - reactive groups, or `undefined` while their membership is unknown.
    * @returns registration disposer, restoring physical rows.
    */
-  register(provider: ObservableSnapshot<readonly WorkspaceNavigationGroup[]>): () => void {
+  register(provider: WorkspaceNavigationGroupSource): () => void {
     if (this.providers.has(provider)) throw new Error('Navigation group provider is already registered')
     const stop = provider.subscribe(this.refresh)
     this.providers.set(provider, stop)
@@ -146,7 +152,15 @@ export class WorkspaceNavigationGroups {
   private refresh = (): void => {
     const snapshot = this.source.getSnapshot()
     const owners = new Map<SessionId, WorkspaceNavigationGroup>()
-    const groups = [...this.providers.keys()].flatMap(provider => [...provider.getSnapshot()])
+    const contributions = [...this.providers.keys()].map(provider => provider.getSnapshot())
+    // Physical rows of a not-yet-grouped member would render as separate Workspaces, then collapse.
+    if (contributions.includes(undefined)) {
+      this.listed.clear()
+      this.snapshot = { ...snapshot, phase: 'pending', items: [] }
+      notifySubscribers(this.listeners, 'workspace navigation groups')
+      return
+    }
+    const groups = contributions.flatMap(contribution => [...contribution ?? []])
     const keys = new Set<WorkspaceId>()
     for (const group of groups) {
       if (keys.has(group.key)) throw new Error(`Navigation group ${group.key} is contributed more than once`)
