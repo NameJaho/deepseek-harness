@@ -137,7 +137,8 @@ export class CloudAgentService extends TypertRemoteService {
     registerAuthoringCommands(owner, this)
     owner.effect(() => owner.permissionPresets.registerGuard((session, permission) => {
       const preset = owner.agentPresets.presetForSession(session)
-      if (preset !== null && preset !== 'cloud-agent-authoring' && preset.startsWith('cloud-agent-')
+      const binding = this.domain?.table('conversations').get(session.id)
+      if ((binding?.role === 'usage' || (preset !== null && preset !== 'cloud-agent-authoring' && preset.startsWith('cloud-agent-')))
         && permission !== 'read-only') {
         throw new RemoteError('cloud-agent/authoring-required', 'Usage conversations are read-only; open an editing conversation', {})
       }
@@ -146,7 +147,11 @@ export class CloudAgentService extends TypertRemoteService {
     owner.on('agent/created', async ({ agent }) => {
       await this.initialized
       if (this.bindingProjection === undefined) throw new Error('Cloud Agent binding projection is unavailable')
-      await this.recoverConversation(agent.session.header, this.bindingProjection.stateOf(agent.session))
+      const binding = this.bindingProjection.stateOf(agent.session)
+      await this.recoverConversation(agent.session.header, binding)
+      if (binding?.role === 'usage' && binding.releaseId !== undefined) {
+        await this.owner.agentPresets.mountRetained(agent.ctx, presetId(binding.releaseId))
+      }
     })
     owner.on('agent/disposed', ({ agent }) => {
       for (const handle of this.handles) if (handle.agent === agent) this.handles.delete(handle)
@@ -183,7 +188,6 @@ export class CloudAgentService extends TypertRemoteService {
     }
     for (const { header } of await this.owner.sessionPersistence.list()) {
       if (domain.table('conversations').get(header.id) !== undefined) continue
-      if (!header.agentPreset?.startsWith('cloud-agent-')) continue
       await using handle = await this.owner.sessionPersistence.open(header.id, 'read')
       const events = (await handle.read()).events
       const restored = this.owner.sessionProjections.restore({}, events, SessionLogOffset(0), header, SessionLogOffset(0))
@@ -738,8 +742,8 @@ export class CloudAgentService extends TypertRemoteService {
    * @returns recorded references, including compacted history.
    */
   conversationFiles(agent: Agent): FileAttachmentRef[] {
-    const preset = this.owner.agentPresets.composedPreset(agent.ctx)
-    this.requireReleaseAgent(agent, preset?.slice('cloud-agent-'.length) ?? '')
+    const binding = this.domain?.table('conversations').get(agent.id)
+    this.requireReleaseAgent(agent, binding?.releaseId)
     if (this.filesProjection === undefined) throw new Error('Cloud Agent file projection is unavailable')
     return conversationFiles(this.filesProjection, agent.session)
   }
@@ -769,11 +773,12 @@ export class CloudAgentService extends TypertRemoteService {
     return prepareReport(name, content, this.config.reportMaxBytes)
   }
 
-  private requireReleaseAgent(agent: Agent | undefined, releaseId: string): asserts agent is Agent {
+  private requireReleaseAgent(agent: Agent | undefined, releaseId: string | undefined): asserts agent is Agent {
+    const binding = agent === undefined ? undefined : this.domain?.table('conversations').get(agent.id)
     if (this.stopping || agent === undefined || this.owner.agents.get(agent.id) !== agent
-      || !this.releases.has(brandString<CloudAgentReleaseId>(releaseId))
-      || agent.session.header.agentPreset !== presetId(releaseId)
-      || this.owner.agentPresets.composedPreset(agent.ctx) !== presetId(releaseId)) throw unavailableCapability(releaseId)
+      || releaseId === undefined
+      || binding?.role !== 'usage' || binding.releaseId !== releaseId
+      || !this.releases.has(brandString<CloudAgentReleaseId>(releaseId))) throw unavailableCapability(releaseId ?? agent?.id ?? 'unknown-agent')
   }
 
   private newRecord(draft: CloudAgentDraft, ownerId: CloudAgentOwnerId): CloudAgentRecord {
@@ -1003,7 +1008,7 @@ export class CloudAgentService extends TypertRemoteService {
       const cwd = await this.workspaces.agentWorkspace(String(request.id), String(ownerId))
       await this.workspaces.materializeSkillsAt(cwd, release.skillSnapshots ?? [])
       workspace = await this.owner.workspaceRegistry.create(cwd, release.definition.name)
-      handle = await this.owner.agents.create({ sessionId, signal, meta: { cwd, agentPreset: presetId(release.id) },
+      handle = await this.owner.agents.create({ sessionId, signal, meta: { cwd },
         agentOptions: { provider, model }, setup: async (agentCtx, agent) => {
           // The selectable run mode is audited, never mounted with its unapproved tools or file capabilities.
           agent.session.append('cloud-agent/binding', binding)

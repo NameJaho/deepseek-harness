@@ -257,7 +257,7 @@ it('filters public-or-own releases, retains caller ownership, and audits restric
   expect(binding).toMatchObject({ sessionId: usage.sessionId, ownerId: 'wecom:corp:bob', creationPreset: 'standard', runPreset: 'ptc' })
   expect(binding?.effectiveDigest).toMatch(/^[a-f0-9]{64}$/)
   const agent = f.agents.get(usage.sessionId)!
-  expect(agent.session.header.agentPreset).toBe(`cloud-agent-${releaseId}`)
+  expect(agent.session.header.agentPreset).toBeUndefined()
   expect(() =>{  f.ctx.permissionPresets.set(agent.session, 'danger-full-access') }).toThrow(expect.objectContaining({ code: 'cloud-agent/authoring-required' }))
   const [tool] = await f.ctx.cloudAgents.releaseMcpTools(releaseId)
   expect(await tool!.execute({}, { agent, signal: new AbortController().signal } as ToolRunContext)).toBe('PINNED_RESULT')
