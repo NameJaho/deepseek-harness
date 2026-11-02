@@ -1,3 +1,10 @@
 - insert:
     - id: company-wecom
       name: '@deepseek-ai/dsh-company-wecom'
+
+# The company deployment curates the Plugins page to its three supported
+# management surfaces. Other built-in and installed plugin cards remain
+# available to the Host but do not appear in this company-facing page.
+- id: ui-plugin-manager
+  config:
+    visibleItems: [company-mcp, company-knowledge, company-wecom]
