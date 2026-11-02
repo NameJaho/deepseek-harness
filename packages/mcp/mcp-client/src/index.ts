@@ -24,7 +24,8 @@ import { registerServerContext } from './server-context.ts'
 import type {} from '@deepseek-ai/dsh-tools'
 
 export { createMcpToolDefinition } from './tools.ts'
-export type { McpResult, McpToolDefinitionOptions } from './tools.ts'
+export { syncTools } from './tools.ts'
+export type { McpResult, McpToolDefinitionOptions, ToolBridgeOptions, ToolDisposers } from './tools.ts'
 export type { ReconnectConfig, ResolvedReconnectPolicy } from './connection.ts'
 
 /** Cordis plugin name used by loader diagnostics. */

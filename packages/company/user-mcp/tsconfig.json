@@ -1,0 +1,15 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": { "rootDir": "src", "outDir": "lib/types" },
+  "include": ["src/*.ts"],
+  "references": [
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../../vendor/schemastery" },
+    { "path": "../../util/brand" },
+    { "path": "../../typert/protocol" },
+    { "path": "../../mcp/mcp-client" },
+    { "path": "../../core/agent" },
+    { "path": "../../llm/llm" },
+    { "path": "../../core/tools" }
+  ]
+}

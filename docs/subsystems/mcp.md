@@ -119,6 +119,21 @@ MCP prompt templates, human-input elicitation, task-based execution, and resourc
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
+<a id="ctxcompanyusermcp--companyusermcpservice"></a>
+
+### `ctx.companyUserMcp` — `CompanyUserMcpService`
+
+Authenticate one platform-backed user MCP service.
+
+```ts cordis-catalog
+/** Return the logged-in caller's authorized MCP catalog without credentials or endpoints.
+ * @returns credential-free MCP summaries for the authenticated caller.
+ */
+@Remote async catalog(): Promise<UserMcpCatalog>
+```
+
+Source: [`packages/company/user-mcp/src/index.ts`](../../packages/company/user-mcp/src/index.ts)
+
 <a id="ctxmcpresources--mcpresourceruntime"></a>
 
 ### `ctx.mcpResources` — `McpResourceRuntime`

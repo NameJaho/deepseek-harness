@@ -745,6 +745,50 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'companyUserMcp',
+    summary: 'Authenticate one platform-backed user MCP service.',
+    description: 'Authenticate one platform-backed user MCP service.',
+    methods: [
+      {
+        signature: '@Remote async catalog(): Promise<UserMcpCatalog>',
+        description: 'Return the logged-in caller\'s authorized MCP catalog without credentials or endpoints.',
+        parameters: [],
+        returns: 'credential-free MCP summaries for the authenticated caller.',
+      },
+    ],
+  },
+  {
+    key: 'companyWecomAuth',
+    summary: 'Required browser login; local revocation stops admission before durable writes.',
+    description: 'Required browser login; local revocation stops admission before durable writes.',
+    methods: [
+      {
+        signature: 'async beginLogin(request: ConnectionTrustRequest, browserNonce: string, redirect: string | null): Promise<WecomLoginConfig>',
+        description: 'Begin a durable, browser-bound, single-use login attempt.',
+        parameters: [{ name: 'request', description: 'trusted request authority.' }, { name: 'browserNonce', description: 'random HttpOnly browser binding.' }, { name: 'redirect', description: 'site-local requested destination; unsafe destinations become `/`.' }],
+        returns: 'public identifiers, callback URI and unpredictable state.',
+      },
+      {
+        signature: 'async exchange(request: ConnectionTrustRequest, input: unknown): Promise<WecomLoginResult & { readonly cookie: string }>',
+        description: 'Consume state before exchanging the code with official APIs.',
+        parameters: [{ name: 'request', description: 'callback headers including the initiating browser cookie.' }, { name: 'input', description: 'untrusted callback fields.' }],
+        returns: 'persisted member session and signed cookie; failures require a fresh login.',
+      },
+      {
+        signature: 'getCurrentSession(request: ConnectionTrustRequest): WecomSessionView | null',
+        description: 'Resolve only enabled, unexpired, unrevoked local sessions for this deployment.',
+        parameters: [{ name: 'request', description: 'browser cookie and authority.' }],
+        returns: 'credential-free member view, or null when admission is denied.',
+      },
+      {
+        signature: 'async logout(request: ConnectionTrustRequest): Promise<void>',
+        description: 'Revoke the local session and its Peer\'s streams before persistence.',
+        parameters: [{ name: 'request', description: 'browser cookie; absent or invalid cookies are harmless.' }],
+        returns: 'completed durable revocation; storage failure keeps in-process admission denied.',
+      },
+    ],
+  },
+  {
     key: 'computerUse',
     summary: 'Owns one optional provider registration in the shared computer-use service.',
     description: 'Owns one optional provider registration in the shared computer-use service.',
@@ -803,6 +847,24 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [],
       },
       {
+        signature: 'registerBrowserPrincipalProvider(provider: BrowserPrincipalProvider): BrowserPrincipalRegistration',
+        description: 'Register one browser identity provider in the caller\'s Context.',
+        parameters: [{ name: 'provider', description: 'synchronous authentication and optional login route.' }],
+        returns: 'scoped registration; providers revoke Peers on logout, expiry, and account disablement.',
+      },
+      {
+        signature: 'clearOwnerCookie(request: ConnectionTrustRequest): string | undefined',
+        description: 'Expire the built-in Owner cookie after an external login replaces browser identity.',
+        parameters: [{ name: 'request', description: 'trusted headers for the cookie authority.' }],
+        returns: 'deletion Set-Cookie header, or undefined when no authority can be resolved.',
+      },
+      {
+        signature: 'trustRejection(request: ConnectionTrustRequest): 403 | undefined',
+        description: 'Apply the Host/Origin fence to a public route without requiring a credential.',
+        parameters: [{ name: 'request', description: 'request headers from the HTTP carrier.' }],
+        returns: '403 for an untrusted authority or Origin; undefined otherwise.',
+      },
+      {
         signature: 'readonly allowsRemoteAuthorities: boolean',
         description: 'Whether this deployment accepts authorities beyond loopback: true only when a validated `trustedHosts` entry names a non-loopback hostname.',
         parameters: [],
@@ -815,7 +877,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'requestRejection(request: ConnectionTrustRequest): ConnectionRequestRejection',
-        description: 'Apply Connection\'s Host/Origin checks and browser authentication to another Web route.',
+        description: 'Apply Connection\'s Host/Origin checks and browser authentication to another Owner-only Web route. Non-owner Peers receive 403; business routes use admit() and their resource policy instead.',
         parameters: [{ name: 'request', description: 'request headers from the HTTP or upgrade request.' }],
         returns: 'rejection status, or undefined when the route may accept the request.',
       },
@@ -5648,6 +5710,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type BrandedNumber<B extends string> = number & {\n    readonly [BRAND]: B;\n};',
   },
   {
+    name: 'BrowserPrincipalAuthentication',
+    declaration: 'export interface BrowserPrincipalAuthentication {\n    readonly sessionKey: BrowserSessionKey;\n    readonly principal: Principal;\n}',
+  },
+  {
+    name: 'BrowserPrincipalProvider',
+    declaration: 'export interface BrowserPrincipalProvider {\n    readonly loginPath?: string;\n    readonly requireLogin?: boolean;\n    authenticate(request: ConnectionTrustRequest, secure: boolean): BrowserPrincipalAuthentication | undefined;\n}',
+  },
+  {
+    name: 'BrowserPrincipalRegistration',
+    declaration: 'export interface BrowserPrincipalRegistration {\n    revoke(sessionKey: BrowserSessionKey): Promise<void>;\n    dispose(): Promise<void>;\n}',
+  },
+  {
+    name: 'BrowserSessionKey',
+    declaration: 'export type BrowserSessionKey = Branded<\'browser-session-key\'>;',
+  },
+  {
     name: 'BrowserUseProviderName',
     declaration: 'export type BrowserUseProviderName = Branded<\'BrowserUseProviderName\'>;',
   },
@@ -9720,6 +9798,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface UpdateTeamTaskRequest {\n    readonly taskId: TeamTaskId;\n    readonly expectedRevision: number;\n    readonly action: TeamTaskAction;\n    readonly subject?: string;\n    readonly description?: string;\n    readonly blockedBy?: readonly TeamTaskId[];\n    readonly writeScopes?: readonly string[];\n    readonly owner?: string;\n}',
   },
   {
+    name: 'UserMcpCatalog',
+    declaration: 'export interface UserMcpCatalog {\n    readonly userId: string;\n    readonly entries: readonly UserMcpSummary[];\n}',
+  },
+  {
+    name: 'UserMcpId',
+    declaration: 'export type UserMcpId = Branded<\'user-mcp-id\'>;',
+  },
+  {
+    name: 'UserMcpSummary',
+    declaration: 'export interface UserMcpSummary {\n    readonly id: UserMcpId;\n    readonly displayName: string;\n    readonly description: string;\n    readonly environment: string;\n    readonly accessType: \'open\' | \'authorized\' | \'unknown\';\n}',
+  },
+  {
     name: 'UserMessage',
     declaration: 'export interface UserMessage extends MessageBase {\n    readonly role: \'user\';\n}',
   },
@@ -9854,6 +9944,38 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WebUpgradeRoute',
     declaration: 'export interface WebUpgradeRoute {\n    path: string;\n    handler: (req: IncomingMessage, socket: Duplex, head: Buffer) => void | Promise<void>;\n}',
+  },
+  {
+    name: 'WecomCorpId',
+    declaration: 'export type WecomCorpId = Branded<\'wecom-corp-id\'>;',
+  },
+  {
+    name: 'WecomIdentityId',
+    declaration: 'export type WecomIdentityId = Branded<\'wecom-identity-id\'>;',
+  },
+  {
+    name: 'WecomLoginAttemptId',
+    declaration: 'export type WecomLoginAttemptId = Branded<\'wecom-login-attempt-id\'>;',
+  },
+  {
+    name: 'WecomLoginConfig',
+    declaration: 'export interface WecomLoginConfig {\n    readonly corpId: WecomCorpId;\n    readonly agentId: string;\n    readonly redirectUri: string;\n    readonly state: string;\n    readonly attemptId: WecomLoginAttemptId;\n    readonly expiresAt: number;\n}',
+  },
+  {
+    name: 'WecomLoginResult',
+    declaration: 'export interface WecomLoginResult {\n    readonly session: WecomSessionView;\n    readonly redirect: string;\n}',
+  },
+  {
+    name: 'WecomSessionView',
+    declaration: 'export interface WecomSessionView {\n    readonly identityId: WecomIdentityId;\n    readonly corpId: WecomCorpId;\n    readonly userId: WecomUserId;\n    readonly role: WecomUserRole;\n    readonly displayName?: string;\n    readonly logoutUrl?: string;\n    readonly expiresAt: number;\n}',
+  },
+  {
+    name: 'WecomUserId',
+    declaration: 'export type WecomUserId = Branded<\'wecom-user-id\'>;',
+  },
+  {
+    name: 'WecomUserRole',
+    declaration: 'export type WecomUserRole = \'admin\' | \'user\';',
   },
   {
     name: 'WeeklyInput',

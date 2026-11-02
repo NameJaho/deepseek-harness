@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-11-02-authenticated-user-mcp-bridge.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-11-02-authenticated-user-mcp-bridge.md
+/agent-note-authenticated-user-mcp-bridge:
+  en: 30793f991aa2e799
+  zh: e2a778c608fde4c9
+/agent-note-authenticated-user-mcp-bridge/problem:
+  en: 926b73d8644a6acb
+  zh: cd3e28688c32848e
+/agent-note-authenticated-user-mcp-bridge/decision:
+  en: b8af04235ca0c9f7
+  zh: 9bffe231b208aa2d
+/agent-note-authenticated-user-mcp-bridge/alternatives-considered:
+  en: a421508f3336de53
+  zh: f8368f39c3eaedd9
+/agent-note-authenticated-user-mcp-bridge/consequences:
+  en: 3ba62b738577800b
+  zh: e1e360e0d1f8ada1

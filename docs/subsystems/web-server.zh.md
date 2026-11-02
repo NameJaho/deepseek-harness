@@ -115,6 +115,43 @@ interface TlsConfig {
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
+<a id="ctxcompanywecomauth--companywecomauthservice"></a>
+
+### `ctx.companyWecomAuth` — `CompanyWecomAuthService`
+
+Required browser login; local revocation stops admission before durable writes.
+
+```ts cordis-catalog
+/** Begin a durable, browser-bound, single-use login attempt.
+ * @param request - trusted request authority.
+ * @param browserNonce - random HttpOnly browser binding.
+ * @param redirect - site-local requested destination; unsafe destinations become `/`.
+ * @returns public identifiers, callback URI and unpredictable state.
+ */
+async beginLogin(request: ConnectionTrustRequest, browserNonce: string, redirect: string | null): Promise<WecomLoginConfig>
+
+/** Consume state before exchanging the code with official APIs.
+ * @param request - callback headers including the initiating browser cookie.
+ * @param input - untrusted callback fields.
+ * @returns persisted member session and signed cookie; failures require a fresh login.
+ */
+async exchange(request: ConnectionTrustRequest, input: unknown): Promise<WecomLoginResult & { readonly cookie: string }>
+
+/** Resolve only enabled, unexpired, unrevoked local sessions for this deployment.
+ * @param request - browser cookie and authority.
+ * @returns credential-free member view, or null when admission is denied.
+ */
+getCurrentSession(request: ConnectionTrustRequest): WecomSessionView | null
+
+/** Revoke the local session and its Peer's streams before persistence.
+ * @param request - browser cookie; absent or invalid cookies are harmless.
+ * @returns completed durable revocation; storage failure keeps in-process admission denied.
+ */
+async logout(request: ConnectionTrustRequest): Promise<void>
+```
+
+Source: [`packages/company/wecom-auth/src/index.ts`](../../packages/company/wecom-auth/src/index.ts)
+
 <a id="ctxconnection--hostconnectionhandle"></a>
 
 ### `ctx.connection` — `HostConnectionHandle`
@@ -122,6 +159,26 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 Host `ctx.connection` members consumed by transport-independent adapters.
 
 ```ts cordis-catalog
+/**
+ * Register one browser identity provider in the caller's Context.
+ * @param provider - synchronous authentication and optional login route.
+ * @returns scoped registration; providers revoke Peers on logout, expiry, and account disablement.
+ */
+registerBrowserPrincipalProvider(provider: BrowserPrincipalProvider): BrowserPrincipalRegistration
+
+/** Expire the built-in Owner cookie after an external login replaces browser identity.
+ * @param request - trusted headers for the cookie authority.
+ * @returns deletion Set-Cookie header, or undefined when no authority can be resolved.
+ */
+clearOwnerCookie(request: ConnectionTrustRequest): string | undefined
+
+/**
+ * Apply the Host/Origin fence to a public route without requiring a credential.
+ * @param request - request headers from the HTTP carrier.
+ * @returns 403 for an untrusted authority or Origin; undefined otherwise.
+ */
+trustRejection(request: ConnectionTrustRequest): 403 | undefined
+
 /**
  * Compose exact Fetch routes and the shared-channel RPC interceptor.
  * @param channel - shared channel mounted by Connection.
@@ -131,7 +188,8 @@ createSharedFetchHandler(channel: '/api'): ConnectionFetchHandler
 
 /**
  * Apply Connection's Host/Origin checks and browser authentication to
- * another Web route.
+ * another Owner-only Web route. Non-owner Peers receive 403; business
+ * routes use admit() and their resource policy instead.
  * @param request - request headers from the HTTP or upgrade request.
  * @returns rejection status, or undefined when the route may accept the request.
  */

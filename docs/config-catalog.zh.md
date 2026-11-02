@@ -797,12 +797,51 @@ export interface ToolResultPruneConfig {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-compaction-tool-result-pruner -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-company-user-mcp -->
+<a id="deepseek-aidsh-company-user-mcp"></a>
+
+## `@deepseek-ai/dsh-company-user-mcp`
+
+- `inject`: `tools` · `agents` · `sessionProjections`
+- `source`: [`packages/company/user-mcp/src/config.ts:5`](../packages/company/user-mcp/src/config.ts)
+
+```ts config-catalog
+/** URLs, platform identity and bounded upstream operation deadlines. Secrets are read from the process environment. */
+export interface Config {
+  /** Enables the bridge when set for a deployment. */
+  enabled: boolean
+  /** Streamable HTTP MCP endpoint exposing `queryUserAvailableMcp`. */
+  listUrl: string
+  /** Platform token-exchange endpoint. */
+  exchangeUrl: string
+  /** Platform identifier used in the HMAC request headers. */
+  platformId: string
+  /** Target MCP environment passed to the exchange endpoint. */
+  environment: string
+  /** Process environment variable containing the list-service API key. */
+  listApiKeyEnv: string
+  /** Process environment variable containing the platform HMAC secret. */
+  platformSecretEnv: string
+  /** Timeout for one catalog or token-exchange request, in milliseconds. */
+  requestTimeoutMs: number
+  /** Timeout for MCP initialization and tool discovery, in milliseconds. */
+  connectionTimeoutMs: number
+  /** Timeout for one user MCP tool call, in milliseconds. */
+  toolCallTimeoutMs: number
+  /** Maximum number of servers returned by one catalog request. */
+  maxServers: number
+  /** How long one Agent reuses its loaded catalog before the next step refreshes it, in milliseconds. */
+  catalogTtlMs: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-company-user-mcp -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-company-wecom-auth -->
 <a id="deepseek-aidsh-company-wecom-auth"></a>
 
 ## `@deepseek-ai/dsh-company-wecom-auth`
 
-- `inject`: `credentials` · `storageDomain` · `connection` · `webServer`
+- `inject`: `credentials` · `storageDomain` · `connection` · `webServer` · `remoteAccess` · `workspaceRegistry`
 - `source`: [`packages/company/wecom-auth/src/config.ts:5`](../packages/company/wecom-auth/src/config.ts)
 
 ```ts config-catalog
@@ -826,6 +865,10 @@ export interface Config {
   maxResponseBytes: number
   /** Root directory under which each member receives one private default Workspace. */
   workspaceRoot?: string
+  /** Accept URL-encoded X-User-Info identity data from a trusted upstream gateway. */
+  gatewayIdentityEnabled: boolean
+  /** Optional upstream logout URL used by gateway-authenticated account pages. */
+  gatewayLogoutUrl: string
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-company-wecom-auth -->
@@ -1809,7 +1852,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-host-open-in-app`
 
 - `inject`: `webServer` · `connection` · `subprocess`
-- `source`: [`packages/host/open-in-app/src/index.ts:50`](../packages/host/open-in-app/src/index.ts)
+- `source`: [`packages/host/open-in-app/src/index.ts:51`](../packages/host/open-in-app/src/index.ts)
 
 ```ts config-catalog
 /** Open-in-app host configuration. */
@@ -2411,7 +2454,7 @@ export interface LspLocalServerConfig {
 ## `@deepseek-ai/dsh-mcp-client`
 
 - `inject`: `tools`
-- `source`: [`packages/mcp/mcp-client/src/index.ts:104`](../packages/mcp/mcp-client/src/index.ts)
+- `source`: [`packages/mcp/mcp-client/src/index.ts:105`](../packages/mcp/mcp-client/src/index.ts)
 
 ```ts config-catalog
 /** Configuration for one stdio or Streamable HTTP MCP server. */

@@ -12,3 +12,13 @@
         workspaceRoot: !!js process.env.DSH_WECOM_WORKSPACE_ROOT ?? ''
         gatewayIdentityEnabled: !!js process.env.DSH_GATEWAY_IDENTITY_ENABLED === '1'
         gatewayLogoutUrl: !!js process.env.DSH_GATEWAY_LOGOUT_URL ?? ''
+    - id: company-user-mcp
+      name: '@deepseek-ai/dsh-company-user-mcp'
+      config:
+        enabled: !!js process.env.DSH_USER_MCP_ENABLED === '1'
+        listUrl: !!js process.env.DSH_MCP_LIST_URL ?? 'https://test-ai-gateway.busyming.com/mcp-servers/get-user-mcp-list'
+        exchangeUrl: !!js process.env.DSH_MCP_EXCHANGE_URL ?? 'https://workflow-engine.busyming.com/token/exchange'
+        platformId: !!js process.env.DSH_MCP_PLATFORM_ID ?? 'dsh'
+        environment: !!js process.env.DSH_MCP_ENVIRONMENT ?? 'test'
+        listApiKeyEnv: !!js process.env.DSH_MCP_LIST_API_KEY_ENV ?? 'DSH_MCP_LIST_API_KEY'
+        platformSecretEnv: !!js process.env.DSH_MCP_PLATFORM_SECRET_ENV ?? 'DSH_MCP_PLATFORM_SECRET'

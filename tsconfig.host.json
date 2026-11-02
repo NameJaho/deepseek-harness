@@ -576,6 +576,7 @@
     { "path": "./packages/llm/plugin-package-inventory-deepseek" },
     { "path": "./packages/host/webserver" },
     { "path": "./packages/company/wecom-auth" },
+    { "path": "./packages/company/user-mcp" },
     { "path": "./packages/sdk/client" },
     { "path": "./packages/sdk/protocol" },
     { "path": "./packages/lsp/lsp" },

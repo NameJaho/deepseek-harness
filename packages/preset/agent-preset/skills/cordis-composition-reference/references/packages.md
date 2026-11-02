@@ -131,6 +131,13 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-compaction-image-offload` | no | Durable image offload for image-capable routes: replace over-budget request images with placeholders and retry |
 | `@deepseek-ai/dsh-compaction-tool-result-pruner` | yes | Replay-safe model-free head/middle/tail pruning for tool-result surface nodes |
 
+## company
+
+| Package | Config | Description |
+|---|---|---|
+| `@deepseek-ai/dsh-company-user-mcp` | yes | Authenticated user MCP catalog and Agent-scoped execution |
+| `@deepseek-ai/dsh-company-wecom-auth` | yes | Official WeCom self-built app login and browser member sessions |
+
 ## computer-use
 
 | Package | Config | Description |
