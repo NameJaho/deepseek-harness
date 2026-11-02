@@ -22,3 +22,14 @@
         environment: !!js process.env.DSH_MCP_ENVIRONMENT ?? 'test'
         listApiKeyEnv: !!js process.env.DSH_MCP_LIST_API_KEY_ENV ?? 'DSH_MCP_LIST_API_KEY'
         platformSecretEnv: !!js process.env.DSH_MCP_PLATFORM_SECRET_ENV ?? 'DSH_MCP_PLATFORM_SECRET'
+    - id: company-user-mcp-provider
+      name: '@deepseek-ai/dsh-company-user-mcp/provider'
+      disabled: !!js process.env.DSH_USER_MCP_ENABLED !== '1'
+      config:
+        enabled: true
+        listUrl: !!js process.env.DSH_MCP_LIST_URL ?? 'https://test-ai-gateway.busyming.com/mcp-servers/get-user-mcp-list'
+        exchangeUrl: !!js process.env.DSH_MCP_EXCHANGE_URL ?? 'https://workflow-engine.busyming.com/token/exchange'
+        platformId: !!js process.env.DSH_MCP_PLATFORM_ID ?? 'dsh'
+        environment: !!js process.env.DSH_MCP_ENVIRONMENT ?? 'test'
+        listApiKeyEnv: !!js process.env.DSH_MCP_LIST_API_KEY_ENV ?? 'DSH_MCP_LIST_API_KEY'
+        platformSecretEnv: !!js process.env.DSH_MCP_PLATFORM_SECRET_ENV ?? 'DSH_MCP_PLATFORM_SECRET'

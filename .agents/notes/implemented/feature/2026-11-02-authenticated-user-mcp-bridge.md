@@ -23,3 +23,9 @@ The existing static `mcp-client` configuration was considered, but it cannot sel
 Members see only tools returned for their own principal, and tool registrations disappear when the Agent is disposed. The Remote catalog method reports failures as structured `RemoteError` codes. Inside a turn, catalog, exchange, and connection failures are contained per server and logged, because one unavailable upstream must not fail a member's conversation; the Agent keeps its current tools until the next refresh.
 
 Reconciliation starts at Agent creation and inbox insertion as well as before each step, because the agent loop resolves a step's tool set before `agent/pre-step`. Tools connected during a step still appear only from the next step; removing that delay requires an agent-loop extension point. A per-Agent catalog TTL bounds catalog traffic, and tokens are reused until one minute before expiry.
+
+## Company MCP provider
+
+The same bundle also implements `ctx.companyMcpProvider` when enabled, so the company MCP page and Cloud Agent capability selection read the member's authorized servers from the same catalog the Agent bridge uses. The Market HTTP adapter is disabled in that mode because the provider seam accepts one implementation. The provider keys the catalog on the verified WeCom login `sub`; portal logins have no WeCom member id and fail with `company-mcp/member-unresolved` rather than guessing a mapping.
+
+The provider keeps the Market adapter's execution semantics: `resolveTool` returns a definition whose `execute` rejects with `company-mcp/call-unavailable`. Connecting provider invocation to the Agent connection pool is deferred, so this decision does not extend the bridge's execution path to Cloud Agent releases. The MCP SDK's top-level `$schema` marker is dropped before schema validation because the supported JSON Schema subset rejects it and it does not change validation.

@@ -23,3 +23,9 @@ Status: implemented
 成员只能看到为其本人 principal 返回的工具，Agent 释放后工具注册随之消失。Remote 目录方法以结构化 `RemoteError` 代码报告失败。在一轮对话内，目录、换 token 和连接失败按服务器隔离并记录日志，因为一个不可用的上游不应让成员的对话失败；Agent 保留当前工具，直到下次刷新。
 
 由于 agent loop 在 `agent/pre-step` 之前确定 step 的工具集合，同步会在 Agent 创建、消息进入 inbox 以及每个 step 之前开始。在某个 step 中连接的工具仍然只从下一个 step 起可用；消除这一延迟需要 agent-loop 扩展点。每个 Agent 的目录 TTL 限制目录请求量，令牌在到期前一分钟内才重新换取。
+
+## 公司 MCP provider
+
+启用后，同一个插件也实现 `ctx.companyMcpProvider`，因此公司 MCP 页面与云端 Agent 能力选择读取的是 Agent 桥接所用的同一份成员目录。此模式下禁用 Market HTTP 适配器，因为 provider 接口只接受一个实现。provider 以已验证的 WeCom 登录 `sub` 为键；门户登录没有 WeCom 成员 id，直接返回 `company-mcp/member-unresolved`，不做猜测映射。
+
+provider 沿用 Market 适配器的执行语义：`resolveTool` 返回的定义中 `execute` 以 `company-mcp/call-unavailable` 拒绝。把 provider 调用接入 Agent 连接池的工作被推迟，因此本决策不把桥接的执行路径扩展到云端 Agent 发布。MCP SDK 顶层的 `$schema` 标记在 schema 校验前被去掉，因为受支持的 JSON Schema 子集会拒绝它，且它不改变校验结果。

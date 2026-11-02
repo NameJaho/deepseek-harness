@@ -10,6 +10,8 @@
     { "path": "../../mcp/mcp-client" },
     { "path": "../../core/agent" },
     { "path": "../../llm/llm" },
-    { "path": "../../core/tools" }
+    { "path": "../../core/tools" },
+    { "path": "../mcp-provider" },
+    { "path": "../wecom-auth" }
   ]
 }

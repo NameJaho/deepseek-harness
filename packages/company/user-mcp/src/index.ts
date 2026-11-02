@@ -1,16 +1,15 @@
 /** Authenticated user MCP catalog, token exchange and Agent-scoped tool bridge. */
-import { createHash, createHmac, randomBytes } from 'node:crypto'
+import { createHash } from 'node:crypto'
 import { Service, type Context } from '@deepseek-ai/cordis'
-import { brandString } from '@deepseek-ai/dsh-brand'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import type { ProjectionHandle } from '@deepseek-ai/dsh-session-projection'
 import { syncTools, type ToolBridgeOptions, type ToolDisposers } from '@deepseek-ai/dsh-mcp-client'
 import { principalOf, Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import { Client } from '@modelcontextprotocol/client'
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
+import type { Client } from '@modelcontextprotocol/client'
 import { z as schema } from 'zod'
 import { Config } from './config.ts'
+import { connectFailed, UserMcpClient, type UserMcpConnection } from './client.ts'
 import type { UserMcpCatalog, UserMcpId, UserMcpTarget } from '@deepseek-ai/dsh-company-user-mcp/types'
 
 export { Config } from './config.ts'
@@ -36,39 +35,10 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
   }
 }
 
-const tokenResponse = schema.object({
-  access_token: schema.string().min(1),
-  token_type: schema.string().min(1),
-  expires_in: schema.number().int().positive(),
-  scope: schema.string().optional(),
-  resource: schema.url(),
-})
-
-const catalogRecord = schema.object({
-  mcpServiceId: schema.number().int().optional(),
-  name: schema.string().trim().min(1),
-  displayName: schema.string().optional(),
-  description: schema.string().optional(),
-  accessType: schema.string().optional(),
-})
-
-const listResponse = schema.object({
-  success: schema.boolean(),
-  code: schema.string().optional(),
-  msg: schema.string().optional(),
-  data: schema.object({ records: schema.array(catalogRecord) }).optional(),
-})
-
-interface TokenEntry {
-  readonly token: string
-  readonly resource: string
-  readonly expiresAt: number
-}
-
 interface ConnectionState {
   readonly target: UserMcpTarget
   readonly client: Client
-  readonly token: TokenEntry
+  readonly token: UserMcpConnection['token']
   disposers: ToolDisposers
 }
 
@@ -78,8 +48,6 @@ interface AgentState {
   listedAt: number
   readonly servers: Map<string, ConnectionState>
 }
-
-const listToolName = 'queryUserAvailableMcp'
 
 interface PrincipalState {
   /** Latest authenticated member id recorded by a Session `user/message`, or null. */
@@ -102,12 +70,11 @@ export default class CompanyUserMcpService extends TypertRemoteService {
 
   private readonly config: Config
   private readonly lifetime = new AbortController()
-  private readonly tokenCache = new Map<string, TokenEntry>()
+  private readonly client: UserMcpClient
   private readonly agentStates = new WeakMap<Agent, AgentState>()
   private readonly preparations = new WeakMap<Agent, Promise<void>>()
   private readonly disposed = new WeakSet<Agent>()
   private readonly states = new Set<AgentState>()
-  private readonly active = new Set<Promise<unknown>>()
   private principals!: ProjectionHandle<PrincipalState>
 
   /** @param owner - Host context containing the tool registry and Remote gateway. @param config - validated bridge configuration. */
@@ -116,9 +83,10 @@ export default class CompanyUserMcpService extends TypertRemoteService {
     this.config = Config(config)
     this.requireHttpUrl(this.config.listUrl, 'listUrl')
     this.requireHttpUrl(this.config.exchangeUrl, 'exchangeUrl')
+    this.client = new UserMcpClient(this.config, this.lifetime.signal)
     owner.effect(() => async () => {
       this.lifetime.abort()
-      await Promise.allSettled(this.active)
+      await this.client.idle()
       await Promise.all([...this.states].map(state => this.clearAgent(state)))
       this.states.clear()
     }, 'company-user-mcp: lifetime')
@@ -164,7 +132,7 @@ export default class CompanyUserMcpService extends TypertRemoteService {
   @Remote
   async catalog(): Promise<UserMcpCatalog> {
     const userId = this.remoteUserId()
-    const targets = await this.listUserMcps(userId)
+    const targets = await this.client.list(userId)
     return { userId, entries: targets.map(({ mcpName: _mcpName, ...entry }) => entry) }
   }
 
@@ -189,8 +157,7 @@ export default class CompanyUserMcpService extends TypertRemoteService {
         if (!this.lifetime.signal.aborted) this.owner.logger.warn(`company-user-mcp: preparation failed: ${this.describe(error)}`)
       })
     this.preparations.set(agent, run)
-    this.active.add(run)
-    void run.finally(() => { this.active.delete(run) })
+    void this.client.track(run)
     return run
   }
 
@@ -221,7 +188,7 @@ export default class CompanyUserMcpService extends TypertRemoteService {
     this.states.add(state)
     if (state.listedAt !== 0 && Date.now() - state.listedAt < this.config.catalogTtlMs) return
     let targets: UserMcpTarget[]
-    try { targets = await this.listUserMcps(userId) }
+    try { targets = await this.client.list(userId) }
     catch (error) {
       this.owner.logger.warn(`company-user-mcp: catalog unavailable, keeping current tools: ${this.describe(error)}`)
       return
@@ -268,28 +235,14 @@ export default class CompanyUserMcpService extends TypertRemoteService {
 
   /** Establish one token-authenticated MCP connection and publish its tools. */
   private async connectTarget(target: UserMcpTarget, userId: string, agent: Agent): Promise<ConnectionState> {
-    const token = await this.exchangeToken(userId, target)
-    const headers = { Authorization: `Bearer ${token.token}` }
-    const client = new Client({ name: 'dsh-company-user-mcp', version: '0.1.0' }, { capabilities: {} })
+    const connection = await this.client.connect(userId, target)
     try {
-      const transport = new StreamableHTTPClientTransport(new URL(this.mcpUrl(token.resource)), { requestInit: { headers } })
-      const pending = client.connect(transport, { timeout: this.config.connectionTimeoutMs })
-      this.active.add(pending)
-      await pending.finally(() => { this.active.delete(pending) })
-      const state: ConnectionState = { target, client, token, disposers: new Map() }
-      state.disposers = await syncTools(client, agent.ctx, this.bridgeOptions(target), state.disposers)
-      return state
+      const disposers = await syncTools(connection.client, agent.ctx, this.bridgeOptions(target), new Map())
+      return { target, client: connection.client, token: connection.token, disposers }
     } catch (error) {
-      await this.closeClient(client)
-      throw new RemoteError('company-user-mcp/connect-failed', 'Could not connect to an authorized MCP server', { mcp: target.id }, { cause: error })
+      await this.client.close(connection.client)
+      throw connectFailed(target, error)
     }
-  }
-
-  /** Build the MCP endpoint from the token resource without exposing it to callers. */
-  private mcpUrl(resource: string): string {
-    const url = new URL(resource)
-    if (!url.pathname.endsWith('/mcp')) url.pathname = `${url.pathname.replace(/\/$/, '')}/mcp`
-    return url.toString()
   }
 
   /** Stable namespace used only for model-facing tool names. */
@@ -297,71 +250,6 @@ export default class CompanyUserMcpService extends TypertRemoteService {
     const normalized = target.mcpName.replace(/[^A-Za-z0-9_-]/g, '_')
     const digest = createHash('sha256').update(target.mcpName).digest('hex').slice(0, 8)
     return { registrationFailure: 'throw', serverName: `${normalized.slice(0, 23)}_${digest}`, toolCallTimeoutMs: this.config.toolCallTimeoutMs }
-  }
-
-  /** Query the list MCP server using its server-side API key. */
-  private async listUserMcps(userId: string): Promise<UserMcpTarget[]> {
-    const apiKey = process.env[this.config.listApiKeyEnv]
-    if (apiKey === undefined || apiKey.trim() === '') throw new RemoteError('company-user-mcp/missing-credential', 'The user MCP list credential is not configured', {})
-    const client = new Client({ name: 'dsh-company-user-mcp-catalog', version: '0.1.0' }, { capabilities: {} })
-    const headers = { Authorization: `Bearer ${apiKey}` }
-    try {
-      const transport = new StreamableHTTPClientTransport(new URL(this.config.listUrl), { requestInit: { headers } })
-      const pending = client.connect(transport, { timeout: this.config.connectionTimeoutMs })
-      this.active.add(pending)
-      await pending.finally(() => { this.active.delete(pending) })
-      const tools = await client.listTools(undefined, { timeout: this.config.connectionTimeoutMs })
-      if (!tools.tools.some(tool => tool.name === listToolName)) {
-        throw new Error(`catalog MCP does not expose ${listToolName}`)
-      }
-      const result = await client.callTool({ name: listToolName, arguments: { thirdUid: userId, accessType: 'all', pageNo: 1, pageSize: this.config.maxServers } }, { timeout: this.config.requestTimeoutMs })
-      return this.parseCatalogResult(result)
-    } catch (error) {
-      throw new RemoteError('company-user-mcp/catalog-failed', 'Could not load the authenticated MCP catalog', {}, { cause: error })
-    } finally { await this.closeClient(client) }
-  }
-
-  /** Validate the catalog's structured result and keep only fields DSH uses. */
-  private parseCatalogResult(result: object): UserMcpTarget[] {
-    const parsed = listResponse.safeParse(Reflect.get(result, 'structuredContent'))
-    if (!parsed.success) throw new Error('catalog MCP returned an invalid response')
-    const { success, code, msg, data } = parsed.data
-    if (!success || data === undefined) throw new Error(`catalog request failed (${code ?? 'unknown'}): ${msg ?? ''}`)
-    return data.records.slice(0, this.config.maxServers).map(({ mcpServiceId, name, displayName, description, accessType }) => ({
-      id: brandString<UserMcpId>(String(mcpServiceId ?? name)),
-      mcpName: name,
-      displayName: displayName === undefined || displayName === '' ? name : displayName,
-      description: description ?? '',
-      environment: this.config.environment,
-      accessType: accessType === 'open' || accessType === 'authorized' ? accessType : 'unknown',
-    }))
-  }
-
-  /** Exchange a short-lived token with an exact raw request body and HMAC signature. */
-  private async exchangeToken(userId: string, target: UserMcpTarget): Promise<TokenEntry> {
-    const key = `${userId}\0${target.mcpName}\0${target.environment}`
-    const cached = this.tokenCache.get(key)
-    if (cached !== undefined && cached.expiresAt > Date.now() + 60_000) return cached
-    const secret = process.env[this.config.platformSecretEnv]
-    if (secret === undefined || secret.trim() === '') throw new RemoteError('company-user-mcp/missing-credential', 'The platform exchange secret is not configured', {})
-    const body = Buffer.from(JSON.stringify({ user_id: userId, mcp_name: target.mcpName, environment: target.environment }), 'utf8')
-    const timestamp = String(Math.floor(Date.now() / 1000))
-    const nonce = randomBytes(24).toString('base64url')
-    const digest = createHash('sha256').update(body).digest('hex')
-    const message = `${this.config.platformId}\n${timestamp}\n${nonce}\n${digest}`
-    const signature = createHmac('sha256', secret).update(message, 'utf8').digest('hex')
-    const response = await fetch(this.config.exchangeUrl, {
-      method: 'POST', redirect: 'error', body,
-      headers: { 'content-type': 'application/json', 'X-Platform-Id': this.config.platformId, 'X-Platform-Timestamp': timestamp, 'X-Platform-Nonce': nonce, 'X-Platform-Signature': `v1=${signature}` },
-      signal: AbortSignal.any([this.lifetime.signal, AbortSignal.timeout(this.config.requestTimeoutMs)]),
-    })
-    if (!response.ok) { await response.text(); throw new Error(`token exchange failed (${response.status})`) }
-    const parsed = tokenResponse.safeParse(await response.json())
-    if (!parsed.success) throw new Error('token exchange returned an invalid response')
-    const { access_token: token, resource, expires_in: expiresIn } = parsed.data
-    const entry: TokenEntry = { token, resource, expiresAt: Date.now() + expiresIn * 1000 }
-    this.tokenCache.set(key, entry)
-    return entry
   }
 
   /** Stable key for one user MCP environment. */
@@ -380,12 +268,7 @@ export default class CompanyUserMcpService extends TypertRemoteService {
   /** Remove one connection's tools and close its transport. */
   private async closeConnection(connection: ConnectionState): Promise<void> {
     connection.disposers.forEach((dispose) => { dispose() })
-    await this.closeClient(connection.client)
-  }
-
-  /** Close one MCP client whose transport is discarded regardless of the close outcome. */
-  private async closeClient(client: Client): Promise<void> {
-    try { await client.close() } catch (_closeError) { /* Nothing depends on a discarded transport closing cleanly. */ }
+    await this.client.close(connection.client)
   }
 
   /** Close one Agent's user MCP generation. */

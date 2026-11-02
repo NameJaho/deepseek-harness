@@ -7567,6 +7567,12 @@ importers:
       '@deepseek-ai/dsh-brand':
         specifier: workspace:*
         version: link:../../util/brand
+      '@deepseek-ai/dsh-company-mcp-provider':
+        specifier: workspace:*
+        version: link:../mcp-provider
+      '@deepseek-ai/dsh-company-wecom-auth':
+        specifier: workspace:*
+        version: link:../wecom-auth
       '@deepseek-ai/dsh-mcp-client':
         specifier: workspace:*
         version: link:../../mcp/mcp-client

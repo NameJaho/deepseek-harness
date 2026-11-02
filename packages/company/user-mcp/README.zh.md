@@ -32,6 +32,8 @@ Agent 的成员取自最新待处理用户消息上的 principal；没有时，�
 
 `requestTimeoutMs` 限制一次目录调用或换 token 请求，`connectionTimeoutMs` 限制 MCP 初始化，`toolCallTimeoutMs` 限制一次工具调用。缺少凭据、目录失败、换 token 被拒绝或服务器不可达时只记录警告，不会让本轮失败：Agent 保留当前工具，下次刷新重试被跳过的服务器。step 被取消时只停止等待，共享的同步继续运行。释放 Agent 或本服务时关闭 MCP 客户端并注销工具。
 
+同一开关也把本包注册为公司 MCP provider。`DSH_USER_MCP_ENABLED=1` 时，`company-user-mcp-provider` 基于登录成员有权限的服务提供 `ctx.companyMcpProvider`，同时禁用 Market HTTP 适配器（`company-mcp-provider/http`），因为 provider 只能有一个实现。因此公司 MCP 页面与 Agent 桥接使用同一批服务。成员取自 WeCom 登录的 `sub`；门户登录没有 WeCom 成员身份，返回 `company-mcp/member-unresolved`。工具 schema 在发现时加载。通过该 provider 的工具调用尚未接通：`resolveTool` 返回的定义中 `execute` 会以 `company-mcp/call-unavailable` 拒绝，与 Market 适配器一致。
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -72,6 +74,7 @@ Agent 的成员取自最新待处理用户消息上的 principal；没有时，�
 - step 期间连接断开会使该次工具调用失败；在服务器被撤销后重新授权或成员变化之前，桥接不会重连已列出的服务器。
 - 授权由平台决定：已列出服务器的换 token 被拒绝，或服务器拒绝其令牌时，只会记录警告并跳过。
 - 目录校验器只接受带 `success` 和 `data.records` 的 `structuredContent`；上游 wire 格式变化时需要同步更新。
+- 通过公司 MCP provider 的工具调用尚未接通：引用用户 MCP 工具的 Cloud Agent 发布可以发布并解析该工具，但在接通 provider 调用之前无法执行。
 
 <a id="dev-note"></a>
 ### 开发备注

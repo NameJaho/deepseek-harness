@@ -1,6 +1,7 @@
 - insert:
     - id: company-mcp-provider
       name: '@deepseek-ai/dsh-company-mcp-provider/http'
+      disabled: !!js process.env.DSH_USER_MCP_ENABLED === '1'
       config:
         baseUrl: !!js process.env.DSH_MCP_MARKET_URL ?? ''
         corpId: !!js process.env.DSH_WECOM_CORP_ID ?? ''

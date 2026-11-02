@@ -18,6 +18,11 @@ import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { z } from 'zod'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import CompanyUserMcpService, { Config } from '../src/index.ts'
+import { brandString } from '@deepseek-ai/dsh-brand'
+import type { CompanyMcpId } from '@deepseek-ai/dsh-company-mcp-provider/types'
+import { companyMcpToolName } from '@deepseek-ai/dsh-company-mcp-provider'
+import type { CompanyMarketSubject, CompanyOwnerScope, PortalUserId, WecomCorpId, WecomUserId } from '@deepseek-ai/dsh-company-wecom-auth/types'
+import UserMcpCompanyProvider from '../src/provider.ts'
 
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface PrincipalMap {
@@ -557,5 +562,70 @@ describe('company user MCP bridge', () => {
     const endpoints = { listUrl: 'http://127.0.0.1/catalog', exchangeUrl: 'http://127.0.0.1/token' }
     const config = bridgeConfig(endpoints, key === 'listUrl' ? { listUrl: value } : { exchangeUrl: value })
     expect(() => new CompanyUserMcpService(ctx, config)).toThrow(`company-user-mcp: ${key} must be an HTTP(S) URL`)
+  })
+})
+
+describe('company user MCP provider', () => {
+  const wecom = (sub: string): CompanyMarketSubject => ({
+    scope: brandString<CompanyOwnerScope>(`wecom:corp:${sub}`),
+    corpId: brandString<WecomCorpId>('corp'),
+    sub: brandString<WecomUserId>(sub),
+  })
+
+  async function providerFor(platform: Platform) {
+    const ctx = new Context()
+    onTestFinished(() => ctx.fiber.dispose())
+    vi.stubEnv('USER_MCP_TEST_LIST_KEY', LIST_KEY)
+    vi.stubEnv('USER_MCP_TEST_SECRET', SECRET)
+    ctx.provide('companyWecomAuth', { registerResourceProvider: () => async () => {} })
+    await ctx.plugin(UserMcpCompanyProvider, bridgeConfig(platform))
+    return ctx.companyMcpProvider
+  }
+
+  it('lists the authorized servers for a WeCom member and reads their tools without endpoints', async () => {
+    const platform = await startPlatform()
+    platform.catalogs.set('alice', [{ mcpServiceId: 7, name: 'inventory', displayName: 'Inventory', description: 'Stock', accessType: 'authorized' }])
+    const provider = await providerFor(platform)
+
+    const catalog = await provider.catalog(wecom('alice'))
+    expect(catalog).toMatchObject({ loaded: true, servers: [{ id: '7', name: 'Inventory', description: 'Stock', enabled: true, status: 'available', tools: [] }] })
+    expect(JSON.stringify(catalog)).not.toContain(platform.exchangeUrl)
+
+    const [server] = catalog.servers
+    const tools = await provider.discover(wecom('alice'), server!.id, new AbortController().signal)
+    expect(tools).toEqual([expect.objectContaining({ rawName: 'lookup', name: companyMcpToolName(server!.id, 'lookup') })])
+    expect(JSON.parse(tools[0]!.parametersJson)).toMatchObject({ type: 'object' })
+  })
+
+  it('resolves and routes a model-facing name only inside the member\'s authorized servers', async () => {
+    const platform = await startPlatform()
+    platform.catalogs.set('alice', [{ mcpServiceId: 7, name: 'inventory', displayName: 'Inventory', accessType: 'authorized' }])
+    const provider = await providerFor(platform)
+    const name = companyMcpToolName(brandString<CompanyMcpId>('7'), 'lookup')
+
+    const resolved = await provider.resolveTool(wecom('alice'), name)
+    expect(resolved).toMatchObject({ schema: { name } })
+    expect(resolved?.fingerprint).toMatch(/^[0-9a-f]{64}$/)
+    await expect(provider.describeTool(wecom('alice'), name)).resolves.toMatchObject({ serverId: '7', rawName: 'lookup' })
+    await expect(provider.resolveTool(wecom('bob'), name)).resolves.toBeUndefined()
+    await expect(provider.describeTool(wecom('alice'), 'mcp__unknown__lookup')).resolves.toBeUndefined()
+  })
+
+  it('reports a sanitized failure instead of an empty catalog when the platform rejects the read', async () => {
+    const platform = await startPlatform()
+    platform.setMode('failed')
+    const provider = await providerFor(platform)
+
+    expect(await provider.catalog(wecom('alice'))).toEqual({ loaded: false, servers: [], failure: {
+      code: 'company-mcp/catalog-unavailable', message: 'MCP catalog is unavailable; refresh to try again',
+    } })
+  })
+
+  it('requires a WeCom identity: a portal login has no user MCP catalog', async () => {
+    const platform = await startPlatform()
+    const provider = await providerFor(platform)
+    const portal: CompanyMarketSubject = { scope: brandString<CompanyOwnerScope>('gateway:1'), portalUserId: brandString<PortalUserId>('1'), displayName: 'portal' }
+
+    expect(await provider.catalog(portal)).toMatchObject({ loaded: false, servers: [], failure: { code: 'company-mcp/member-unresolved' } })
   })
 })
