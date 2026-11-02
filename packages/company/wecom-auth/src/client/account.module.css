@@ -20,3 +20,44 @@
   font-size: 11px;
   line-height: 1.2;
 }
+
+.popover {
+  width: 300px;
+}
+
+.card {
+  padding: 8px 10px 4px;
+}
+
+.title {
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.rows {
+  margin: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.row dt {
+  color: var(--dsh-color-text-secondary, #667085);
+}
+
+.row dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.error {
+  margin: 4px 0 0;
+  color: var(--dsh-color-text-error, #c0392b);
+  font-size: 12px;
+}

@@ -160,6 +160,7 @@ export class CompanyWecomAuthService extends Service {
         table.push({ kind: 'global', name: '__DSH_WECOM_SESSION__', value: {
           identityId: peer.principal.identityId, corpId: 'gateway', userId: peer.principal.userId,
           displayName: peer.principal.displayName, role: peer.principal.role,
+          ...this.config.gatewayLogoutUrl === '' ? {} : { logoutUrl: this.config.gatewayLogoutUrl },
         } })
         return
       }

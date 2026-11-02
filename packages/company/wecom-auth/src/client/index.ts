@@ -9,13 +9,14 @@ import { z } from 'zod'
 import { WecomAccount } from './account.tsx'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
-  interface LocaleNamespaceMap { 'company.wecomAuth': 'account' | 'admin' | 'user' }
+  interface LocaleNamespaceMap { 'company.wecomAuth': 'account' | 'admin' | 'user' | 'name' | 'userId' | 'corpId' | 'role' | 'logout' | 'failed' }
 }
 
 /** Services used for account navigation and reconnection. */
 export const inject = ['connection', 'slots', 'locale']
 
-const browserIdentity = z.object({ userId: z.string(), displayName: z.string().optional(), role: z.enum(['admin', 'user']).default('user') })
+const browserIdentity = z.object({ userId: z.string(), corpId: z.string().default(''), displayName: z.string().optional(),
+  role: z.enum(['admin', 'user']).default('user'), logoutUrl: z.string().optional() })
 type BrowserIdentity = z.infer<typeof browserIdentity>
 
 /** Install account controls for the page's enterprise identity: the index injection, otherwise `/auth/me`.
@@ -54,16 +55,25 @@ export function apply(ctx: Context): void {
 function install(ctx: Context, identity: BrowserIdentity): void {
   console.info('[wecom-auth] browser identity', identity)
   const connection = ctx.get('connection') as ConnectionHandle
-  ctx.effect(() => ctx.locale.register('company.wecomAuth', { en: { account: 'WeCom account', admin: 'Administrator', user: 'Standard user' }, zh: { account: '企业微信账号', admin: '管理员', user: '普通用户' } }))
-  const loginUrl = (account: boolean): URL => {
+  ctx.effect(() => ctx.locale.register('company.wecomAuth', {
+    en: { account: 'WeCom account', admin: 'Administrator', user: 'Standard user', name: 'Name', userId: 'User ID', corpId: 'Corporation ID', role: 'Role', logout: 'Sign out', failed: 'Sign-out failed. Try again.' },
+    zh: { account: '企业微信账号', admin: '管理员', user: '普通用户', name: '姓名', userId: '用户 ID', corpId: '企业 ID', role: '角色', logout: '退出登录', failed: '退出失败，请重试。' },
+  }))
+  const loginUrl = (): URL => {
     const url = new URL('login', document.baseURI)
     url.searchParams.set('redirect', location.pathname + location.search)
-    if (account) url.searchParams.set('account', '1')
     return url
   }
+  const signOut = async (): Promise<void> => {
+    if (identity.logoutUrl !== undefined) { location.assign(identity.logoutUrl); return }
+    // The HttpOnly session cookie is cleared only by the server response.
+    const response = await fetch(new URL('auth/wecom/logout', document.baseURI), {
+      method: 'POST', credentials: 'same-origin', headers: { 'x-dsh-auth': '1' } })
+    if (!response.ok) throw new Error(`wecom-auth: sign-out answered ${response.status}`)
+    location.replace(new URL('login', document.baseURI))
+  }
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({ name: 'sidebar.footer.action', id: 'wecom-account',
-    locale: 'company.wecomAuth', inject: () => ({ displayName: identity.displayName ?? identity.userId, roleLabel: identity.role === 'admin' ? ctx.locale.bind('company.wecomAuth')('admin') : ctx.locale.bind('company.wecomAuth')('user'),
-      openAccount: () => { location.assign(loginUrl(true)) } }),
+    locale: 'company.wecomAuth', inject: () => ({ displayName: identity.displayName ?? identity.userId, userId: identity.userId, corpId: identity.corpId, signOut, roleLabel: identity.role === 'admin' ? ctx.locale.bind('company.wecomAuth')('admin') : ctx.locale.bind('company.wecomAuth')('user') }),
   }, WecomAccount))
   ctx.effect(() => {
     const lifetime = new AbortController()
@@ -73,7 +83,7 @@ function install(ctx: Context, identity: BrowserIdentity): void {
       checking = (async () => {
         try {
           const response = await fetch(new URL('auth/me', document.baseURI), { credentials: 'same-origin', signal: lifetime.signal })
-          if (response.status === 401 && !lifetime.signal.aborted) location.replace(loginUrl(false))
+          if (response.status === 401 && !lifetime.signal.aborted) location.replace(loginUrl())
         } catch (_networkUnavailable) {
           // Connection owns network recovery; only a confirmed 401 replaces this browser's page.
         } finally { checking = undefined }
