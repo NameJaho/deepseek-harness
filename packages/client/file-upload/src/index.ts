@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+import type {} from '@deepseek-ai/dsh-api-remote-access'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import type { CommandFileReceiptResolver } from '@deepseek-ai/dsh-commands'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
@@ -56,7 +57,7 @@ class PromptFileBindingGuard implements PromptFileBinding {
 
 /** Host service owning upload storage and receipts keyed by each receiving Agent's exact Session. */
 export class FileUploads extends TypertRemoteService {
-  static inject = ['agents', 'attachments', 'commands', 'connection']
+  static inject = ['agents', 'attachments', 'commands', 'connection', 'remoteAccess']
 
   private readonly stagedFiles = new WeakMap<Session, Map<FileUploadReceiptId, StagedFileUpload>>()
   // Inside a method called through `ctx.fileUploads`, Cordis returns a new proxy
@@ -64,7 +65,7 @@ export class FileUploads extends TypertRemoteService {
   // registered resolver would always be false; a plain object is returned as is.
   private readonly agentResolution: { resolver: AgentResolver | undefined } = { resolver: undefined }
 
-  /** @param ctx - Host context carrying Agent, attachment, command, and Connection services. */
+  /** @param ctx - Host context carrying Agent, attachment, command, access, and Connection services. */
   constructor(ctx: Context) {
     super(ctx, 'fileUploads')
     // Commands accept staged files only; an image receipt is unknown to them.
@@ -81,7 +82,8 @@ export class FileUploads extends TypertRemoteService {
         path: FILE_UPLOAD_PATH,
         methods: ['POST'],
         requestBody: 'streaming',
-        fetch: request => handleFileUploadHttp(this, request),
+        allowNonOwner: true,
+        fetch: (request, peer) => handleFileUploadHttp(this, request, peer, ctx.remoteAccess),
       }),
       'file-upload: streaming route',
     )

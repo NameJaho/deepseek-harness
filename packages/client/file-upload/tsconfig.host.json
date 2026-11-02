@@ -13,6 +13,7 @@
     { "path": "../../core/session" },
     { "path": "../../attachment/attachment" },
     { "path": "../../interaction/commands" },
+    { "path": "../../api/remote-access/tsconfig.host.json" },
     { "path": "../../typert/protocol" },
     { "path": "../connection/tsconfig.host.json" }
   ]

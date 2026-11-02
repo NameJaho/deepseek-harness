@@ -16,6 +16,7 @@ import CommandRuntime from '@deepseek-ai/dsh-commands'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import FileUploads from '@deepseek-ai/dsh-client-file-upload'
 import type { FileUploadReceiptId } from '@deepseek-ai/dsh-client-file-upload/types'
+import type { PeerScope } from '@deepseek-ai/dsh-typert-protocol'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { ApiSessionAgentController } from '../src/agent.ts'
 import { SessionCommandController } from '../src/commands.ts'
@@ -54,7 +55,8 @@ async function uploadHarness(origin?: 'subagent', imageLimits: ImageAttachmentLi
   saveImages: ReturnType<typeof vi.fn>
   resolveModelInfo: ReturnType<typeof vi.fn>
   disposeAgent: () => Promise<void>
-  uploadRoute: (request: Request) => Promise<Response>
+  uploadRoute: (request: Request, peer: PeerScope) => Promise<Response>
+  uploadRouteAllowsNonOwner: boolean
 }> {
   const ctx = new Context()
   onTestFinished(() => ctx.fiber.dispose())
@@ -107,11 +109,14 @@ async function uploadHarness(origin?: 'subagent', imageLimits: ImageAttachmentLi
     { saveFile, saveFileStream, saveImages, imageLimits },
     AttachmentStore.prototype,
   ) as never)
-  let uploadRoute: ((request: Request) => Promise<Response>) | undefined
+  let uploadRoute: ((request: Request, peer: PeerScope) => Promise<Response>) | undefined
+  let uploadRouteAllowsNonOwner = false
+  ctx.provide('remoteAccess', { decide: () => ({ kind: 'allow' }) } as never)
   ctx.provide('connection', {
     fetch: {
-      register: (route: { readonly fetch: (request: Request) => Promise<Response> }) => {
+      register: (route: { readonly allowNonOwner?: true; readonly fetch: (request: Request, peer: PeerScope) => Promise<Response> }) => {
         uploadRoute = route.fetch
+        uploadRouteAllowsNonOwner = route.allowNonOwner === true
         return () => {}
       },
     },
@@ -143,6 +148,7 @@ async function uploadHarness(origin?: 'subagent', imageLimits: ImageAttachmentLi
     resolveModelInfo,
     disposeAgent,
     uploadRoute,
+    uploadRouteAllowsNonOwner,
   }
 }
 
@@ -160,8 +166,10 @@ function promptRequest(content: Parameters<SessionCommandController['prompt']>[0
 
 describe('Session file uploads', () => {
   it('registers an HTTP route bound to the upload service', async () => {
-    const { uploadRoute } = await uploadHarness()
-    await expect(uploadRoute(new Request('http://host/upload')))
+    const { uploadRoute, uploadRouteAllowsNonOwner } = await uploadHarness()
+    expect(uploadRouteAllowsNonOwner).toBe(true)
+    const owner = { principal: { kind: 'owner' } } as PeerScope
+    await expect(uploadRoute(new Request('http://host/upload'), owner))
       .resolves.toMatchObject({ status: 405 })
   })
 

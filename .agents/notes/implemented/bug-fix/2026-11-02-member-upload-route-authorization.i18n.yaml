@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-11-02-member-upload-route-authorization.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-11-02-member-upload-route-authorization.md
+/agent-note-member-upload-route-authorization:
+  en: 5c03a2e4713c0014
+  zh: 6df30132c8889ab1
+/agent-note-member-upload-route-authorization/problem:
+  en: ee2fc17c1f045e13
+  zh: d77fcd9885e4e763
+/agent-note-member-upload-route-authorization/decision:
+  en: e955b80f9990f033
+  zh: 66a73efbb353ec6c
+/agent-note-member-upload-route-authorization/alternatives-considered:
+  en: 33f962ad06dc1412
+  zh: 81bcf02797e7384d
+/agent-note-member-upload-route-authorization/consequences:
+  en: c084112b0a7e4826
+  zh: 34a7d97ed01a6907

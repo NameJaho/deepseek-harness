@@ -1,6 +1,8 @@
 /** Authenticated raw-byte upload route registered on the Connection fetch registry. */
 
 import { brandString } from '@deepseek-ai/dsh-brand'
+import type { RemoteAccessService } from '@deepseek-ai/dsh-api-remote-access'
+import type { PeerScope } from '@deepseek-ai/dsh-typert-protocol'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import { remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import type { FileUploads } from './index.ts'
@@ -13,14 +15,24 @@ type FileUploadHttpResult =
     readonly error: { readonly code: string; readonly message: string; readonly details: object }
   }
 
+type FileUploadPeer = Pick<PeerScope, 'principal'>
+type FileUploadAccess = Pick<RemoteAccessService, 'decide'>
+
 /**
  * Handle one authenticated raw-byte upload. A `mediaType` query parameter
  * stages the body as a prompt image; without it the body is stored verbatim.
  * @param service - Host upload service receiving streamed bytes.
  * @param request - authenticated HTTP request from Connection.
- * @returns JSON result using HTTP status 200 after request validation.
+ * @param peer - authenticated Peer that owns the request.
+ * @param access - access policy used to authorize the addressed Session.
+ * @returns 403 when the Peer cannot upload to the addressed Session; otherwise a JSON result using HTTP status 200.
  */
-export async function handleFileUploadHttp(service: FileUploads, request: Request): Promise<Response> {
+export async function handleFileUploadHttp(
+  service: FileUploads,
+  request: Request,
+  peer: FileUploadPeer,
+  access: FileUploadAccess,
+): Promise<Response> {
   if (request.method !== 'POST') {
     return new Response(null, { status: 405, headers: { allow: 'POST' } })
   }
@@ -33,10 +45,18 @@ export async function handleFileUploadHttp(service: FileUploads, request: Reques
   if (sessionId === null || sessionId === '') {
     return new Response('sessionId is required', { status: 400 })
   }
+  const addressedSessionId = brandString<SessionId>(sessionId)
+  if (access.decide({
+    principal: peer.principal,
+    action: 'fileUploads/upload',
+    resources: [{ kind: 'session', id: addressedSessionId }],
+  }).kind !== 'allow') {
+    return new Response('forbidden', { status: 403 })
+  }
   const name = url.searchParams.get('name') ?? undefined
   const imageMediaType = url.searchParams.get('mediaType') ?? undefined
   const upload = {
-    sessionId: brandString<SessionId>(sessionId),
+    sessionId: addressedSessionId,
     data: requestBodyChunks(request.body),
     signal: request.signal,
     ...(name === undefined ? {} : { name }),
