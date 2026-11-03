@@ -188,6 +188,19 @@ it('redirects protected root, offers desktop QR and automatically authorizes a W
   expect(result.headers.get('set-cookie')).toContain('HttpOnly; SameSite=Lax; Secure')
 })
 
+it('restarts a cookie-less WeCom desktop callback once with in-client sign-in', async () => {
+  const f = await fixture()
+  const { attempt } = await f.begin()
+  const callback = '/auth/wecom/callback?' + new URLSearchParams({ code: 'PRIVATE_CODE', state: attempt.state }).toString()
+  const desktop = await f.request(callback, { headers: { 'user-agent': 'wxwork' } })
+  expect(desktop.status).toBe(302)
+  expect(desktop.headers.get('location')).toBe('/login')
+  const retry = desktop.headers.get('set-cookie')?.split(';')[0] ?? ''
+  expect((await f.request(callback, { headers: { 'user-agent': 'wxwork', cookie: retry } })).status).toBe(400)
+  expect((await f.request(callback)).status).toBe(400)
+  expect(f.calls).toHaveLength(0)
+})
+
 it('binds state to a browser, consumes once and preserves only local redirects', async () => {
   const f = await fixture()
   const attempt = await f.begin('/reports?tab=mine&token=secret')

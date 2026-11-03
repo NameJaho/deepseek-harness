@@ -27,6 +27,8 @@ import { WecomOfficial, type WecomMemberLogin } from './upstream.ts'
 import { loginPage } from './login-page.ts'
 import { accountPage } from './account-page.ts'
 
+const DESKTOP_RETRY_COOKIE = 'dsh-wecom-desktop-retry'
+
 export { Config } from './config.ts'
 export type * from './types.ts'
 
@@ -691,6 +693,11 @@ export class CompanyWecomAuthService extends Service {
       }
       if (path === '/auth/wecom/callback') {
         if (url.searchParams.getAll('code').length !== 1 || url.searchParams.getAll('state').length !== 1) throw new WecomAuthError('wecom-auth/invalid-request', 400)
+        // WeCom desktop opens the panel's callback in its own browser without the initiating browser cookie;
+        // restart there once with in-client silent sign-in instead of failing.
+        if (/wxwork/i.test(header(req, 'user-agent') ?? '') && cookie(req, BROWSER_COOKIE) === undefined && cookie(req, DESKTOP_RETRY_COOKIE) === undefined) {
+          res.writeHead(302, { ...headers, location: '/login', 'set-cookie': cookieHeader(DESKTOP_RETRY_COOKIE, '1', true, this.config.loginAttemptTtlMs, '/') }); res.end(); return
+        }
         const result = await this.exchange(req, { code: url.searchParams.get('code'), state: url.searchParams.get('state') })
         const clearOwner = this.owner.connection.clearOwnerCookie(req)
         res.writeHead(303, { ...headers, location: result.redirect,
