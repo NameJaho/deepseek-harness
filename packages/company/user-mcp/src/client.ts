@@ -2,7 +2,7 @@
 import { createHash, createHmac, randomBytes } from 'node:crypto'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
-import { Client, StreamableHTTPClientTransport, type Tool } from '@modelcontextprotocol/client'
+import { Client, StreamableHTTPClientTransport, type CallToolResult, type Tool } from '@modelcontextprotocol/client'
 import { z as schema } from 'zod'
 import type { Config } from './config.ts'
 import type { UserMcpId, UserMcpTarget } from '@deepseek-ai/dsh-company-user-mcp/types'
@@ -138,6 +138,22 @@ export class UserMcpClient {
     try {
       const listed = await client.listTools(undefined, { timeout: this.config.connectionTimeoutMs })
       return listed.tools
+    } finally { await this.close(client) }
+  }
+
+  /**
+   * Call one tool on a user MCP in a short-lived session; the session closes whether or not the call succeeds.
+   * @param userId - platform user id of the verified member.
+   * @param target - the user MCP that owns the tool.
+   * @param toolName - upstream tool name.
+   * @param args - JSON object arguments forwarded unchanged.
+   * @returns the MCP call result as reported.
+   * @throws Error or RemoteError when the exchange, connection or call fails.
+   */
+  async call(userId: string, target: UserMcpTarget, toolName: string, args: Record<string, unknown>): Promise<CallToolResult> {
+    const { client } = await this.connect(userId, target)
+    try {
+      return await client.callTool({ name: toolName, arguments: args }, { timeout: this.config.toolCallTimeoutMs })
     } finally { await this.close(client) }
   }
 

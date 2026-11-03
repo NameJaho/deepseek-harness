@@ -8,13 +8,13 @@ import type { CompanyMarketSubject } from '@deepseek-ai/dsh-company-wecom-auth/t
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { assertSupportedJsonSchema, JsonSchemaError, type ToolDefinition } from '@deepseek-ai/dsh-tools'
 import type { ToolSchema } from '@deepseek-ai/dsh-llm'
-import type { Tool } from '@modelcontextprotocol/client'
+import type { CallToolResult, Tool } from '@modelcontextprotocol/client'
 import { Config } from './config.ts'
 import { UserMcpClient } from './client.ts'
 import type { UserMcpTarget } from '@deepseek-ai/dsh-company-user-mcp/types'
 
 /** A tool found among the member's authorized servers, with the server that owns it. */
-type FoundTool = CompanyMcpTool & { readonly serverId: CompanyMcpId }
+type FoundTool = CompanyMcpTool & { readonly serverId: CompanyMcpId; readonly userId: string; readonly target: UserMcpTarget }
 
 /** Read the platform user id from a verified WeCom login; portal identities have no WeCom member id.
  * @param subject - verified login or Session owner.
@@ -164,10 +164,31 @@ export default class UserMcpCompanyProvider extends CompanyMcpProvider {
     const definition: ToolDefinition = { ...schema,
       output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text',
         text: typeof value === 'string' ? value : JSON.stringify(value) }] },
-      execute: () => Promise.reject(new RemoteError('company-mcp/call-unavailable',
-        'MCP invocation is not connected; this integration currently provides the member directory and tool discovery', {})),
+      execute: args => this.invoke(found, name, args),
     }
     return { schema, fingerprint: found.fingerprint, tool: definition }
+  }
+
+  /** Run one authorized tool on its user MCP and return the text the model reads.
+   * @param found - the owning server and the tool as resolved for this run.
+   * @param name - model-facing tool name, used in failure reports.
+   * @param args - tool arguments from the model; anything but a JSON object is sent as an empty object.
+   * @returns the concatenated text content of the MCP result.
+   * @throws RemoteError `company-mcp/call-failed` when the call fails or the MCP reports an error.
+   */
+  private async invoke(found: FoundTool, name: string, args: unknown): Promise<string> {
+    const argsObject = typeof args === 'object' && args !== null && !Array.isArray(args) ? args as Record<string, unknown> : {}
+    let result: CallToolResult
+    try {
+      result = await this.client.call(found.userId, found.target, found.rawName, argsObject)
+    } catch (error) {
+      throw new RemoteError('company-mcp/call-failed', 'The MCP tool call failed', { name, reason: 'transport' }, { cause: error })
+    }
+    const text = result.content.flatMap(block => block.type === 'text' ? [block.text] : []).join('\n')
+    if (result.isError === true) {
+      throw new RemoteError('company-mcp/call-failed', 'The MCP tool returned an error', { name, reason: text.slice(0, 500) })
+    }
+    return text
   }
 
   /** Describe the non-secret route of a model-facing tool.
@@ -188,7 +209,7 @@ export default class UserMcpCompanyProvider extends CompanyMcpProvider {
       const id = serverIdOf(target)
       if (!name.startsWith(`mcp__${companyMcpNamespace(id)}__`)) continue
       const tool = (await this.toolsOf(userId, target)).find(entry => entry.name === name)
-      return tool === undefined ? undefined : { ...tool, serverId: id }
+      return tool === undefined ? undefined : { ...tool, serverId: id, userId, target }
     }
     return undefined
   }

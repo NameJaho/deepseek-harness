@@ -56,6 +56,16 @@ interface PrincipalState {
 
 const principalState = schema.object({ userId: schema.string().nullable() })
 
+/** Whether the Session belongs to a Cloud Agent release, whose tools come only from its release policy. */
+interface CloudAgentState {
+  readonly bound: boolean
+}
+
+const cloudAgentState = schema.object({ bound: schema.boolean() })
+
+/** Session event type appended by the Cloud Agent package. Typed as `string`: depending on that package would cycle through wecom-auth. */
+const cloudAgentBindingEvent: string = 'cloud-agent/binding'
+
 /** Read the authenticated member id attached to one user message. */
 function principalUserId(message: UserMessage): string | undefined {
   const principal: unknown = Reflect.get(message.source, 'principal')
@@ -76,6 +86,7 @@ export default class CompanyUserMcpService extends TypertRemoteService {
   private readonly disposed = new WeakSet<Agent>()
   private readonly states = new Set<AgentState>()
   private principals!: ProjectionHandle<PrincipalState>
+  private cloudAgents!: ProjectionHandle<CloudAgentState>
 
   /** @param owner - Host context containing the tool registry and Remote gateway. @param config - validated bridge configuration. */
   constructor(private readonly owner: Context, config: Config) {
@@ -105,6 +116,13 @@ export default class CompanyUserMcpService extends TypertRemoteService {
         const userId = principalUserId(event.data)
         return userId === undefined || userId === state.userId ? state : { userId }
       },
+    })
+    this.cloudAgents = await this.owner.sessionProjections.register({
+      key: 'companyUserMcpCloudAgent',
+      stateVersion: 1,
+      stateSchema: cloudAgentState,
+      init: () => ({ bound: false }),
+      apply: (state, event) => event.type === cloudAgentBindingEvent && !state.bound ? { bound: true } : state,
     })
     // The step's tool set is resolved before `agent/pre-step`, so connections start as early as the user is known.
     this.owner.on('agent/created', ({ agent }) => { void this.schedule(agent, []) })
@@ -175,6 +193,11 @@ export default class CompanyUserMcpService extends TypertRemoteService {
     const signal = this.lifetime.signal
     signal.throwIfAborted()
     if (this.disposed.has(agent)) return
+    // Cloud Agent tools are published by their release; bridge tools there would be refused by policy.
+    if (this.cloudAgents.stateOf(agent.session).bound) {
+      await this.releaseAgent(agent)
+      return
+    }
     const userId = this.userIdForAgent(agent, messages)
     if (userId === undefined) return
     const previous = this.agentStates.get(agent)
@@ -258,6 +281,11 @@ export default class CompanyUserMcpService extends TypertRemoteService {
   /** Dispose every connection and scoped tool owned by one Agent. */
   private async disposeAgent(agent: Agent): Promise<void> {
     this.disposed.add(agent)
+    await this.releaseAgent(agent)
+  }
+
+  /** Close one Agent's connections and tools without marking the Agent disposed. */
+  private async releaseAgent(agent: Agent): Promise<void> {
     const state = this.agentStates.get(agent)
     if (state === undefined) return
     this.agentStates.delete(agent)

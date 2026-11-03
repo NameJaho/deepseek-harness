@@ -28,4 +28,6 @@ Status: implemented
 
 启用后，同一个插件也实现 `ctx.companyMcpProvider`，因此公司 MCP 页面与云端 Agent 能力选择读取的是 Agent 桥接所用的同一份成员目录。此模式下禁用 Market HTTP 适配器，因为 provider 接口只接受一个实现。provider 以已验证的 WeCom 登录 `sub` 为键；门户登录没有 WeCom 成员 id，直接返回 `company-mcp/member-unresolved`，不做猜测映射。
 
-provider 沿用 Market 适配器的执行语义：`resolveTool` 返回的定义中 `execute` 以 `company-mcp/call-unavailable` 拒绝。把 provider 调用接入 Agent 连接池的工作被推迟，因此本决策不把桥接的执行路径扩展到云端 Agent 发布。MCP SDK 顶层的 `$schema` 标记在 schema 校验前被去掉，因为受支持的 JSON Schema 子集会拒绝它，且它不改变校验结果。
+provider 基于成员有权限的用户 MCP 执行已解析的工具，换 token 方式与桥接相同，每次调用使用一个短生命周期会话；失败时以 `company-mcp/call-failed` 拒绝。暂不共享 Agent 连接池：每次调用独立会话，使 provider 不在成员与发布之间保存状态。
+
+云端 Agent 会话不接收桥接工具。其发布策略只启用明确的工具集合，桥接工具超出该集合时会被拒绝（`Only tools explicitly enabled for this Cloud Agent can be used`），同时还会让模型看到同一服务的第二套名字。桥接通过仅 Host 可见的投影，依据 `cloud-agent/binding` 事件识别云端 Agent 会话；该事件名以字符串类型声明，因为依赖云端 Agent 包会经由 wecom-auth 形成循环。MCP SDK 顶层的 `$schema` 标记在 schema 校验前被去掉，因为受支持的 JSON Schema 子集会拒绝它，且它不改变校验结果。

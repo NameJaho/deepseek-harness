@@ -446,6 +446,20 @@ describe('company user MCP bridge', () => {
     expect(requestTools(adapter, 1)).toContain(STORE)
   })
 
+  it('does not register bridge tools into a Cloud Agent Session', async () => {
+    const platform = await startPlatform()
+    platform.catalogs.set('alice', [{ name: 'store-goods' }])
+    const adapter = new MockAdapter([textResponse('answer')])
+    const { ctx } = await harness(platform, adapter)
+    // A Cloud Agent release appends this binding; its tools are published by the release policy instead.
+    const binding = { type: 'cloud-agent/binding', seq: 0, time: 1, data: {} } as never
+    const cloud = await createAgent(ctx, 'cloud', [binding])
+
+    await turn(ctx, cloud, prompt('hello', member('alice')))
+    expect(requestTools(adapter, 0).filter(name => name.startsWith('mcp__'))).toEqual([])
+    expect(platform.catalogCalls).toHaveLength(0)
+  })
+
   it('drops work for an Agent disposed while its catalog or connections are pending', async () => {
     const platform = await startPlatform()
     platform.catalogs.set('alice', [{ name: 'store-goods' }])
@@ -628,6 +642,17 @@ describe('company user MCP provider', () => {
     await expect(provider.describeTool(wecom('alice'), name)).resolves.toMatchObject({ serverId: '7', rawName: 'lookup' })
     await expect(provider.resolveTool(wecom('bob'), name)).resolves.toBeUndefined()
     await expect(provider.describeTool(wecom('alice'), 'mcp__unknown__lookup')).resolves.toBeUndefined()
+  })
+
+  it('executes an authorized tool on the member\'s MCP and returns its text to the model', async () => {
+    const platform = await startPlatform()
+    platform.catalogs.set('alice', [{ mcpServiceId: 7, name: 'inventory', displayName: 'Inventory', accessType: 'authorized' }])
+    const provider = await providerFor(platform)
+    const name = companyMcpToolName(brandString<CompanyMcpId>('7'), 'lookup')
+    const resolved = await provider.resolveTool(wecom('alice'), name)
+
+    await expect(resolved!.tool.execute({ query: 'apples' }, undefined as never)).resolves.toBe('inventory:apples')
+    expect(platform.lookups).toContain('inventory:apples')
   })
 
   it('reports a sanitized failure instead of an empty catalog when the platform rejects the read', async () => {

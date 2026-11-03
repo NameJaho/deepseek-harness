@@ -32,7 +32,7 @@ An Agent's member is the principal on the newest pending user message, otherwise
 
 `requestTimeoutMs` bounds one catalog call or token exchange, `connectionTimeoutMs` bounds MCP initialization, and `toolCallTimeoutMs` bounds one tool call. A missing credential, failed catalog, refused exchange, or unreachable server is logged as a warning and never fails the turn: the Agent keeps its current tools, and the next refresh retries the skipped servers. A cancelled step stops waiting while the shared reconciliation continues. Disposing the Agent or the service closes the MCP clients and unregisters their tools.
 
-The same switch registers this package as the company MCP provider. With `DSH_USER_MCP_ENABLED=1`, `company-user-mcp-provider` provides `ctx.companyMcpProvider` from the logged-in member's authorized servers, and the Market HTTP adapter (`company-mcp-provider/http`) is disabled because only one provider may register. The company MCP page therefore lists the same servers the Agent bridge uses. The member is the WeCom login `sub`; portal logins have no WeCom member and fail with `company-mcp/member-unresolved`. Tool schemas load on discovery. Tool calls made through this provider are not connected yet: `resolveTool` returns a definition whose `execute` rejects with `company-mcp/call-unavailable`, as the Market adapter does.
+The same switch registers this package as the company MCP provider. With `DSH_USER_MCP_ENABLED=1`, `company-user-mcp-provider` provides `ctx.companyMcpProvider` from the logged-in member's authorized servers, and the Market HTTP adapter (`company-mcp-provider/http`) is disabled because only one provider may register. The company MCP page therefore lists the same servers the Agent bridge uses. The member is the WeCom login `sub`; portal logins have no WeCom member and fail with `company-mcp/member-unresolved`. Tool schemas load on discovery. A tool call through this provider runs on the member's user MCP in a short-lived session, using the same token exchange as the Agent bridge; a failed call rejects with `company-mcp/call-failed`. Cloud Agent Sessions never receive bridge tools, so their tools come only from the provider and their release policy.
 
 -----
 
@@ -74,7 +74,7 @@ Changing the member's authorized MCP catalog changes the tool set for the next r
 - A connection lost during a step fails that tool call; the bridge does not reconnect a listed server until it is withdrawn and authorized again or the member changes.
 - The platform decides authorization: an exchange refused for a listed server, or a server that rejects its token, is only skipped with a warning.
 - The catalog validator accepts only `structuredContent` carrying `success` and `data.records`; a new wire format must update it.
-- Tool calls through the company MCP provider are not connected: a Cloud Agent release that references a user MCP tool can publish and resolve it, but cannot execute it until provider invocation is connected.
+- Each provider tool call opens a new MCP session; there is no connection reuse, so calls pay one token exchange (cached) and one handshake.
 
 <a id="dev-note"></a>
 ### Dev Note
