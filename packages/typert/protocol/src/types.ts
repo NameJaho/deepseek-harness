@@ -239,7 +239,12 @@ export type TypertForwardableEventEntry = {
         readonly resources?: TypertResourceReaders<TypertEventParameters<Event>>
       }
       : Mode extends 'waterfall'
-        ? { readonly event: Event; readonly mode: Mode }
+        ? {
+          readonly event: Event
+          readonly mode: Mode
+          /** Readers of the request's resources; a non-owner Peer receives the waterfall only when `event:<name>` is allowed on them. */
+          readonly resources?: TypertResourceReaders<TypertEventParameters<Event>>
+        }
         : never
     : never
 }[keyof Events]

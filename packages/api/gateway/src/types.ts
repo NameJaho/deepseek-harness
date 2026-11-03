@@ -68,6 +68,8 @@ export interface TypertRemoteEventInvocation {
   /** Sole request argument before the waterfall's `next()` callback. */
   readonly request: object
   readonly context: TypertRemoteEventContext
+  /** Readers of the request's resources, or none for the built-in `global` resource. */
+  readonly resources?: Readonly<Record<string, TypertResourceReader>>
   /** Resume the source's Cordis listener with a Client result or `next()`. */
   readonly resolve: (outcome: TypertRemoteEventOutcome) => void
   /** Reject the source's Cordis listener after cancellation, transport failure, or Client rejection. */

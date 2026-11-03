@@ -56,6 +56,7 @@ function remoteEventSource(ctx: Context): TypertRemoteEventSource {
           queue.push({ event, args: assertJsonArgs(event, args), ...resources === undefined ? {} : { resources } })
         }) as never)
       }
+      const resources = 'resources' in entry ? entry.resources : undefined
       return ctx.on(event as never, (function (
         this: unknown,
         request: object,
@@ -73,6 +74,7 @@ function remoteEventSource(ctx: Context): TypertRemoteEventSource {
           request,
           { value: agent.ctx, subject: agent, agentId: agent.id },
           next,
+          resources,
         )
       }) as never)
     })
@@ -140,12 +142,14 @@ function forwardWaterfall(
   request: object,
   context: TypertRemoteEventInvocation['context'],
   next: () => unknown,
+  resources: TypertRemoteEventInvocation['resources'],
 ): Promise<unknown> {
   const settled = Promise.withResolvers<unknown>()
   const dispatch: TypertRemoteEventInvocation = {
     event,
     request,
     context,
+    ...resources === undefined ? {} : { resources },
     resolve: (outcome: TypertRemoteEventOutcome) => {
       if (outcome.kind === 'result') {
         settled.resolve(outcome.value)

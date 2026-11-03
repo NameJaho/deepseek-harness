@@ -48,7 +48,7 @@ Host 下行、Host 上行和 Client 上行泵的取消与停止状态归属单�
 
 Host 组合可通过 `registerRemoteEvents()` 注册唯一的应用事件 source。Gateway 为它保留内部 `$events` logical endpoint，只接受空 `args`，并在 source 撤回时中止该注册打开的流。事件名单、参数校验、每个 Client 的队列及 opening `{ type: 'ready', clientId, host: { home } }` frame 中的 Host home 由 API Remotes 拥有。source factory 在返回 iterable 前同步挂好增量 listener，因此 Client 只在增量投递就绪后发布 generation 并开始 baseline 读取。Peer 的 principal 不是 owner 的 `$events` 流从不收到它可以作答的 scoped waterfall（瀑布式事件）；只有当 `ctx.remoteAccess.decide({ principal, action: 'event:<name>', resources })` 在该帧读取函数指明的资源上（帧没有读取函数时为 `global`）允许时，才整条、不裁剪地收到广播 emit 帧；每帧只解析一次资源，资源非法的帧不经判定即不送达任何非 owner 流，被拒的帧只对该流丢弃。这类 Peer 的 `$events/result` 回复以 `gateway/invocation-unavailable` 失败。
 
-已释放的 Peer 在事件流参与检查之前被拒绝。无论 principal 是否为 owner，`$events` 与 `$events/result` 都要求 `peer.interactions === 'answer'`；否则返回 `gateway/interactions-forbidden`。只有 owner Peer 接收并回答转发的 waterfall，回复必须来自持有该事件流的同一 Peer。`hasLiveClient()` 只计算未取消的 owner 回答流；非 owner 广播流、单独的 WebSocket 与已取消但尚未完成 iterator 清理的流均不计入。这一同步观察不保证后续投递成功或 Client Provider 已就绪。
+已释放的 Peer 在事件流参与检查之前被拒绝。无论 principal 是否为 owner，`$events` 与 `$events/result` 都要求 `peer.interactions === 'answer'`；否则返回 `gateway/interactions-forbidden`。owner 接收并可回答每个转发的 waterfall；其他 Peer 仅当 `remoteAccess.decide` 允许请求资源上的 `event:<name>` 时才接收并可回答，资源缺失或无效的 waterfall 不会送达任何非 owner。回复必须来自被投递该事件的同一事件流。`hasLiveClient()` 只计算未取消的 owner 回答流；非 owner 广播流、单独的 WebSocket 与已取消但尚未完成 iterator 清理的流均不计入。这一同步观察不保证后续投递成功或 Client Provider 已就绪。
 
 <a id="client-service-clientremote-ctx-key-remote"></a>
 ## Client 服务：`ClientRemote`（ctx key：`remote`）

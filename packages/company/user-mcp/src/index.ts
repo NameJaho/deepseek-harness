@@ -297,8 +297,9 @@ export default class CompanyUserMcpService extends TypertRemoteService {
     signal.throwIfAborted()
     if (this.agentStates.get(agent) !== state) return
     const nextKeys = new Set(targets.map(target => this.targetKey(target)))
+    // A connection whose token has expired is replaced: an idle Session outlives its MCP session and token.
     for (const [key, connection] of state.servers) {
-      if (!nextKeys.has(key)) {
+      if (!nextKeys.has(key) || connection.token.expiresAt <= Date.now()) {
         state.servers.delete(key)
         await this.closeConnection(connection)
       }
