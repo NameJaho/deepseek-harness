@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Button, Checkbox } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { UserMcpPreferences } from '@deepseek-ai/dsh-company-user-mcp/types'
 import type { CloudAgentLocaleKey } from './locales.ts'
+import css from './page.module.css'
 
 /** Copy and the member's selection, supplied by the owning pane. */
 export interface DefaultCapabilitiesProps {
@@ -55,18 +56,24 @@ export function DefaultCapabilities(props: DefaultCapabilitiesProps) {
 
   const busy = status === 'loading' || status === 'saving'
   const message = status === 'failed' ? t('defaultMcpFailed') : status === 'saved' ? t('defaultMcpSaved') : status === 'loading' ? t('defaultMcpLoading') : undefined
-  return <section aria-busy={busy}>
-    <h3>{t('defaultMcpTitle')}</h3>
-    <p>{t('defaultMcpHelp')}</p>
-    {entries.length === 0 && status !== 'loading' ? <p>{t('defaultMcpEmpty')}</p> : null}
-    {entries.map(entry => <div key={entry.id}>
-      <Checkbox label={entry.displayName} checked={selected.includes(entry.id)} disabled={status === 'saving'}
-        onChange={(checked: boolean) => { setSelected(toggle(selected, entry.id, checked)) }} />
-      {entry.description === '' ? null : <p>{entry.description}</p>}
-    </div>)}
-    <p>{t('defaultMcpSelected', { count: String(selected.length) })}</p>
-    <div role="status">{message}</div>
-    <Button variant="outline" disabled={busy} onClick={reload}>{t('defaultMcpRefresh')}</Button>
-    <Button disabled={busy} onClick={persist}>{status === 'saving' ? t('defaultMcpSaving') : t('defaultMcpSave')}</Button>
+  return <section className={css.info} aria-busy={busy}>
+    <h3 className={css.capabilityPickerTitle}>{t('defaultMcpTitle')}</h3>
+    <p className={css.help}>{t('defaultMcpHelp')}</p>
+    {entries.length === 0 && status !== 'loading' ? <p className={css.help}>{t('defaultMcpEmpty')}</p> : null}
+    <div className={css.capabilityList}>
+      {entries.map(entry => <div key={entry.id} className={css.capabilityOption}>
+        <Checkbox label={entry.displayName} checked={selected.includes(entry.id)} disabled={status === 'saving'}
+          onChange={(checked: boolean) => { setSelected(toggle(selected, entry.id, checked)) }} />
+        {entry.description === '' ? null : <p className={css.capabilityDescription}>{entry.description}</p>}
+      </div>)}
+    </div>
+    <div className={css.capabilityFooter}>
+      <span className={css.metadata}>{t('defaultMcpSelected', { count: String(selected.length) })}</span>
+      <span role="status" className={css.help}>{message}</span>
+      <div className={css.actions}>
+        <Button variant="outline" disabled={busy} onClick={reload}>{t('defaultMcpRefresh')}</Button>
+        <Button disabled={busy} onClick={persist}>{status === 'saving' ? t('defaultMcpSaving') : t('defaultMcpSave')}</Button>
+      </div>
+    </div>
   </section>
 }
