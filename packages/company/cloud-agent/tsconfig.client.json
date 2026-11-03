@@ -49,6 +49,7 @@
     { "path": "../../client/ui-tool" },
     { "path": "../../client/ui-plugin-manager/tsconfig.client.json" },
     { "path": "../../preset/agent-preset-registry" },
+    { "path": "../user-mcp/tsconfig.client.json" },
     { "path": "../../util/brand" }
   ]
 }

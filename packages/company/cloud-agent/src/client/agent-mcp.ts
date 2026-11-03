@@ -60,3 +60,12 @@ export function agentMcpSelection(catalog: CloudAgentCatalog, sessionId: Session
   return connected === undefined ? { kind: 'unavailable' }
     : { kind: 'release', ...connected, tools: tools(connected.release.mcpBindings?.map(binding => binding.name) ?? connected.release.definition.mcpTools) }
 }
+
+/** Whether a conversation belongs to a Cloud Agent, as an editor or as a usage Session.
+ * @param catalog - caller-scoped directory.
+ * @param sessionId - rendered conversation identity.
+ * @returns true when the directory records a binding for this Session.
+ */
+export function isAgentSession(catalog: CloudAgentCatalog, sessionId: SessionId): boolean {
+  return catalog.conversations.some(item => item.sessionId === sessionId && item.deletedAt === undefined)
+}

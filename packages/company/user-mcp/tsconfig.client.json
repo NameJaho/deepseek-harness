@@ -7,11 +7,6 @@
   },
   "include": ["src/client", "src/types.ts"],
   "references": [
-    { "path": "../../api/remotes/tsconfig.client.json" },
-    { "path": "../../client/locale/tsconfig.client.json" },
-    { "path": "../../client/ui-primitives" },
-    { "path": "../../client/ui-slots" },
-    { "path": "../../client/ui-sidebar-right" },
-    { "path": "../../client/ui-renderer" }
+    { "path": "../../api/remotes/tsconfig.client.json" }
   ]
 }

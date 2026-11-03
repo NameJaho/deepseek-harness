@@ -2,15 +2,14 @@
 import type { ComponentProps } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type {} from '../src/client/index.ts'
-import { UserMcpPanel } from '../src/client/panel.tsx'
-import { en, zh } from '../src/client/locales.ts'
-import type { UserMcpPreferences } from '../src/types.ts'
+import type { UserMcpPreferences } from '@deepseek-ai/dsh-company-user-mcp/types'
+import { DefaultCapabilities } from '../src/client/default-capabilities.tsx'
+import { en } from '../src/client/locales.ts'
 
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
-const t = ((key: keyof typeof zh, params?: Record<string, string>) =>
-  Object.entries(params ?? {}).reduce((text, [name, value]) => text.replaceAll(`{${name}}`, value), en[key])) as ComponentProps<typeof UserMcpPanel>['t']
+const t = (key: keyof typeof en, params?: Record<string, string>) =>
+  Object.entries(params ?? {}).reduce((text, [name, value]) => text.replaceAll(`{${name}}`, value), en[key])
 
 const preferences: UserMcpPreferences = {
   selectedIds: ['7'],
@@ -21,11 +20,11 @@ const preferences: UserMcpPreferences = {
 }
 
 function panel(load: () => Promise<UserMcpPreferences>, save: (ids: readonly string[]) => Promise<UserMcpPreferences>) {
-  const props = { t, load, save } as ComponentProps<typeof UserMcpPanel>
-  return render(<UserMcpPanel {...props} />)
+  const props = { t, load, save } as ComponentProps<typeof DefaultCapabilities>
+  return render(<DefaultCapabilities {...props} />)
 }
 
-describe('user MCP sidebar panel', () => {
+describe('default-conversation capabilities', () => {
   it('shows the member catalog with the stored selection checked', async () => {
     panel(async () => preferences, vi.fn())
 
@@ -56,13 +55,13 @@ describe('user MCP sidebar panel', () => {
   it('explains an empty catalog', async () => {
     panel(async () => ({ selectedIds: [], entries: [] }), vi.fn())
 
-    expect(await screen.findByText('You have no MCP servers available.')).toBeTruthy()
+    expect(await screen.findByText(en.defaultMcpEmpty)).toBeTruthy()
   })
 
   it('reports a failed read without offering a stale selection', async () => {
     panel(async () => { throw new Error('unavailable') }, vi.fn())
 
-    expect(await screen.findByText('Could not load or save right now. Try again later.')).toBeTruthy()
+    expect(await screen.findByText(en.defaultMcpFailed)).toBeTruthy()
     expect(screen.queryByRole('checkbox')).toBeNull()
   })
 })

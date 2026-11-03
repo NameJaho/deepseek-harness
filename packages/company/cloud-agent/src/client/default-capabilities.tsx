@@ -1,14 +1,15 @@
-/** Sidebar panel for choosing which user MCP servers the default Agent may use. */
+/** Default-conversation capabilities: choose which user MCP servers the default Agent may use. */
 import { useEffect, useState } from 'react'
 import { Button, Checkbox } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import type { UserMcpPreferences } from '../types.ts'
+import type { UserMcpPreferences } from '@deepseek-ai/dsh-company-user-mcp/types'
+import type { CloudAgentLocaleKey } from './locales.ts'
 
-type PanelProps = PropsRuntime<'sidebar.right.pane.tab'> & PropsLocale<'company.userMcp'>
-  & InjectFace<{
-    readonly load: () => Promise<UserMcpPreferences>
-    readonly save: (selectedIds: readonly string[]) => Promise<UserMcpPreferences>
-  }>
+/** Copy and the member's selection, supplied by the owning pane. */
+export interface DefaultCapabilitiesProps {
+  readonly t: (key: CloudAgentLocaleKey, params?: Record<string, string>) => string
+  readonly load: () => Promise<UserMcpPreferences>
+  readonly save: (selectedIds: readonly string[]) => Promise<UserMcpPreferences>
+}
 
 /** Local view state; the server copy is authoritative after each successful read or save. */
 type Status = 'loading' | 'idle' | 'saving' | 'saved' | 'failed'
@@ -27,7 +28,7 @@ function toggle(selected: readonly string[], id: string, checked: boolean): stri
  * @param props - sidebar pane props with the injected load and save functions.
  * @returns the panel.
  */
-export function UserMcpPanel(props: PanelProps) {
+export function DefaultCapabilities(props: DefaultCapabilitiesProps) {
   const { t, load, save } = props
   const [entries, setEntries] = useState<UserMcpPreferences['entries']>([])
   const [selected, setSelected] = useState<readonly string[]>([])
@@ -53,19 +54,19 @@ export function UserMcpPanel(props: PanelProps) {
   }
 
   const busy = status === 'loading' || status === 'saving'
-  const message = status === 'failed' ? t('failed') : status === 'saved' ? t('saved') : status === 'loading' ? t('loading') : undefined
+  const message = status === 'failed' ? t('defaultMcpFailed') : status === 'saved' ? t('defaultMcpSaved') : status === 'loading' ? t('defaultMcpLoading') : undefined
   return <section aria-busy={busy}>
-    <h3>{t('title')}</h3>
-    <p>{t('help')}</p>
-    {entries.length === 0 && status !== 'loading' ? <p>{t('empty')}</p> : null}
+    <h3>{t('defaultMcpTitle')}</h3>
+    <p>{t('defaultMcpHelp')}</p>
+    {entries.length === 0 && status !== 'loading' ? <p>{t('defaultMcpEmpty')}</p> : null}
     {entries.map(entry => <div key={entry.id}>
       <Checkbox label={entry.displayName} checked={selected.includes(entry.id)} disabled={status === 'saving'}
         onChange={(checked: boolean) => { setSelected(toggle(selected, entry.id, checked)) }} />
       {entry.description === '' ? null : <p>{entry.description}</p>}
     </div>)}
-    <p>{t('selected', { count: String(selected.length) })}</p>
+    <p>{t('defaultMcpSelected', { count: String(selected.length) })}</p>
     <div role="status">{message}</div>
-    <Button variant="outline" disabled={busy} onClick={reload}>{t('refresh')}</Button>
-    <Button disabled={busy} onClick={persist}>{status === 'saving' ? t('saving') : t('save')}</Button>
+    <Button variant="outline" disabled={busy} onClick={reload}>{t('defaultMcpRefresh')}</Button>
+    <Button disabled={busy} onClick={persist}>{status === 'saving' ? t('defaultMcpSaving') : t('defaultMcpSave')}</Button>
   </section>
 }

@@ -32,7 +32,7 @@ Agent 的成员取自最新待处理用户消息上的 principal；没有时，�
 
 `requestTimeoutMs` 限制一次目录调用或换 token 请求，`connectionTimeoutMs` 限制 MCP 初始化，`toolCallTimeoutMs` 限制一次工具调用。缺少凭据、目录失败、换 token 被拒绝或服务器不可达时只记录警告，不会让本轮失败：Agent 保留当前工具，下次刷新重试被跳过的服务器。step 被取消时只停止等待，共享的同步继续运行。释放 Agent 或本服务时关闭 MCP 客户端并注销工具。
 
-每位成员自行选择默认智能体可使用的目录服务。选择保存在 `DSH_USER_MCP_PREFERENCES_FILE` 指定的 JSON 文件中（启用桥接时必填，首次写入时创建目录）。未选择任何服务的成员不会获得用户 MCP 工具，也不会发起目录查询。Remote `companyUserMcp.preferences()` 返回目录与已选 id；`companyUserMcp.setPreferences({ selectedIds })` 替换选择，拒绝不在调用者当前目录中的 id，并从下一个 step 生效。默认智能体还有一个 `user_mcp` 工具：`list` 列出目录及已选标记，`add` 或 `remove` 按展示名或 id 修改选择。模型被要求只在成员明确要求时调用 `add` 或 `remove`；未知或重名的名字会被拒绝，并使用与 Remote 相同的目录检查。云端 Agent 会话从不接收桥接工具，也没有这个工具。右侧栏的“个人能力”标签页（`client/`）列出目录，每个服务一个复选框，并通过这些 Remote 保存选择。
+每位成员自行选择默认智能体可使用的目录服务。选择保存在 `DSH_USER_MCP_PREFERENCES_FILE` 指定的 JSON 文件中（启用桥接时必填，首次写入时创建目录）。未选择任何服务的成员不会获得用户 MCP 工具，也不会发起目录查询。Remote `companyUserMcp.preferences()` 返回目录与已选 id；`companyUserMcp.setPreferences({ selectedIds })` 替换选择，拒绝不在调用者当前目录中的 id，并从下一个 step 生效。默认智能体还有一个 `user_mcp` 工具：`list` 列出目录及已选标记，`add` 或 `remove` 按展示名或 id 修改选择。模型被要求只在成员明确要求时调用 `add` 或 `remove`；未知或重名的名字会被拒绝，并使用与 Remote 相同的目录检查。云端 Agent 会话从不接收桥接工具，也没有这个工具。右侧栏中只有一个能力标签页，由云端 Agent 持有：默认会话中显示本选择（标题为“默认能力”），智能体会话中显示智能体能力（标题为“智能体能力”）。`client/` 挂载 Remote 与文案；`./panel` 导出该标签页渲染的复选框面板。
 
 同一开关也把本包注册为公司 MCP provider。`DSH_USER_MCP_ENABLED=1` 时，`company-user-mcp-provider` 基于登录成员有权限的服务提供 `ctx.companyMcpProvider`，同时禁用 Market HTTP 适配器（`company-mcp-provider/http`），因为 provider 只能有一个实现。因此公司 MCP 页面与 Agent 桥接使用同一批服务。成员取自 WeCom 登录的 `sub`；门户登录没有 WeCom 成员身份，返回 `company-mcp/member-unresolved`。工具 schema 在发现时加载。通过该 provider 的工具调用会在一个短生命周期会话中运行在成员的用户 MCP 上，换 token 方式与 Agent 桥接相同；调用失败时以 `company-mcp/call-failed` 拒绝。云端 Agent 会话从不接收桥接工具，其工具只来自 provider 与发布策略。
 

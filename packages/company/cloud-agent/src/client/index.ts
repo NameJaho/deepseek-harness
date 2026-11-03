@@ -7,6 +7,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@deepseek-ai/dsh-company-user-mcp/remote'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
@@ -24,7 +25,7 @@ import { CloudAgentDraftCard, CloudAgentHeaderAction } from './conversation.tsx'
 import { McpController } from './mcp-controller.ts'
 import { CompanyMcpPage } from './mcp-page.tsx'
 import { CloudAgentReportCard } from './report.tsx'
-import { CloudAgentCapabilitiesNavigation, CloudAgentCapabilitiesPanel } from './capabilities.tsx'
+import { CapabilitiesBody, CapabilitiesTitle, CloudAgentCapabilitiesNavigation, type UserMcpInjected } from './capabilities.tsx'
 import './page-slots.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -68,7 +69,7 @@ function registerUi(ctx: Context, navigation: AgentNavigationGroupsGate): void {
     return () => { navigation.set(undefined); groups.dispose() }
   }, 'cloud-agent: caller navigation groups')
   ctx.effect(() => ctx.sidebarRightTabs.register({ id: 'cloud-agent-capabilities', kind: 'cloud-agent-capabilities',
-    title: () => t('capabilitiesTab'), guide: [{ id: 'cloud-agent-capabilities', order: 16, title: () => t('capabilitiesTab'),
+    title: () => t('capabilitiesMenu'), guide: [{ id: 'cloud-agent-capabilities', order: 16, title: () => t('capabilitiesMenu'),
       description: () => t('capabilitiesGuide'), icon: IconCordisPluginOutlineRegular }],
   }), 'cloud-agent: capabilities tab')
   ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: 'cloud-agent-capabilities',
@@ -76,8 +77,13 @@ function registerUi(ctx: Context, navigation: AgentNavigationGroupsGate): void {
       saveCapabilities: face.saveCapabilities, prepareEditor: face.prepareEditor, openConversation: face.openConversation,
       clone: face.clone,
       manageMcp: () => { ctx.pluginNavigation.openItem('company-mcp') },
+      userMcp: userMcpInjected(ctx),
     }),
-  }, CloudAgentCapabilitiesPanel))
+  }, CapabilitiesBody))
+  ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register({
+    name: 'sidebar.right.pane.tab.title', key: 'cloud-agent-capabilities', locale: 'company.cloudAgent',
+    inject: () => ({ hooks: face.hooks }),
+  }, CapabilitiesTitle))
   ctx.slots.inject('conversation.input.right', () => ctx.slots.register({
     name: 'conversation.input.right', id: 'cloud-agent-capabilities', locale: 'company.cloudAgent',
     inject: () => ({ hooks: face.hooks, refresh: face.refresh,
@@ -164,7 +170,26 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   try { unmountMcp = await ctx.remote.$mount(mcpRemote) } catch (error) { await unmountRemote(); throw error }
   ctx.effect(() => ctx.locale.register('company.cloudAgent', { zh, en }), 'cloud-agent: dictionaries')
   const ui = ctx.inject(['remote.cloudAgents', 'remote.companyMcp', 'remote.commands', 'remote.agentPresets', 'connection', 'sessions',
-    'slots', 'locale', 'uiWorkspace', 'layout', 'sidebarRight', 'sidebarRightTabs', 'pluginNavigation'], registerConnectedUi)
+    'slots', 'locale', 'uiWorkspace', 'layout', 'sidebarRight', 'sidebarRightTabs', 'pluginNavigation', 'remote.companyUserMcp'], registerConnectedUi)
   try { await ui } catch (error) { await ui.dispose(); await unmountMcp(); await unmountRemote(); throw error }
   return async () => { await ui.dispose(); await unmountMcp(); await unmountRemote() }
+}
+
+/** Default-Agent selection callbacks for the capabilities pane; failed Remote results throw to the panel.
+ * @param ctx - connected shell services with the user MCP Remote.
+ * @returns the translation and the read and write functions.
+ */
+function userMcpInjected(ctx: Context): UserMcpInjected {
+  return {
+    load: async () => {
+      const result = await ctx.remote.companyUserMcp.preferences()
+      if (!result.ok) throw result.error
+      return result.value
+    },
+    save: async (selectedIds: readonly string[]) => {
+      const result = await ctx.remote.companyUserMcp.setPreferences({ selectedIds: [...selectedIds] })
+      if (!result.ok) throw result.error
+      return result.value
+    },
+  }
 }

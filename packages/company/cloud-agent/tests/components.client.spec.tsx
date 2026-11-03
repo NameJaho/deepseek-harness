@@ -9,7 +9,7 @@ import type { CompanyMcpId, CompanyMcpServer } from '../src/types.ts'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 import { CompanyMcpPage, ToolDisclosure } from '../src/client/mcp-page.tsx'
-import { CapabilityChoices, CloudAgentCapabilitiesPanel } from '../src/client/capabilities.tsx'
+import { CapabilityChoices, CapabilitiesBody, CapabilitiesTitle, CloudAgentCapabilitiesPanel } from '../src/client/capabilities.tsx'
 import { CloudAgentPage } from '../src/client/page.tsx'
 import { en, zh, type CloudAgentLocaleKey } from '../src/client/locales.ts'
 import type {} from '../src/client/index.ts'
@@ -55,6 +55,43 @@ function agentProps(view: CloudAgentView) {
     refresh: vi.fn(async () => {}), prepareEditor: vi.fn(async () => 'controlled-editor' as SessionId), openConversation: vi.fn(), clone: vi.fn(async () => {}),
     saveCapabilities: vi.fn(async () => undefined), manageMcp: vi.fn() }
 }
+
+describe('one capabilities entry for agent and default conversations', () => {
+  const defaultSession = 'plain' as SessionId
+  const userMcp = {
+    load: vi.fn(async () => ({ selectedIds: [], entries: [] })),
+    save: vi.fn(async () => ({ selectedIds: [], entries: [] })),
+  }
+  const noAgents: CloudAgentCatalog = { ...catalog, conversations: [], mine: [], published: [], usage: [] }
+
+  it('shows the member selection in a default conversation and leaves agent conversations unchanged', () => {
+    const plain = { ...agentProps(viewOf(noAgents)), sessionId: defaultSession, userMcp }
+    const { unmount } = render(<CapabilitiesBody {...plain as ComponentProps<typeof CapabilitiesBody>} />)
+    expect(screen.getByText(en.defaultMcpTitle)).toBeTruthy()
+    expect(userMcp.load).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button', { name: en.editAgent })).toBe(null)
+    unmount()
+
+    const agent = { ...agentProps(viewOf(catalog)), userMcp }
+    render(<CapabilitiesBody {...agent as ComponentProps<typeof CapabilitiesBody>} />)
+    expect(userMcp.load).toHaveBeenCalledOnce()
+    expect(screen.getByRole('button', { name: en.editAgent })).toBeTruthy()
+    expect(screen.queryByText(en.defaultMcpTitle)).toBe(null)
+  })
+
+  it('titles the one tab by the conversation kind and the menu label while the catalog loads', () => {
+    const titleOf = (view: CloudAgentView, sessionId: SessionId) => {
+      const props = { ...agentProps(view), sessionId, t: translate(en) }
+      const { unmount, container } = render(<CapabilitiesTitle {...props as ComponentProps<typeof CapabilitiesTitle>} />)
+      const text = container.textContent
+      unmount()
+      return text
+    }
+    expect(titleOf(viewOf(catalog), sessionId)).toBe(en.capabilitiesTab)
+    expect(titleOf(viewOf(noAgents), defaultSession)).toBe(en.defaultCapabilitiesTab)
+    expect(titleOf({ ...viewOf(noAgents), catalog: null }, defaultSession)).toBe(en.capabilitiesMenu)
+  })
+})
 
 describe.each([{ name: 'English', dict: en }, { name: 'Chinese', dict: zh }])('$name MCP presentation', ({ dict }) => {
   it('searches server and tool names/descriptions, filters status, and expresses status with text', () => {

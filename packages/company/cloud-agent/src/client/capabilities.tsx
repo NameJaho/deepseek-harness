@@ -5,14 +5,24 @@ import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-cli
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { CloudAgentCapabilities, CloudAgentCatalog, CloudAgentDraft, CloudAgentRecord } from '../types.ts'
 import type { CloudAgentInjected } from './controller.ts'
-import { agentMcpSelection } from './agent-mcp.ts'
+import type { UserMcpPreferences } from '@deepseek-ai/dsh-company-user-mcp/types'
+import { agentMcpSelection, isAgentSession } from './agent-mcp.ts'
+import { DefaultCapabilities } from './default-capabilities.tsx'
 import { mcpStatuses, mcpStatusTones } from './mcp-page.tsx'
 import css from './page.module.css'
 
+/** The member's default-Agent selection, shown in conversations that are not Cloud Agents. */
+export interface UserMcpInjected {
+  readonly load: () => Promise<UserMcpPreferences>
+  readonly save: (selectedIds: readonly string[]) => Promise<UserMcpPreferences>
+}
 type CapabilityProps = PropsRuntime<'sidebar.right.pane.tab'> & PropsLocale<'company.cloudAgent'>
   & InjectFace<Pick<CloudAgentInjected, 'hooks' | 'refresh' | 'saveCapabilities' | 'prepareEditor' | 'openConversation' | 'clone'> & {
     readonly manageMcp: () => void
+    readonly userMcp: UserMcpInjected
   }>
+/** Title chip inputs: the copy, the conversation, and the Cloud Agent store read. */
+export type CapabilityTitleProps = PropsLocale<'company.cloudAgent'> & Pick<CapabilityProps, 'sessionId' | 'useCloudAgent'>
 type NavigationProps = PropsRuntime<'conversation.input.right'> & PropsLocale<'company.cloudAgent'>
   & InjectFace<Pick<CloudAgentInjected, 'hooks' | 'refresh'>> & { readonly revealCapabilities: (sessionId: SessionId) => void }
 /** Editable capability fields, excluding executable plugins and connection settings. */
@@ -131,6 +141,28 @@ function CapabilityEditor({ catalog, record, sessionId, busy, t, saveCapabilitie
  * @param props - scoped session, framework catalog hooks and controlled mutation actions.
  * @returns authoring choices or a read-only release.
  */
+/** Pane body: the Cloud Agent's capabilities in an agent conversation, the member's default selection elsewhere.
+ * @param props - capability pane props with both sets of injected functions.
+ * @returns the panel for the conversation's kind.
+ */
+export function CapabilitiesBody(props: CapabilityProps) {
+  const view = props.useCloudAgent(state => state)
+  if (view.catalog !== null && !isAgentSession(view.catalog, props.sessionId)) {
+    return <DefaultCapabilities t={props.t} load={props.userMcp.load} save={props.userMcp.save} />
+  }
+  return <CloudAgentCapabilitiesPanel {...props} />
+}
+
+/** Chip text for the capabilities tab: the Agent's name in an agent conversation, the default name elsewhere.
+ * @param props - tab title props with the Cloud Agent store.
+ * @returns the localized title.
+ */
+export function CapabilitiesTitle(props: CapabilityTitleProps) {
+  const view = props.useCloudAgent(state => state)
+  if (view.catalog === null) return <>{props.t('capabilitiesMenu')}</>
+  return <>{props.t(isAgentSession(view.catalog, props.sessionId) ? 'capabilitiesTab' : 'defaultCapabilitiesTab')}</>
+}
+
 export function CloudAgentCapabilitiesPanel(props: CapabilityProps) {
   const view = props.useCloudAgent(state => state)
   const preset = props.useProjection('agentPreset')
