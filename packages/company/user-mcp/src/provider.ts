@@ -6,7 +6,7 @@ import type { CompanyMcpCatalog, CompanyMcpErrorCode, CompanyMcpFailure, Company
 import type {} from '@deepseek-ai/dsh-company-wecom-auth'
 import type { CompanyMarketSubject } from '@deepseek-ai/dsh-company-wecom-auth/types'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
-import { assertSupportedJsonSchema, type ToolDefinition } from '@deepseek-ai/dsh-tools'
+import { assertSupportedJsonSchema, JsonSchemaError, type ToolDefinition } from '@deepseek-ai/dsh-tools'
 import type { ToolSchema } from '@deepseek-ai/dsh-llm'
 import type { Tool } from '@modelcontextprotocol/client'
 import { Config } from './config.ts'
@@ -36,6 +36,34 @@ function failureOf(error: unknown): CompanyMcpFailure {
   return { code: 'company-mcp/catalog-unavailable', message: 'MCP catalog is unavailable; refresh to try again' }
 }
 
+/** Metadata or value-constraint keywords the Host does not enforce; the MCP server still validates arguments. */
+const UNENFORCED_KEYWORDS = new Set(['$schema', '$id', '$comment', 'format', 'minLength', 'maxLength', 'pattern',
+  'minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'multipleOf', 'minItems', 'maxItems', 'uniqueItems',
+  'minProperties', 'maxProperties', 'contentMediaType', 'readOnly', 'writeOnly'])
+
+/** Remove UNENFORCED_KEYWORDS from every schema node, keeping property names that happen to match them.
+ * @param node - raw JSON Schema value from the upstream tool.
+ * @returns a copy with those keywords removed; structure and other keywords are unchanged.
+ */
+function withoutUnenforcedKeywords(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(withoutUnenforcedKeywords)
+  if (node === null || typeof node !== 'object') return node
+  const record: Record<string, unknown> = { ...node }
+  const out: Record<string, unknown> = {}
+  for (const key of Object.keys(record)) {
+    if (UNENFORCED_KEYWORDS.has(key)) continue
+    const value = record[key]
+    out[key] = key === 'properties' || key === 'definitions' ? mapSchemaMap(value) : withoutUnenforcedKeywords(value)
+  }
+  return out
+}
+
+/** Apply withoutUnenforcedKeywords to each named subschema of a `properties` or `definitions` map; names are kept verbatim. */
+function mapSchemaMap(value: unknown): unknown {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return withoutUnenforcedKeywords(value)
+  return Object.fromEntries(Object.entries({ ...value }).map(([name, child]) => [name, withoutUnenforcedKeywords(child)]))
+}
+
 /** Build a model-facing tool from one upstream descriptor.
  * @param id - stable server identity used for the namespace.
  * @param tool - upstream descriptor with a JSON Schema input.
@@ -43,10 +71,10 @@ function failureOf(error: unknown): CompanyMcpFailure {
  * @throws RemoteError `company-mcp/invalid-response` when the schema uses unsupported JSON Schema features.
  */
 function toCompanyTool(id: CompanyMcpId, tool: Tool): CompanyMcpTool {
-  // The MCP SDK emits a top-level `$schema` dialect marker that the supported subset rejects; it does not change validation.
-  const { $schema: _dialect, ...parameters } = tool.inputSchema as Record<string, unknown>
+  const parameters = withoutUnenforcedKeywords(tool.inputSchema) as Record<string, unknown>
   try { assertSupportedJsonSchema(parameters) } catch (error) {
-    throw new RemoteError('company-mcp/invalid-response', 'MCP returned a tool schema DSH cannot use', { reason: 'unsupported-schema' }, { cause: error })
+    const reason = error instanceof JsonSchemaError ? error.violations.join('; ') : 'unsupported-schema'
+    throw new RemoteError('company-mcp/invalid-response', 'MCP returned a tool schema DSH cannot use', { reason }, { cause: error })
   }
   const name = companyMcpToolName(id, tool.name)
   const description = tool.description ?? ''

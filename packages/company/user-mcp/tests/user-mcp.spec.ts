@@ -114,6 +114,8 @@ async function startPlatform() {
         lookups.push(`${name}:${query}`)
         return { content: [{ type: 'text', text: `${name}:${query}` }] }
       })
+      mcp.registerTool('rich', { description: 'Accepts validated fields.', inputSchema: z.object({ site: z.url(), code: z.string().min(2), format: z.string() }) },
+        async (): Promise<CallToolResult> => ({ content: [{ type: 'text', text: 'ok' }] }))
       return mcp
     })
     serverHandlers.set(name, handler)
@@ -309,7 +311,7 @@ describe('company user MCP bridge', () => {
     await turn(ctx, agent, prompt('look up apples'))
 
     expect(requestTools(adapter, 1)).toEqual(expect.arrayContaining([STORE, INVENTORY]))
-    expect(requestTools(adapter, 1).filter(name => name.startsWith('mcp__'))).toHaveLength(2)
+    expect(requestTools(adapter, 1).filter(name => name.endsWith('__lookup'))).toHaveLength(2)
     expect(platform.lookups).toEqual(['store-goods:apples'])
     const result = agent.session.snapshotEvents().find(event => event.type === 'tool/result')
     expect(JSON.stringify(result?.data)).toContain('store-goods:apples')
@@ -593,8 +595,25 @@ describe('company user MCP provider', () => {
 
     const [server] = catalog.servers
     const tools = await provider.discover(wecom('alice'), server!.id, new AbortController().signal)
-    expect(tools).toEqual([expect.objectContaining({ rawName: 'lookup', name: companyMcpToolName(server!.id, 'lookup') })])
+    expect(tools).toEqual([
+      expect.objectContaining({ rawName: 'lookup', name: companyMcpToolName(server!.id, 'lookup') }),
+      expect.objectContaining({ rawName: 'rich', name: companyMcpToolName(server!.id, 'rich') }),
+    ])
     expect(JSON.parse(tools[0]!.parametersJson)).toMatchObject({ type: 'object' })
+  })
+
+  it('keeps a property named like an unenforced keyword and drops the keyword itself', async () => {
+    const platform = await startPlatform()
+    platform.catalogs.set('alice', [{ mcpServiceId: 7, name: 'inventory', displayName: 'Inventory', accessType: 'authorized' }])
+    const provider = await providerFor(platform)
+    const tools = await provider.discover(wecom('alice'), brandString<CompanyMcpId>('7'), new AbortController().signal)
+    const rich = tools.find(tool => tool.rawName === 'rich')!
+    const parameters = JSON.parse(rich.parametersJson) as { properties: Record<string, Record<string, unknown>> }
+
+    expect(parameters.properties).toHaveProperty('format')
+    expect(Object.keys(parameters.properties.site ?? {})).not.toContain('format')
+    expect(Object.keys(parameters.properties.code ?? {})).not.toContain('minLength')
+    expect(parameters).not.toHaveProperty('$schema')
   })
 
   it('resolves and routes a model-facing name only inside the member\'s authorized servers', async () => {

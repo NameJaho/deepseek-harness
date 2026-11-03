@@ -32,7 +32,7 @@ export interface Config {
 /** Loader schema for the bridge configuration. */
 export const Config: z<Config> = z.object({
   enabled: z.boolean().default(false),
-  listUrl: z.string().default('https://test-ai-gateway.busyming.com/mcp-servers/get-user-mcp-list'),
+  listUrl: z.string().default('https://ai-gateway.busyming.com/mcp-servers/get-user-mcp-list'),
   exchangeUrl: z.string().default('https://workflow-engine.busyming.com/token/exchange'),
   platformId: z.string().default('dsh'),
   environment: z.string().default('test'),
