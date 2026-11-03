@@ -10,6 +10,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 import { CompanyMcpPage, ToolDisclosure } from '../src/client/mcp-page.tsx'
 import { CapabilityChoices, CapabilitiesBody, CapabilitiesTitle, CloudAgentCapabilitiesPanel } from '../src/client/capabilities.tsx'
+import { AgentInfoPanel } from '../src/client/agent-info.tsx'
 import { CloudAgentPage } from '../src/client/page.tsx'
 import { en, zh, type CloudAgentLocaleKey } from '../src/client/locales.ts'
 import type {} from '../src/client/index.ts'
@@ -55,6 +56,27 @@ function agentProps(view: CloudAgentView) {
     refresh: vi.fn(async () => {}), prepareEditor: vi.fn(async () => 'controlled-editor' as SessionId), openConversation: vi.fn(), clone: vi.fn(async () => {}),
     saveCapabilities: vi.fn(async () => undefined), manageMcp: vi.fn() }
 }
+
+describe('agent information pane', () => {
+  it('shows the published release with its invocation methods, and notices for drafts and plain conversations', () => {
+    const published = { ...agentProps(viewOf(catalog)), sessionId }
+    const { unmount } = render(<AgentInfoPanel {...published as ComponentProps<typeof AgentInfoPanel>} />)
+    expect(screen.getByText(en.agentInfoInvocation)).toBeTruthy()
+    expect(screen.getByText(en.agentInfoMcp)).toBeTruthy()
+    expect(screen.getByText(en.agentInfoKnowledge)).toBeTruthy()
+    expect(screen.getByText(en.version.replace('{version}', String(release.version)), { exact: false })).toBeTruthy()
+    unmount()
+
+    const plain = { ...agentProps(viewOf({ ...catalog, conversations: [], mine: [], published: [], usage: [] })), sessionId: 'plain' as SessionId }
+    const second = render(<AgentInfoPanel {...plain as ComponentProps<typeof AgentInfoPanel>} />)
+    expect(screen.getByText(en.agentInfoNotAgent)).toBeTruthy()
+    second.unmount()
+
+    const draft = { ...agentProps(viewOf({ ...catalog, conversations: [{ sessionId: 'draft' as SessionId, agentId: record.id, role: 'authoring' as const }], mine: [record], published: [], usage: [] })), sessionId: 'draft' as SessionId }
+    render(<AgentInfoPanel {...draft as ComponentProps<typeof AgentInfoPanel>} />)
+    expect(screen.getByText(en.agentInfoUnpublished)).toBeTruthy()
+  })
+})
 
 describe('one capabilities entry for agent and default conversations', () => {
   const defaultSession = 'plain' as SessionId

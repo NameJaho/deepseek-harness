@@ -25,6 +25,7 @@ import { CloudAgentDraftCard, CloudAgentHeaderAction } from './conversation.tsx'
 import { McpController } from './mcp-controller.ts'
 import { CompanyMcpPage } from './mcp-page.tsx'
 import { CloudAgentReportCard } from './report.tsx'
+import { AgentInfoPanel } from './agent-info.tsx'
 import { CapabilitiesBody, CapabilitiesTitle, CloudAgentCapabilitiesNavigation, type UserMcpInjected } from './capabilities.tsx'
 import './page-slots.ts'
 
@@ -80,6 +81,13 @@ function registerUi(ctx: Context, navigation: AgentNavigationGroupsGate): void {
       userMcp: userMcpInjected(ctx),
     }),
   }, CapabilitiesBody))
+  ctx.effect(() => ctx.sidebarRightTabs.register({ id: 'cloud-agent-info', kind: 'cloud-agent-info',
+    title: () => t('agentInfoTab'), guide: [{ id: 'cloud-agent-info', order: 17, title: () => t('agentInfoTab'),
+      description: () => t('agentInfoGuide'), icon: IconCordisPluginOutlineRegular }],
+  }), 'cloud-agent: info tab')
+  ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: 'cloud-agent-info',
+    locale: 'company.cloudAgent', inject: () => ({ hooks: face.hooks }),
+  }, AgentInfoPanel))
   ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register({
     name: 'sidebar.right.pane.tab.title', key: 'cloud-agent-capabilities', locale: 'company.cloudAgent',
     inject: () => ({ hooks: face.hooks }),
