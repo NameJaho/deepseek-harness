@@ -3,6 +3,9 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import remote from '@deepseek-ai/dsh-company-user-mcp/remote'
 
+/** Shell services `apply` reads; the loader waits for them before calling it. */
+export const inject = ['remote']
+
 /** Mount the Remote namespace.
  * @param ctx - browser plugin lifecycle.
  * @returns teardown that releases the Remote namespace.
