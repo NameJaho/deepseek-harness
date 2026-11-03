@@ -65,7 +65,7 @@ const frame = (id: string) => ({ kind: 'test-frame', id }) as const
 const FIXTURE_ACTIONS: readonly RemoteAccessAction[] = [
   'accessFixture/open', 'accessFixture/read', 'accessFixture/byAgent', 'accessFixture/byLookup',
   'accessFixture/byLookupAndOption', 'accessFixture/byList', 'accessFixture/scoped', 'accessFixture/scopedOnDesk',
-  'accessFixture/scopedByReader', 'accessFixture/annotate', 'accessFixture/bySession', 'absentAccess/read', 'event:fixture/notice', 'event:fixture/shelf',
+  'accessFixture/scopedByReader', 'accessFixture/annotate', 'accessFixture/bySession', 'absentAccess/read', 'event:fixture/ask', 'event:fixture/notice', 'event:fixture/shelf',
 ]
 
 function role<K extends RemoteAccessResourceKind>(resource: K): RemoteAccessRole<K> {
@@ -714,7 +714,7 @@ describe('Gateway forwarded events for non-owner Peers', () => {
     expect(ctx.typertGateway.hasLiveClient()).toBe(false)
   })
 
-  it('delivers only allowed broadcasts and no answerable waterfall to a non-owner, and refuses its results', async () => {
+  it('delivers only allowed broadcasts and no waterfall without a granted resource to a non-owner, and ignores its results', async () => {
     const { ctx, hold } = await setup({ connection: true })
     hold(shelf('s1'))
     const decide = vi.spyOn(RemoteAccessService.prototype, 'decide')
@@ -756,6 +756,7 @@ describe('Gateway forwarded events for non-owner Peers', () => {
     // The global notice and the denied shelf never reach the non-owner; the allowed one arrives whole.
     await expect(guestEvents.next()).resolves.toEqual({ done: false, value: { type: 'emit', event: 'fixture/shelf', args: ['s1'] } })
     expect(decide.mock.calls.map(([request]) => request)).toEqual([
+      { principal: GUEST, action: 'event:fixture/ask', resources: [GLOBAL] },
       { principal: GUEST, action: 'event:fixture/notice', resources: [GLOBAL] },
       { principal: GUEST, action: 'event:fixture/shelf', resources: [shelf('s2')] },
       { principal: GUEST, action: 'event:fixture/shelf', resources: [shelf('s1')] },
@@ -773,12 +774,49 @@ describe('Gateway forwarded events for non-owner Peers', () => {
         payload: { args: { clientId, eventId: 'any', outcome: { kind: 'next' } } },
       }),
     }), guest)
-    expect(await refused.json()).toMatchObject({
-      result: { ok: false, error: { code: 'gateway/invocation-unavailable', details: { endpoint: '$events/result' } } },
-    })
+    // The guest was never delivered this event, so its result is a no-op rather than an answer.
+    expect(await refused.json()).toMatchObject({ result: { ok: true } })
     abort.abort()
     await guestEvents.return?.()
     await ownerEvents.return?.()
+  })
+
+  it('delivers a waterfall to a non-owner whose role allows its event on the request resource, and accepts its result', async () => {
+    const { ctx, hold } = await setup({ connection: true })
+    hold(shelf('s1'))
+    const push = eventSource(ctx)
+    const guest = ctx.connection.createPeer({ principal: GUEST })
+    const abort = new AbortController()
+    const guestEvents = (await ctx.typertGateway.wireStream.open('$events', { args: {} }, (async function* () {})(), guest, abort.signal))[Symbol.asyncIterator]()
+    const guestReady = await guestEvents.next()
+    const agentCtx = ctx.extend({})
+    const subject = {}
+    const settled = vi.fn()
+    push({
+      event: 'fixture/ask',
+      request: { question: 'q', shelfId: 's1', agent: subject },
+      context: { value: agentCtx, subject, agentId: 'agent-1' },
+      resources: { 'test-shelf': (request: unknown) => (request as { readonly shelfId: string }).shelfId },
+      resolve: settled,
+      reject: settled,
+    })
+    const delivered = await guestEvents.next()
+    expect(delivered.value).toMatchObject({ type: 'waterfall', event: 'fixture/ask' })
+    const eventId: unknown = Reflect.get(delivered.value as object, 'eventId')
+    const clientId: unknown = Reflect.get(guestReady.value as object, 'clientId')
+    const outcome = { kind: 'result', value: { answers: [] } }
+    const accepted = await ctx.connection.createSharedFetchHandler('/api').fetch(new Request('http://host/api/$events/result', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        type: 'client-request', rpcId: 'rpc-guest-answer', method: '$events/result',
+        payload: { args: { clientId, eventId, outcome } },
+      }),
+    }), guest)
+    expect(await accepted.json()).toMatchObject({ result: { ok: true } })
+    await vi.waitFor(() => { expect(settled).toHaveBeenCalledWith(outcome) })
+    abort.abort()
+    await guestEvents.return?.()
   })
 
   it('delivers a global event that a global role lists, and drops one whose resource is missing without asking remoteAccess', async () => {

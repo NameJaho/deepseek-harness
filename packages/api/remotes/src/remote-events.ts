@@ -6,6 +6,7 @@
  * type-only.
  */
 
+import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-api-session-controller/remote-events'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-deepseek-account/types'
@@ -53,5 +54,5 @@ export const API_REMOTE_FORWARDED_EVENTS = [
   { event: 'plugin-market/changed', mode: 'emit' },
   { event: 'settings/document-updated', mode: 'emit' },
   { event: 'schedule/changed', mode: 'emit' },
-  { event: 'user-questions/request', mode: 'waterfall' },
+  { event: 'user-questions/request', mode: 'waterfall', resources: { session: request => request.agent?.session.id } },
 ] as const satisfies readonly TypertForwardableEventEntry[]

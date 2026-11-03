@@ -391,6 +391,7 @@ export class CompanyWecomAuthService extends Service {
       'workspaceFiles/stat', 'workspaceFiles/list', 'workspaceFiles/changes',
       'event:api-session/activity', 'event:api-session/added', 'event:api-session/error',
       'event:api-session/removed', 'event:api-session/status',
+      'event:user-questions/request', 'userQuestions/answer', 'userQuestions/attachWait',
     ]
     const bindings: RemoteAccessBinding[] = [{
       role: { name: 'wecom:global', resource: 'global', actions: [

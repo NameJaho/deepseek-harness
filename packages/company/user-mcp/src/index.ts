@@ -81,6 +81,9 @@ interface AgentState {
 
 const listToolName = 'queryUserAvailableMcp'
 
+/** Tokens expiring within this window are exchanged again before a connection is reused. */
+const TOKEN_REUSE_MARGIN_MS = 60_000
+
 interface PrincipalState {
   /** Latest authenticated member id recorded by a Session `user/message`, or null. */
   readonly userId: string | null
@@ -229,8 +232,10 @@ export default class CompanyUserMcpService extends TypertRemoteService {
     signal.throwIfAborted()
     if (this.agentStates.get(agent) !== state) return
     const nextKeys = new Set(targets.map(target => this.targetKey(target)))
+    // A connection whose token has expired is replaced: an idle Session outlives its MCP session and token.
+    const reusable = (key: string, connection: ConnectionState): boolean => nextKeys.has(key) && connection.token.expiresAt > Date.now()
     for (const [key, connection] of state.servers) {
-      if (!nextKeys.has(key)) {
+      if (!reusable(key, connection)) {
         state.servers.delete(key)
         await this.closeConnection(connection)
       }
@@ -341,7 +346,7 @@ export default class CompanyUserMcpService extends TypertRemoteService {
   private async exchangeToken(userId: string, target: UserMcpTarget): Promise<TokenEntry> {
     const key = `${userId}\0${target.mcpName}\0${target.environment}`
     const cached = this.tokenCache.get(key)
-    if (cached !== undefined && cached.expiresAt > Date.now() + 60_000) return cached
+    if (cached !== undefined && cached.expiresAt > Date.now() + TOKEN_REUSE_MARGIN_MS) return cached
     const secret = process.env[this.config.platformSecretEnv]
     if (secret === undefined || secret.trim() === '') throw new RemoteError('company-user-mcp/missing-credential', 'The platform exchange secret is not configured', {})
     const body = Buffer.from(JSON.stringify({ user_id: userId, mcp_name: target.mcpName, environment: target.environment }), 'utf8')
