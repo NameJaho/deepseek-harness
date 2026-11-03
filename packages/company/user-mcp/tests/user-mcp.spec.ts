@@ -1,5 +1,8 @@
 /** Real Agent loop against local catalog, token-exchange and user MCP endpoints. */
-import { createHash, createHmac } from 'node:crypto'
+import { createHash, createHmac, randomUUID } from 'node:crypto'
+import { rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
@@ -23,6 +26,8 @@ import type { CompanyMcpId } from '@deepseek-ai/dsh-company-mcp-provider/types'
 import { companyMcpToolName } from '@deepseek-ai/dsh-company-mcp-provider'
 import type { CompanyMarketSubject, CompanyOwnerScope, PortalUserId, WecomCorpId, WecomUserId } from '@deepseek-ai/dsh-company-wecom-auth/types'
 import UserMcpCompanyProvider from '../src/provider.ts'
+import { PreferenceStore } from '../src/preferences.ts'
+import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface PrincipalMap {
@@ -195,6 +200,7 @@ type Platform = Awaited<ReturnType<typeof startPlatform>>
 function bridgeConfig(platform: Pick<Platform, 'listUrl' | 'exchangeUrl'>, overrides: Partial<Config> = {}): Config {
   return Config({
     enabled: true,
+    preferencesFile: join(tmpdir(), `user-mcp-preferences-${randomUUID()}.json`),
     listUrl: platform.listUrl,
     exchangeUrl: platform.exchangeUrl,
     platformId: PLATFORM,
@@ -215,6 +221,8 @@ async function harness(platform: Platform, adapter: MockAdapter, overrides: Part
   vi.stubEnv('USER_MCP_TEST_SECRET', SECRET)
   const ctx = new Context()
   onTestFinished(() => ctx.fiber.dispose())
+  const config = bridgeConfig(platform, overrides)
+  onTestFinished(async () => { await rm(config.preferencesFile, { force: true }) })
   const warnings: string[] = []
   ctx.logger.exporter({ levels: { default: 3 }, export: (message) => { if (message.type === 'warn') warnings.push(String(message.args[0])) } })
   await ctx.plugin(LlmRuntime)
@@ -226,8 +234,15 @@ async function harness(platform: Platform, adapter: MockAdapter, overrides: Part
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(AgentLoop, { agents: [] })
   ctx.llm.registerAdapter(['mock'], adapter)
-  const bridge = await ctx.plugin(CompanyUserMcpService, bridgeConfig(platform, overrides))
+  const bridge = await ctx.plugin(CompanyUserMcpService, config)
   return { ctx, warnings, bridge }
+}
+
+/** Select every MCP the member can currently see, as the sidebar would. */
+async function selectAll(ctx: Context, userId: string): Promise<void> {
+  const caller = invocationAs(ctx, member(userId))
+  const { entries } = await caller.companyUserMcp.preferences()
+  await caller.companyUserMcp.setPreferences({ selectedIds: entries.map(entry => entry.id) })
 }
 
 function member(userId: string): Principal {
@@ -304,6 +319,8 @@ describe('company user MCP bridge', () => {
       textResponse('done'),
     ])
     const { ctx, warnings } = await harness(platform, adapter)
+    await selectAll(ctx, 'alice')
+    platform.catalogCalls.splice(0)
     const agent = await createAgent(ctx, 'golden')
 
     await turn(ctx, agent, prompt('hello', member('alice')))
@@ -375,6 +392,7 @@ describe('company user MCP bridge', () => {
     platform.catalogs.set('alice', [{ name: 'store-goods' }])
     const adapter = new MockAdapter([textResponse('one'), textResponse('two'), textResponse('three')])
     const { ctx, warnings } = await harness(platform, adapter, { catalogTtlMs: 0 })
+    await selectAll(ctx, 'alice')
     const agent = await createAgent(ctx, 'unavailable')
 
     vi.stubEnv('USER_MCP_TEST_LIST_KEY', ' ')
@@ -401,6 +419,7 @@ describe('company user MCP bridge', () => {
     platform.catalogs.set('bob', [{ name: 'inventory' }])
     const adapter = new MockAdapter([textResponse('1'), textResponse('2'), textResponse('3'), textResponse('4'), textResponse('5')])
     const { ctx } = await harness(platform, adapter, { catalogTtlMs: 0 })
+    await selectAll(ctx, 'alice')
     const first = await createAgent(ctx, 'reconcile-1')
 
     await turn(ctx, first, prompt('alice joins', member('alice')))
@@ -412,6 +431,7 @@ describe('company user MCP bridge', () => {
     expect(ctx.tools.get(STORE, first)).toBeDefined()
     expect(ctx.tools.get(toolName('short-lived', 'lookup'), first)).toBeUndefined()
 
+    await selectAll(ctx, 'bob')
     await turn(ctx, first, prompt('bob takes over', member('bob')))
     expect(ctx.tools.get(STORE, first)).toBeUndefined()
     expect(ctx.tools.get(INVENTORY, first)).toBeDefined()
@@ -435,6 +455,7 @@ describe('company user MCP bridge', () => {
     platform.catalogs.set('alice', [{ name: 'store-goods' }])
     const adapter = new MockAdapter([textResponse('1'), textResponse('2')])
     const { ctx } = await harness(platform, adapter)
+    await selectAll(ctx, 'alice')
     const original = await createAgent(ctx, 'original')
     await turn(ctx, original, prompt('alice', member('alice')))
     const history = original.session.snapshotEvents()
@@ -464,6 +485,7 @@ describe('company user MCP bridge', () => {
     const platform = await startPlatform()
     platform.catalogs.set('alice', [{ name: 'store-goods' }])
     const { ctx } = await harness(platform, new MockAdapter([textResponse('never')]))
+    await selectAll(ctx, 'alice')
 
     const listing = await createAgent(ctx, 'disposed-listing')
     const catalog = platform.hold('catalog')
@@ -488,6 +510,7 @@ describe('company user MCP bridge', () => {
     const platform = await startPlatform()
     platform.catalogs.set('alice', [{ name: 'store-goods' }])
     const { ctx, bridge } = await harness(platform, new MockAdapter([textResponse('never')]))
+    await selectAll(ctx, 'alice')
     const agent = await createAgent(ctx, 'stopped-bridge')
 
     const server = platform.hold('server')
@@ -504,6 +527,7 @@ describe('company user MCP bridge', () => {
     platform.catalogs.set('alice', [{ name: 'store-goods' }])
     const adapter = new MockAdapter([textResponse('after')])
     const { ctx } = await harness(platform, adapter)
+    await selectAll(ctx, 'alice')
     const agent = await createAgent(ctx, 'cancelled')
 
     const catalog = platform.hold('catalog')
@@ -539,6 +563,7 @@ describe('company user MCP bridge', () => {
       }))
     })
     const { ctx, warnings } = await harness(platform, adapter)
+    await selectAll(ctx, 'alice')
     const agent = await createAgent(ctx, 'failing')
 
     await turn(ctx, agent, prompt('owner'))
@@ -671,5 +696,160 @@ describe('company user MCP provider', () => {
     const portal: CompanyMarketSubject = { scope: brandString<CompanyOwnerScope>('gateway:1'), portalUserId: brandString<PortalUserId>('1'), displayName: 'portal' }
 
     expect(await provider.catalog(portal)).toMatchObject({ loaded: false, servers: [], failure: { code: 'company-mcp/member-unresolved' } })
+  })
+})
+
+describe('company user MCP selection', () => {
+  it('attaches no user MCP tools and makes no catalog call until the member selects one', async () => {
+    const platform = await startPlatform()
+    platform.catalogs.set('alice', [{ name: 'store-goods' }])
+    const adapter = new MockAdapter([textResponse('answer')])
+    const { ctx } = await harness(platform, adapter)
+    const agent = await createAgent(ctx, 'unselected')
+
+    await turn(ctx, agent, prompt('hello', member('alice')))
+    expect(requestTools(adapter, 0).filter(name => name.startsWith('mcp__'))).toEqual([])
+    expect(platform.catalogCalls).toEqual([])
+  })
+
+  it('applies a withdrawn selection on the next step, even inside the catalog TTL', async () => {
+    const platform = await startPlatform()
+    platform.catalogs.set('alice', [{ name: 'store-goods' }])
+    const adapter = new MockAdapter([textResponse('1'), textResponse('2'), textResponse('3')])
+    const { ctx } = await harness(platform, adapter)
+    await selectAll(ctx, 'alice')
+    const agent = await createAgent(ctx, 'withdraw')
+    await turn(ctx, agent, prompt('first', member('alice')))
+    expect(ctx.tools.get(STORE, agent)).toBeDefined()
+
+    await invocationAs(ctx, member('alice')).companyUserMcp.setPreferences({ selectedIds: [] })
+    // Tools removed during a step's pre-step hook are listed by that step; the next step has none.
+    await turn(ctx, agent, prompt('second'))
+    expect(ctx.tools.get(STORE, agent)).toBeUndefined()
+    await turn(ctx, agent, prompt('third'))
+    expect(requestTools(adapter, 2).filter(name => name.startsWith('mcp__'))).toEqual([])
+  })
+
+  it('rejects a selection naming an MCP outside the member\'s catalog and keeps the stored one', async () => {
+    const platform = await startPlatform()
+    platform.catalogs.set('alice', [{ name: 'store-goods' }])
+    const { ctx } = await harness(platform, new MockAdapter([]))
+    await selectAll(ctx, 'alice')
+    const caller = invocationAs(ctx, member('alice')).companyUserMcp
+
+    await expect(caller.setPreferences({ selectedIds: ['store-goods', 'not-authorized'] }))
+      .rejects.toMatchObject({ code: 'company-user-mcp/unknown-selection' })
+    await expect(caller.preferences()).resolves.toMatchObject({ selectedIds: ['store-goods'] })
+  })
+
+  it('rejects a selection that is not a list of ids', async () => {
+    const platform = await startPlatform()
+    const { ctx } = await harness(platform, new MockAdapter([]))
+    const caller = invocationAs(ctx, member('alice')).companyUserMcp
+
+    await expect(caller.setPreferences({ selectedIds: 'store-goods' as never }))
+      .rejects.toMatchObject({ code: 'company-user-mcp/invalid-selection' })
+  })
+
+  it('keeps a stored selection across a reopen and refuses a corrupt file at load', async () => {
+    const dir = join(tmpdir(), `user-mcp-store-${randomUUID()}`)
+    onTestFinished(async () => { await rm(dir, { recursive: true, force: true }) })
+    const file = join(dir, 'preferences.json')
+
+    const first = await PreferenceStore.open(file)
+    await first.set('alice', ['store-goods'])
+    expect((await PreferenceStore.open(file)).get('alice')).toEqual(['store-goods'])
+    expect((await PreferenceStore.open(file)).get('bob')).toEqual([])
+
+    await writeFile(file, '{"alice": "not-a-list"}', 'utf8')
+    await expect(PreferenceStore.open(file)).rejects.toThrow('preferences file')
+  })
+
+  it('refuses to load an enabled bridge without a preferences file', async () => {
+    const platform = await startPlatform()
+    await expect(harness(platform, new MockAdapter([]), { preferencesFile: '' })).rejects.toThrow('preferencesFile is required')
+  })
+})
+
+describe('company user MCP conversational selection', () => {
+  const named = [{ mcpServiceId: 7, name: 'store-goods', displayName: 'Store goods', accessType: 'authorized' },
+    { name: 'inventory', displayName: 'Inventory', accessType: 'authorized' }]
+
+  /** Run the registered `user_mcp` tool directly, as the agent loop would. */
+  async function runSelection(ctx: Context, agent: Agent, args: Record<string, unknown>): Promise<unknown> {
+    const tool = ctx.tools.get('user_mcp', agent)
+    if (tool === undefined) throw new Error('user_mcp is not registered')
+    return tool.execute(args, { agent, signal: new AbortController().signal } as ToolRunContext)
+  }
+
+  it('is registered on the default Agent and not on a Cloud Agent Session', async () => {
+    const platform = await startPlatform()
+    const { ctx } = await harness(platform, new MockAdapter([]))
+    const plain = await createAgent(ctx, 'plain')
+    expect(ctx.tools.get('user_mcp', plain)).toBeDefined()
+
+    const cloud = await createAgent(ctx, 'cloud', [{ type: 'cloud-agent/binding', seq: 0, time: 1, data: {} } as never])
+    expect(ctx.tools.get('user_mcp', cloud)).toBeUndefined()
+  })
+
+  it('lists the catalog, then adds and removes servers by display name', async () => {
+    const platform = await startPlatform()
+    platform.catalogs.set('alice', named)
+    const adapter = new MockAdapter([textResponse('hi')])
+    const { ctx } = await harness(platform, adapter)
+    const agent = await createAgent(ctx, 'select')
+    await turn(ctx, agent, prompt('hello', member('alice')))
+
+    const listed = JSON.parse(await runSelection(ctx, agent, { action: 'list' }) as string) as { servers: Array<{ id: string; name: string; selected: boolean }> }
+    expect(listed.servers).toEqual([
+      { id: '7', name: 'Store goods', selected: false },
+      { id: 'inventory', name: 'Inventory', selected: false },
+    ])
+
+    expect(JSON.parse(await runSelection(ctx, agent, { action: 'add', names: ['store GOODS'] }) as string))
+      .toEqual({ selectedIds: ['7'], changed: ['7'] })
+    expect(JSON.parse(await runSelection(ctx, agent, { action: 'remove', names: ['Store goods'] }) as string))
+      .toEqual({ selectedIds: [], changed: ['7'] })
+    await expect(invocationAs(ctx, member('alice')).companyUserMcp.preferences()).resolves.toMatchObject({ selectedIds: [] })
+  })
+
+  it('refuses unknown or ambiguous names and an empty request without changing the selection', async () => {
+    const platform = await startPlatform()
+    platform.catalogs.set('alice', [...named, { name: 'other', displayName: 'Store goods', accessType: 'open' }])
+    const adapter = new MockAdapter([textResponse('hi')])
+    const { ctx } = await harness(platform, adapter)
+    const agent = await createAgent(ctx, 'refuse')
+    await turn(ctx, agent, prompt('hello', member('alice')))
+
+    await expect(runSelection(ctx, agent, { action: 'add', names: ['Missing'] })).rejects.toThrow('not available to this member')
+    await expect(runSelection(ctx, agent, { action: 'add', names: ['Store goods'] })).rejects.toThrow('more than one server')
+    await expect(runSelection(ctx, agent, { action: 'add', names: [] })).rejects.toThrow('needs at least one name')
+    await expect(runSelection(ctx, agent, { action: 'toggle', names: ['Inventory'] })).rejects.toThrow('invalid arguments')
+    await expect(invocationAs(ctx, member('alice')).companyUserMcp.preferences()).resolves.toMatchObject({ selectedIds: [] })
+  })
+
+  it('requires a recorded WeCom member before it reads or changes selections', async () => {
+    const platform = await startPlatform()
+    platform.catalogs.set('alice', named)
+    const { ctx } = await harness(platform, new MockAdapter([]))
+    const agent = await createAgent(ctx, 'anonymous')
+
+    await expect(runSelection(ctx, agent, { action: 'list' })).rejects.toThrow('Sign in with WeCom')
+  })
+
+  it('makes a server added in one turn available to the next turn', async () => {
+    const platform = await startPlatform()
+    platform.catalogs.set('alice', named)
+    const adapter = new MockAdapter([
+      toolCallResponse('call-1', 'user_mcp', { action: 'add', names: ['Store goods'] }),
+      textResponse('added'),
+      textResponse('answer'),
+    ])
+    const { ctx } = await harness(platform, adapter)
+    const agent = await createAgent(ctx, 'chat-select')
+
+    await turn(ctx, agent, prompt('please enable Store goods', member('alice')))
+    await turn(ctx, agent, prompt('look up apples', member('alice')))
+    expect(requestTools(adapter, 2)).toContain(STORE)
   })
 })

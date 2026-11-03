@@ -474,3 +474,14 @@ it('checks a public Agent against the runner when starting and after revocation'
     .rejects.toMatchObject({ code: 'cloud-agent/capability-unavailable' })
   expect(f.call).not.toHaveBeenCalled()
 })
+
+it('makes a privately published agent visible to other members after a public republish', async (test) => {
+  const f = await fixture(test)
+  const editor = await f.editor()
+  const saved = await f.ctx.cloudAgents.create(f.draft, editor)
+  let record = await f.ctx.cloudAgents.publish({ id: saved.id, expectedRevision: saved.revision, authoringSessionId: editor, visibility: 'private' })
+  record = await f.ctx.cloudAgents.publish({ id: record.id, expectedRevision: record.revision, authoringSessionId: editor, visibility: 'public' })
+  expect(record.releases.find(release => release.id === record.publishedReleaseId)?.visibility).toBe('public')
+  f.setOwner('bob')
+  expect((await f.ctx.cloudAgents.catalog()).published.map(entry => entry.id)).toEqual([record.id])
+})

@@ -10,7 +10,9 @@ import type { Client } from '@modelcontextprotocol/client'
 import { z as schema } from 'zod'
 import { Config } from './config.ts'
 import { connectFailed, UserMcpClient, type UserMcpConnection } from './client.ts'
-import type { UserMcpCatalog, UserMcpId, UserMcpTarget } from '@deepseek-ai/dsh-company-user-mcp/types'
+import { PreferenceStore } from './preferences.ts'
+import { selectionTool, type SelectionPort } from './selection-tool.ts'
+import type { UserMcpCatalog, UserMcpId, UserMcpPreferences, UserMcpSelection, UserMcpSummary, UserMcpTarget } from '@deepseek-ai/dsh-company-user-mcp/types'
 
 export { Config } from './config.ts'
 export type * from './types.ts'
@@ -28,6 +30,10 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'company-user-mcp/unauthenticated': Record<string, never>
     /** A required server-side credential is missing. */
     'company-user-mcp/missing-credential': Record<string, never>
+    /** The selection request is not a list of MCP ids. */
+    'company-user-mcp/invalid-selection': Record<string, never>
+    /** The selection names an MCP that is not in the member's current catalog. */
+    'company-user-mcp/unknown-selection': Record<string, never>
     /** The user MCP catalog could not be validated or reached. */
     'company-user-mcp/catalog-failed': Record<string, never>
     /** An authorized MCP endpoint could not be initialized. */
@@ -55,6 +61,13 @@ interface PrincipalState {
 }
 
 const principalState = schema.object({ userId: schema.string().nullable() })
+
+const selectionSchema = schema.object({ selectedIds: schema.array(schema.string().min(1)).max(100) })
+
+/** Credential-free summary of one target. */
+function summaryOf({ mcpName: _mcpName, ...entry }: UserMcpTarget): UserMcpSummary {
+  return entry
+}
 
 /** Whether the Session belongs to a Cloud Agent release, whose tools come only from its release policy. */
 interface CloudAgentState {
@@ -86,12 +99,21 @@ export default class CompanyUserMcpService extends TypertRemoteService {
   private readonly disposed = new WeakSet<Agent>()
   private readonly states = new Set<AgentState>()
   private principals!: ProjectionHandle<PrincipalState>
+  private selections!: PreferenceStore
+  private readonly toolExposed = new WeakSet<Agent>()
+  private readonly selectionPort: SelectionPort = {
+    memberOf: agent => this.userIdForAgent(agent, []),
+    catalog: userId => this.client.list(userId),
+    selectedIds: userId => this.selections.get(userId),
+    commit: (userId, selectedIds, catalog) => this.commitSelection(userId, selectedIds, catalog),
+  }
   private cloudAgents!: ProjectionHandle<CloudAgentState>
 
   /** @param owner - Host context containing the tool registry and Remote gateway. @param config - validated bridge configuration. */
   constructor(private readonly owner: Context, config: Config) {
     super(owner, 'companyUserMcp', { namespace: 'companyUserMcp' })
     this.config = Config(config)
+    if (this.config.enabled && this.config.preferencesFile === '') throw new Error('company-user-mcp: preferencesFile is required when enabled')
     this.requireHttpUrl(this.config.listUrl, 'listUrl')
     this.requireHttpUrl(this.config.exchangeUrl, 'exchangeUrl')
     this.client = new UserMcpClient(this.config, this.lifetime.signal)
@@ -106,6 +128,7 @@ export default class CompanyUserMcpService extends TypertRemoteService {
   /** Register the member projection, then start Agent reconciliation when enabled. */
   protected async [Service.init](): Promise<void> {
     if (!this.config.enabled) return
+    this.selections = await PreferenceStore.open(this.config.preferencesFile)
     this.principals = await this.owner.sessionProjections.register({
       key: 'companyUserMcpPrincipal',
       stateVersion: 1,
@@ -151,7 +174,47 @@ export default class CompanyUserMcpService extends TypertRemoteService {
   async catalog(): Promise<UserMcpCatalog> {
     const userId = this.remoteUserId()
     const targets = await this.client.list(userId)
-    return { userId, entries: targets.map(({ mcpName: _mcpName, ...entry }) => entry) }
+    return { userId, entries: targets.map(summaryOf) }
+  }
+
+  /** Read the caller's MCP catalog together with the servers selected for the default Agent.
+   * @returns credential-free summaries and the selected ids; an unselected member has no tools.
+   */
+  @Remote
+  async preferences(): Promise<UserMcpPreferences> {
+    const userId = this.remoteUserId()
+    const targets = await this.client.list(userId)
+    return { selectedIds: [...this.selections.get(userId)], entries: targets.map(summaryOf) }
+  }
+
+  /** Replace the caller's selection; every id must be in the caller's current catalog. Applies from the next step.
+   * @param request - selected user MCP ids.
+   * @returns the stored selection with the current catalog.
+   * @throws RemoteError `company-user-mcp/invalid-selection` or `company-user-mcp/unknown-selection`.
+   */
+  @Remote
+  async setPreferences(request: UserMcpSelection): Promise<UserMcpPreferences> {
+    const userId = this.remoteUserId()
+    const parsed = selectionSchema.safeParse(request)
+    if (!parsed.success) throw new RemoteError('company-user-mcp/invalid-selection', 'The selection must be a list of MCP ids', {})
+    const selectedIds = [...new Set(parsed.data.selectedIds)]
+    const targets = await this.client.list(userId)
+    await this.commitSelection(userId, selectedIds, targets)
+    return { selectedIds, entries: targets.map(summaryOf) }
+  }
+
+  /**
+   * Store a member's selection and make every affected Agent reconcile at its next step.
+   * @param userId - platform user id of the verified member.
+   * @param selectedIds - selected user MCP ids.
+   * @param catalog - the member's current catalog, used to reject ids it does not contain.
+   * @throws RemoteError `company-user-mcp/unknown-selection` when an id is outside the catalog.
+   */
+  private async commitSelection(userId: string, selectedIds: readonly string[], catalog: readonly UserMcpTarget[]): Promise<void> {
+    const known = new Set(catalog.map(target => String(target.id)))
+    if (selectedIds.some(id => !known.has(id))) throw new RemoteError('company-user-mcp/unknown-selection', 'A selected MCP is not available to this member', {})
+    await this.selections.set(userId, selectedIds)
+    for (const state of this.states) if (state.userId === userId) state.listedAt = 0
   }
 
   /** Extract the authenticated principal from the current Remote invocation. */
@@ -188,6 +251,20 @@ export default class CompanyUserMcpService extends TypertRemoteService {
     try { await Promise.race([work, aborted.promise]) } finally { signal.removeEventListener('abort', abort) }
   }
 
+  /** Register the conversational selection tool once per default Agent. */
+  private exposeSelectionTool(agent: Agent): void {
+    if (this.toolExposed.has(agent)) return
+    this.toolExposed.add(agent)
+    agent.ctx.tools.register(selectionTool(this.selectionPort))
+  }
+
+  /** Targets the member selected from the current catalog; an empty selection makes no catalog call. */
+  private async selectedTargets(userId: string): Promise<UserMcpTarget[]> {
+    const selected = new Set(this.selections.get(userId))
+    if (selected.size === 0) return []
+    return (await this.client.list(userId)).filter(target => selected.has(String(target.id)))
+  }
+
   /** Load a catalog and reconcile its tools into the exact Agent scope. */
   private async prepareAgent(agent: Agent, messages: readonly UserMessage[]): Promise<void> {
     const signal = this.lifetime.signal
@@ -198,6 +275,7 @@ export default class CompanyUserMcpService extends TypertRemoteService {
       await this.releaseAgent(agent)
       return
     }
+    this.exposeSelectionTool(agent)
     const userId = this.userIdForAgent(agent, messages)
     if (userId === undefined) return
     const previous = this.agentStates.get(agent)
@@ -211,7 +289,7 @@ export default class CompanyUserMcpService extends TypertRemoteService {
     this.states.add(state)
     if (state.listedAt !== 0 && Date.now() - state.listedAt < this.config.catalogTtlMs) return
     let targets: UserMcpTarget[]
-    try { targets = await this.client.list(userId) }
+    try { targets = await this.selectedTargets(userId) }
     catch (error) {
       this.owner.logger.warn(`company-user-mcp: catalog unavailable, keeping current tools: ${this.describe(error)}`)
       return

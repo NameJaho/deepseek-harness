@@ -169,6 +169,7 @@
     { "path": "./packages/client/resources" },
     { "path": "./packages/api/workspace-files/tsconfig.client.json" },
     { "path": "./packages/company/cloud-agent/tsconfig.client.json" },
+    { "path": "./packages/company/user-mcp/tsconfig.client.json" },
     { "path": "./packages/company/wecom/tsconfig.client.json" },
     { "path": "./packages/company/knowledge/tsconfig.client.json" },
     { "path": "./packages/client/web" },

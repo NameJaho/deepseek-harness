@@ -27,6 +27,8 @@ export interface Config {
   maxServers: number
   /** How long one Agent reuses its loaded catalog before the next step refreshes it, in milliseconds. */
   catalogTtlMs: number
+  /** JSON file holding each member's selected user MCPs; required when the bridge is enabled. */
+  preferencesFile: string
 }
 
 /** Loader schema for the bridge configuration. */
@@ -43,4 +45,5 @@ export const Config: z<Config> = z.object({
   toolCallTimeoutMs: z.natural().min(1000).default(60_000),
   maxServers: z.natural().min(1).max(100).default(100),
   catalogTtlMs: z.natural().default(60_000),
+  preferencesFile: z.string().default(''),
 })

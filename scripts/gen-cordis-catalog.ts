@@ -1048,6 +1048,8 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   McpResourceProvider: 'scoped resource provider is owned by packages/mcp/mcp-resources/README.md',
   CloudAgentRelease: 'immutable Cloud Agent release is owned by packages/company/cloud-agent/README.md',
   UserMcpCatalog: 'authenticated user MCP catalog is owned by packages/company/user-mcp/README.md',
+  UserMcpPreferences: 'member MCP selection is owned by packages/company/user-mcp/README.md',
+  UserMcpSelection: 'member MCP selection is owned by packages/company/user-mcp/README.md',
   'z.ZodType': 'Zod response validation API is owned by https://zod.dev/packages/zod',
   Socket: 'Node.js byte stream API is owned by https://nodejs.org/api/net.html#class-netsocket',
   z: 'schemastery schema constructor is owned by vendor/schemastery (vendored upstream)',

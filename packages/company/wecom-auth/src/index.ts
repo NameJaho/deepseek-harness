@@ -543,6 +543,7 @@ export class CompanyWecomAuthService extends Service {
     const bindings: RemoteAccessBinding[] = [{
       role: { name: 'wecom:global', resource: 'global', actions: [
         'agentPresets/list', 'agentPresets/read', 'agentPresets/select', 'companyUserMcp/catalog',
+        'companyUserMcp/preferences', 'companyUserMcp/setPreferences',
         'credentials/describe', 'credentials/set', 'credentials/unset',
         'dynamicCordisRunner/inventory', 'dynamicCordisRunner/syncInspectManifest',
         'llm/discoverModels', 'llm/listProviders', 'llm/listConfigurableProviders',

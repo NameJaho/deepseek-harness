@@ -1000,6 +1000,8 @@ export interface Config {
   maxServers: number
   /** How long one Agent reuses its loaded catalog before the next step refreshes it, in milliseconds. */
   catalogTtlMs: number
+  /** JSON file holding each member's selected user MCPs; required when the bridge is enabled. */
+  preferencesFile: string
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-company-user-mcp -->

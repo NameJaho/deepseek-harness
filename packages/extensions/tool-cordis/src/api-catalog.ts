@@ -773,6 +773,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [],
         returns: 'credential-free MCP summaries for the authenticated caller.',
       },
+      {
+        signature: '@Remote async preferences(): Promise<UserMcpPreferences>',
+        description: 'Read the caller\'s MCP catalog together with the servers selected for the default Agent.',
+        parameters: [],
+        returns: 'credential-free summaries and the selected ids; an unselected member has no tools.',
+      },
+      {
+        signature: '@Remote async setPreferences(request: UserMcpSelection): Promise<UserMcpPreferences>',
+        description: 'Replace the caller\'s selection; every id must be in the caller\'s current catalog. Applies from the next step.',
+        parameters: [{ name: 'request', description: 'selected user MCP ids.' }],
+        returns: 'the stored selection with the current catalog.',
+        throws: ['RemoteError `company-user-mcp/invalid-selection` or `company-user-mcp/unknown-selection`.'],
+      },
     ],
   },
   {
@@ -9884,6 +9897,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'UserMcpId',
     declaration: 'export type UserMcpId = Branded<\'user-mcp-id\'>;',
+  },
+  {
+    name: 'UserMcpPreferences',
+    declaration: 'export interface UserMcpPreferences extends UserMcpSelection {\n    readonly entries: readonly UserMcpSummary[];\n}',
+  },
+  {
+    name: 'UserMcpSelection',
+    declaration: 'export interface UserMcpSelection {\n    readonly selectedIds: readonly string[];\n}',
   },
   {
     name: 'UserMcpSummary',

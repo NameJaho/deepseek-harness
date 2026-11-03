@@ -140,7 +140,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-company-external-agent-subagent` | yes | Optional external-platform subagent provider with a private Dify blocking adapter |
 | `@deepseek-ai/dsh-company-knowledge` | yes | Approved company knowledge search over an external HTTP retrieval service |
 | `@deepseek-ai/dsh-company-mcp-provider` | no | Company MCP provider seam, HTTP gateway adapter and browser-safe catalog Remote |
-| `@deepseek-ai/dsh-company-user-mcp` | yes | Authenticated user MCP catalog and Agent-scoped execution |
+| `@deepseek-ai/dsh-company-user-mcp` | yes | Authenticated user MCP catalog, member selection, and Agent-scoped execution |
 | `@deepseek-ai/dsh-company-wecom` | yes | Scan-to-create WeCom robots bound to immutable company Cloud Agent releases |
 | `@deepseek-ai/dsh-company-wecom-auth` | yes | Official WeCom self-built app login and browser member sessions |
 

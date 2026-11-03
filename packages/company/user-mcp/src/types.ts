@@ -19,6 +19,16 @@ export interface UserMcpCatalog {
   readonly entries: readonly UserMcpSummary[]
 }
 
+/** One member's selection: the user MCP ids whose tools the member's default Agent may use. */
+export interface UserMcpSelection {
+  readonly selectedIds: readonly string[]
+}
+
+/** The member's catalog together with the current selection. */
+export interface UserMcpPreferences extends UserMcpSelection {
+  readonly entries: readonly UserMcpSummary[]
+}
+
 /** Internal normalized record retained only for connection setup. */
 export interface UserMcpTarget extends UserMcpSummary {
   readonly mcpName: string

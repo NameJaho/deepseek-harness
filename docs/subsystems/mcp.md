@@ -234,6 +234,18 @@ Authenticate one platform-backed user MCP service.
  * @returns credential-free MCP summaries for the authenticated caller.
  */
 @Remote async catalog(): Promise<UserMcpCatalog>
+
+/** Read the caller's MCP catalog together with the servers selected for the default Agent.
+ * @returns credential-free summaries and the selected ids; an unselected member has no tools.
+ */
+@Remote async preferences(): Promise<UserMcpPreferences>
+
+/** Replace the caller's selection; every id must be in the caller's current catalog. Applies from the next step.
+ * @param request - selected user MCP ids.
+ * @returns the stored selection with the current catalog.
+ * @throws RemoteError `company-user-mcp/invalid-selection` or `company-user-mcp/unknown-selection`.
+ */
+@Remote async setPreferences(request: UserMcpSelection): Promise<UserMcpPreferences>
 ```
 
 Source: [`packages/company/user-mcp/src/index.ts`](../../packages/company/user-mcp/src/index.ts)
