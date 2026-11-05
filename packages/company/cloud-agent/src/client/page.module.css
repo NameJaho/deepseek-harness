@@ -47,6 +47,8 @@
 .collapsibleSummary::after { content: '▸'; margin-inline-start: auto; color: var(--dsw-alias-label-secondary); transition: transform 0.15s; }
 .collapsible[open] > .collapsibleSummary::after { transform: rotate(90deg); }
 .collapsibleBody { max-height: 360px; overflow: auto; padding: 0 12px 12px; }
+.collapsibleContent { display: grid; gap: 8px; padding: 0 12px 12px; }
+.capabilityGroup { display: grid; align-content: start; gap: 12px; min-width: 0; }
 .requirements { width: 100%; min-width: 0; }
 .requirements summary { cursor: pointer; }
 .requirements pre { max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }

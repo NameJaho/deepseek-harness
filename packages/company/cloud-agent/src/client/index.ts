@@ -76,7 +76,7 @@ function registerUi(ctx: Context, navigation: AgentNavigationGroupsGate): void {
   ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: 'cloud-agent-capabilities',
     locale: 'company.cloudAgent', inject: () => ({ hooks: face.hooks, refresh: face.refresh,
       saveCapabilities: face.saveCapabilities, prepareEditor: face.prepareEditor, openConversation: face.openConversation,
-      clone: face.clone,
+      clone: face.clone, preview: face.preview,
       manageMcp: () => { ctx.pluginNavigation.openItem('company-mcp') },
       userMcp: userMcpInjected(ctx),
     }),

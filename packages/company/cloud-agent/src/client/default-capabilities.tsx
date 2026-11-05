@@ -56,29 +56,30 @@ export function DefaultCapabilities(props: DefaultCapabilitiesProps) {
 
   const busy = status === 'loading' || status === 'saving'
   const message = status === 'failed' ? t('defaultMcpFailed') : status === 'saved' ? t('defaultMcpSaved') : status === 'loading' ? t('defaultMcpLoading') : undefined
-  return <section className={css.info} aria-busy={busy}>
-    <p className={css.help}>{t('defaultMcpHelp')}</p>
-    {entries.length === 0 && status !== 'loading' ? <p className={css.help}>{t('defaultMcpEmpty')}</p> : null}
+  return <section className={css.capabilityGroup} aria-busy={busy}>
     <details className={css.collapsible}>
       <summary className={css.collapsibleSummary}>
         <span>{t('defaultMcpTitle')}</span>
-        <span className={css.metadata}>{entries.length}</span>
+        <span className={css.metadata}>{t('defaultMcpSelected', { count: String(selected.length) })}</span>
       </summary>
-      <div className={`${css.capabilityList} ${css.collapsibleBody}`}>
-        {entries.map(entry => <div key={entry.id} className={css.capabilityOption}>
-          <Checkbox label={entry.displayName} checked={selected.includes(entry.id)} disabled={status === 'saving'}
-            onChange={(checked: boolean) => { setSelected(toggle(selected, entry.id, checked)) }} />
-          {entry.description === '' ? null : <p className={css.capabilityDescription}>{entry.description}</p>}
-        </div>)}
+      <div className={css.collapsibleContent}>
+        <p className={css.help}>{t('defaultMcpHelp')}</p>
+        {entries.length === 0 && status !== 'loading' ? <p className={css.help}>{t('defaultMcpEmpty')}</p> : null}
+        <div className={`${css.capabilityList} ${css.collapsibleBody}`}>
+          {entries.map(entry => <div key={entry.id} className={css.capabilityOption}>
+            <Checkbox label={entry.displayName} checked={selected.includes(entry.id)} disabled={status === 'saving'}
+              onChange={(checked: boolean) => { setSelected(toggle(selected, entry.id, checked)) }} />
+            {entry.description === '' ? null : <p className={css.capabilityDescription}>{entry.description}</p>}
+          </div>)}
+        </div>
+        <div className={css.capabilityFooter}>
+          <span role="status" className={css.help}>{message}</span>
+          <div className={css.actions}>
+            <Button variant="outline" disabled={busy} onClick={reload}>{t('defaultMcpRefresh')}</Button>
+            <Button disabled={busy} onClick={persist}>{status === 'saving' ? t('defaultMcpSaving') : t('defaultMcpSave')}</Button>
+          </div>
+        </div>
       </div>
     </details>
-    <div className={css.capabilityFooter}>
-      <span className={css.metadata}>{t('defaultMcpSelected', { count: String(selected.length) })}</span>
-      <span role="status" className={css.help}>{message}</span>
-      <div className={css.actions}>
-        <Button variant="outline" disabled={busy} onClick={reload}>{t('defaultMcpRefresh')}</Button>
-        <Button disabled={busy} onClick={persist}>{status === 'saving' ? t('defaultMcpSaving') : t('defaultMcpSave')}</Button>
-      </div>
-    </div>
   </section>
 }

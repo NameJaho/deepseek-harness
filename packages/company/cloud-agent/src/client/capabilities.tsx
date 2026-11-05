@@ -1,5 +1,5 @@
 /** Session-scoped MCP and skill editing; usage sessions display immutable release selections. */
-import { useId, useState } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import { Button, Checkbox, IconCordisPluginOutlineRegular, Input, StateDot, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -17,7 +17,7 @@ export interface UserMcpInjected {
   readonly save: (selectedIds: readonly string[]) => Promise<UserMcpPreferences>
 }
 type CapabilityProps = PropsRuntime<'sidebar.right.pane.tab'> & PropsLocale<'company.cloudAgent'>
-  & InjectFace<Pick<CloudAgentInjected, 'hooks' | 'refresh' | 'saveCapabilities' | 'prepareEditor' | 'openConversation' | 'clone'> & {
+  & InjectFace<Pick<CloudAgentInjected, 'hooks' | 'refresh' | 'saveCapabilities' | 'prepareEditor' | 'openConversation' | 'clone' | 'preview'> & {
     readonly manageMcp: () => void
     readonly userMcp: UserMcpInjected
   }>
@@ -85,37 +85,50 @@ export function CapabilityChoices({ catalog, selection, busy, t, onChange }: {
           <Tag key={server.id}>{server.name}{selection.mcpServers?.includes(server.id) ? ` · ${t('mcpServerSelected')}` : ''}</Tag>)}</div>
       </div>)}
     </div></details>
-    <section className={css.capabilityPicker} aria-labelledby={`${sectionId}-skills`}>
-      <h3 id={`${sectionId}-skills`} className={css.capabilityPickerTitle}>{t('skills')}</h3>
-      {catalog.skills.length === 0 && <p>{t('noSkills')}</p>}
-      {[...new Set([...catalog.skills.map(skill => skill.name), ...(selection.skills ?? [])])].map(name =>
-        <div key={name} className={css.capabilityOption}>
-          <Checkbox label={name} checked={selection.skills?.includes(name) === true} disabled={busy}
-            onChange={(checked) => { onChange({ ...selection, skills: toggle(selection.skills, name, checked) }) }} />
-          <p>{catalog.skills.find(skill => skill.name === name)?.description ?? t('mcpListMissingDescription')}</p>
-        </div>)}
+    <section className={css.capabilitySection}>
+      <Collapsible title={t('skills')} count={t('defaultMcpSelected', { count: String(selection.skills?.length ?? 0) })}>
+        {catalog.skills.length === 0 && <p>{t('noSkills')}</p>}
+        {[...new Set([...catalog.skills.map(skill => skill.name), ...(selection.skills ?? [])])].map(name =>
+          <div key={name} className={css.capabilityOption}>
+            <Checkbox label={name} checked={selection.skills?.includes(name) === true} disabled={busy}
+              onChange={(checked) => { onChange({ ...selection, skills: toggle(selection.skills, name, checked) }) }} />
+            <p>{catalog.skills.find(skill => skill.name === name)?.description ?? t('mcpListMissingDescription')}</p>
+          </div>)}
+      </Collapsible>
     </section>
-    <section className={css.capabilityPicker} aria-labelledby={`${sectionId}-knowledge`}>
-      <h3 id={`${sectionId}-knowledge`} className={css.capabilityPickerTitle}>{t('knowledgeSources')}</h3>
-      {catalog.knowledgeSources.length === 0 && <p>{t('noKnowledgeSources')}</p>}
-      {[...new Set([...catalog.knowledgeSources.map(source => source.id), ...(selection.knowledgeSources ?? [])])].map((id) => {
-        const source = catalog.knowledgeSources.find(item => item.id === id)
-        return <div key={id} className={css.capabilityOption}>
-          <Checkbox label={source?.name ?? id} checked={selection.knowledgeSources?.includes(id) === true} disabled={busy}
-            onChange={(checked) => { onChange({ ...selection, knowledgeSources: toggle(selection.knowledgeSources, id, checked) }) }} />
-          <p>{source?.description ?? t('knowledgeSourceMissing')}</p>
-        </div>
-      })}
+    <section className={css.capabilitySection}>
+      <Collapsible title={t('knowledgeSources')} count={t('defaultMcpSelected', { count: String(selection.knowledgeSources?.length ?? 0) })}>
+        {catalog.knowledgeSources.length === 0 && <p>{t('noKnowledgeSources')}</p>}
+        {[...new Set([...catalog.knowledgeSources.map(source => source.id), ...(selection.knowledgeSources ?? [])])].map((id) => {
+          const source = catalog.knowledgeSources.find(item => item.id === id)
+          return <div key={id} className={css.capabilityOption}>
+            <Checkbox label={source?.name ?? id} checked={selection.knowledgeSources?.includes(id) === true} disabled={busy}
+              onChange={(checked) => { onChange({ ...selection, knowledgeSources: toggle(selection.knowledgeSources, id, checked) }) }} />
+            <p>{source?.description ?? t('knowledgeSourceMissing')}</p>
+          </div>
+        })}
+      </Collapsible>
     </section>
   </>
 }
 
-function CapabilityEditor({ catalog, record, sessionId, busy, t, saveCapabilities, manageMcp }: {
+/** A native disclosure whose closed state is the default, so long lists stay out of the way until opened.
+ * @param props - section title, selected-count text and the list content.
+ * @returns the collapsible section.
+ */
+function Collapsible({ title, count, children }: { readonly title: string; readonly count: string; readonly children: ReactNode }) {
+  return <details className={css.collapsible}>
+    <summary className={css.collapsibleSummary}><span>{title}</span><span className={css.metadata}>{count}</span></summary>
+    <div className={`${css.capabilityList} ${css.collapsibleBody}`}>{children}</div>
+  </details>
+}
+
+function CapabilityEditor({ catalog, record, sessionId, busy, t, saveCapabilities, manageMcp, preview }: {
   readonly catalog: CloudAgentCatalog
   readonly record: CloudAgentRecord
   readonly sessionId: SessionId
   readonly busy: boolean
-} & Pick<CapabilityProps, 't' | 'saveCapabilities' | 'manageMcp'>) {
+} & Pick<CapabilityProps, 't' | 'saveCapabilities' | 'manageMcp' | 'preview'>) {
   const [base, setBase] = useState(record)
   const [selection, setSelection] = useState<CapabilitySelection>(record.draft)
   const [dirty, setDirty] = useState(false)
@@ -130,7 +143,10 @@ function CapabilityEditor({ catalog, record, sessionId, busy, t, saveCapabilitie
     setBase(result); setSelection(result.draft); setDirty(false); setFailed(false)
   }
   return <>
-    <header className={css.cardHeading}><h2>{base.draft.name}</h2><Tag>{t('draft')}</Tag></header>
+    <div className={css.capabilityHeading}>
+      <header className={css.cardHeading}><h2>{base.draft.name}</h2><Tag>{t('draft')}</Tag></header>
+      <Button variant="outline" disabled={busy || dirty} onClick={() => { void preview(base, sessionId) }}>{t('preview')}</Button>
+    </div>
     <p>{t('capabilityDraftHint')}</p>
     <Button variant="outline" disabled={busy} onClick={manageMcp}>{t('capabilityAddMcp')}</Button>
     <CapabilityChoices catalog={catalog.capabilities} selection={selection} busy={busy} t={t}
@@ -154,10 +170,11 @@ function CapabilityEditor({ catalog, record, sessionId, busy, t, saveCapabilitie
  */
 export function CapabilitiesBody(props: CapabilityProps) {
   const view = props.useCloudAgent(state => state)
-  if (view.catalog !== null && !isAgentSession(view.catalog, props.sessionId)) {
-    return <DefaultCapabilities t={props.t} load={props.userMcp.load} save={props.userMcp.save} />
-  }
-  return <CloudAgentCapabilitiesPanel {...props} />
+  const agent = view.catalog === null || isAgentSession(view.catalog, props.sessionId)
+  return <section className={css.info}>
+    {agent && <CloudAgentCapabilitiesPanel {...props} />}
+    <DefaultCapabilities t={props.t} load={props.userMcp.load} save={props.userMcp.save} />
+  </section>
 }
 
 /** Chip text for the capabilities tab: the Agent's name in an agent conversation, the default name elsewhere.
@@ -180,12 +197,13 @@ export function CloudAgentCapabilitiesPanel(props: CapabilityProps) {
     const id = await props.prepareEditor(selection.id)
     if (id !== undefined) props.openConversation(id)
   }
-  return <section className={css.info} data-cloud-agent-capabilities aria-busy={view.busy}>
+  return <section className={css.capabilityGroup} data-cloud-agent-capabilities aria-busy={view.busy}>
     {view.error !== null && <div role="alert" className={css.notice}><span>{props.t(view.error)}</span>
       <Button variant="outline" disabled={view.loading} onClick={() => { void props.refresh() }}>{props.t('retry')}</Button></div>}
     {selection === undefined ? view.loading && <div className={css.infoLoading} role="status" aria-label={props.t('loading')}><StateDot state="ongoing" size={24} /></div>
       : selection.kind === 'draft' && view.catalog !== null ? <CapabilityEditor key={selection.record.id} catalog={view.catalog} record={selection.record}
-        sessionId={props.sessionId} busy={view.busy} t={props.t} saveCapabilities={props.saveCapabilities} manageMcp={props.manageMcp} />
+        sessionId={props.sessionId} busy={view.busy} t={props.t} saveCapabilities={props.saveCapabilities} manageMcp={props.manageMcp}
+        preview={props.preview} />
         : selection.kind === 'release' ? <>
           <header className={css.cardHeading}><h2>{selection.release.definition.name}</h2><Tag>{props.t('version', { version: String(selection.release.version) })}</Tag></header>
           <p>{props.t('capabilityReleaseHint')}</p>

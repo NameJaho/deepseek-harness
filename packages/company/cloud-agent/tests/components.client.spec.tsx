@@ -86,7 +86,7 @@ describe('one capabilities entry for agent and default conversations', () => {
   }
   const noAgents: CloudAgentCatalog = { ...catalog, conversations: [], mine: [], published: [], usage: [] }
 
-  it('shows the member selection in a default conversation and leaves agent conversations unchanged', () => {
+  it('shows the member selection in a default conversation and beside agent capabilities', () => {
     const plain = { ...agentProps(viewOf(noAgents)), sessionId: defaultSession, userMcp }
     const { unmount } = render(<CapabilitiesBody {...plain as ComponentProps<typeof CapabilitiesBody>} />)
     expect(screen.getByText(en.defaultMcpTitle)).toBeTruthy()
@@ -96,9 +96,9 @@ describe('one capabilities entry for agent and default conversations', () => {
 
     const agent = { ...agentProps(viewOf(catalog)), userMcp }
     render(<CapabilitiesBody {...agent as ComponentProps<typeof CapabilitiesBody>} />)
-    expect(userMcp.load).toHaveBeenCalledOnce()
+    expect(userMcp.load).toHaveBeenCalledTimes(2)
     expect(screen.getByRole('button', { name: en.editAgent })).toBeTruthy()
-    expect(screen.queryByText(en.defaultMcpTitle)).toBe(null)
+    expect(screen.getByText(en.defaultMcpTitle)).toBeTruthy()
   })
 
   it('titles the one tab by the conversation kind and the menu label while the catalog loads', () => {
