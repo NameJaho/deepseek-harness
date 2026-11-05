@@ -51,21 +51,28 @@ export function CapabilityChoices({ catalog, selection, busy, t, onChange }: {
   return <>
     <p className={css.metadata}>{t('capabilityDraftScope')}</p>
     <Input aria-label={t('mcpSearch')} placeholder={t('mcpSearch')} value={query} onChange={(event) => { setQuery(event.target.value) }} />
-    <section className={css.capabilityPicker} aria-labelledby={`${sectionId}-mcp`}>
-      <h3 id={`${sectionId}-mcp`} className={css.capabilityPickerTitle}>{t('mcpServers')}</h3>
-      {servers.length === 0 && <p>{t('noMcpServers')}</p>}
-      {servers.map(server => <div key={server.id} className={css.capabilityOption}>
-        <Checkbox label={server.name} checked={selection.mcpServers?.includes(server.id) === true}
-          disabled={busy || (!selection.mcpServers?.includes(server.id) && (!server.enabled || server.status !== 'available'))}
-          onChange={(checked) => { onChange({ ...selection, mcpServers: toggle(selection.mcpServers, server.id, checked) }) }} />
-        <p>{server.description || t('mcpListNoDescription')}</p><div className={css.capabilityMeta}>
-          <Tag tone={mcpStatusTones[server.status]}>{t(mcpStatuses[server.status])}</Tag>{!server.enabled && <Tag>{t('mcpDisabled')}</Tag>}
-          <Tag>{t('mcpToolsCount', { count: String(server.toolCount ?? server.toolNames.length) })}</Tag></div>
-      </div>)}
-      {(selection.mcpServers ?? []).filter(id => !catalog.mcpServers.some(server => server.id === id)).map(id =>
-        <Checkbox key={id} label={id} checked disabled={busy} onChange={(checked) => {
-          onChange({ ...selection, mcpServers: toggle(selection.mcpServers, id, checked) })
-        }} />)}
+    <section className={css.capabilitySection} aria-labelledby={`${sectionId}-mcp`}>
+      <details className={css.collapsible} open={query.trim() !== '' || undefined}>
+        <summary id={`${sectionId}-mcp`} className={css.collapsibleSummary}>
+          <span>{t('mcpServers')}</span>
+          <span className={css.metadata}>{t('defaultMcpSelected', { count: String(selection.mcpServers?.length ?? 0) })}</span>
+        </summary>
+        <div className={css.collapsibleBody}>
+          {servers.length === 0 && <p>{t('noMcpServers')}</p>}
+          {servers.map(server => <div key={server.id} className={css.capabilityOption}>
+            <Checkbox label={server.name} checked={selection.mcpServers?.includes(server.id) === true}
+              disabled={busy || (!selection.mcpServers?.includes(server.id) && (!server.enabled || server.status !== 'available'))}
+              onChange={(checked) => { onChange({ ...selection, mcpServers: toggle(selection.mcpServers, server.id, checked) }) }} />
+            <p>{server.description || t('mcpListNoDescription')}</p><div className={css.capabilityMeta}>
+              <Tag tone={mcpStatusTones[server.status]}>{t(mcpStatuses[server.status])}</Tag>{!server.enabled && <Tag>{t('mcpDisabled')}</Tag>}
+              <Tag>{t('mcpToolsCount', { count: String(server.toolCount ?? server.toolNames.length) })}</Tag></div>
+          </div>)}
+          {(selection.mcpServers ?? []).filter(id => !catalog.mcpServers.some(server => server.id === id)).map(id =>
+            <Checkbox key={id} label={id} checked disabled={busy} onChange={(checked) => {
+              onChange({ ...selection, mcpServers: toggle(selection.mcpServers, id, checked) })
+            }} />)}
+        </div>
+      </details>
     </section>
     <details className={css.requirements}><summary>{t('mcpTools')}</summary><div className={css.capabilityList}>
       {tools.length === 0 && <p>{t('noMcpTools')}</p>}

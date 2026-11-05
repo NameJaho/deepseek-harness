@@ -57,16 +57,21 @@ export function DefaultCapabilities(props: DefaultCapabilitiesProps) {
   const busy = status === 'loading' || status === 'saving'
   const message = status === 'failed' ? t('defaultMcpFailed') : status === 'saved' ? t('defaultMcpSaved') : status === 'loading' ? t('defaultMcpLoading') : undefined
   return <section className={css.info} aria-busy={busy}>
-    <h3 className={css.capabilityPickerTitle}>{t('defaultMcpTitle')}</h3>
     <p className={css.help}>{t('defaultMcpHelp')}</p>
     {entries.length === 0 && status !== 'loading' ? <p className={css.help}>{t('defaultMcpEmpty')}</p> : null}
-    <div className={css.capabilityList}>
-      {entries.map(entry => <div key={entry.id} className={css.capabilityOption}>
-        <Checkbox label={entry.displayName} checked={selected.includes(entry.id)} disabled={status === 'saving'}
-          onChange={(checked: boolean) => { setSelected(toggle(selected, entry.id, checked)) }} />
-        {entry.description === '' ? null : <p className={css.capabilityDescription}>{entry.description}</p>}
-      </div>)}
-    </div>
+    <details className={css.collapsible}>
+      <summary className={css.collapsibleSummary}>
+        <span>{t('defaultMcpTitle')}</span>
+        <span className={css.metadata}>{entries.length}</span>
+      </summary>
+      <div className={`${css.capabilityList} ${css.collapsibleBody}`}>
+        {entries.map(entry => <div key={entry.id} className={css.capabilityOption}>
+          <Checkbox label={entry.displayName} checked={selected.includes(entry.id)} disabled={status === 'saving'}
+            onChange={(checked: boolean) => { setSelected(toggle(selected, entry.id, checked)) }} />
+          {entry.description === '' ? null : <p className={css.capabilityDescription}>{entry.description}</p>}
+        </div>)}
+      </div>
+    </details>
     <div className={css.capabilityFooter}>
       <span className={css.metadata}>{t('defaultMcpSelected', { count: String(selected.length) })}</span>
       <span role="status" className={css.help}>{message}</span>
