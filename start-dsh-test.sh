@@ -37,8 +37,8 @@ if [[ -f "$DSH_LAUNCH_ENV" ]]; then
 fi
 DSH_HOST="${DSH_HOST:-127.0.0.1}"
 DSH_PORT="${DSH_PORT:-3080}"
-DSH_PUBLIC_URL="${DSH_PUBLIC_URL:-https://test-hmwork.busyming.com/}"
-DSH_TRUSTED_HOST="${DSH_TRUSTED_HOST:-test-hmwork.busyming.com}"
+DSH_PUBLIC_URL="${DSH_PUBLIC_URL:-https://hmwork.busyming.com/}"
+DSH_TRUSTED_HOST="${DSH_TRUSTED_HOST:-hmwork.busyming.com}"
 DSH_WECOM_WORKSPACE_ROOT="${DSH_WECOM_WORKSPACE_ROOT:-$DSH_BASE/workspaces}"
 DSH_PROFILE="${DSH_PROFILE:-test-web}"
 DSH_PERMISSION_MODE="${DSH_PERMISSION_MODE:-workspace-write}"
@@ -54,7 +54,7 @@ export DSH_PUBLIC_URL
 export DSH_WECOM_WORKSPACE_ROOT
 export DSH_CLIENT_TITLE="${DSH_CLIENT_TITLE:-HMWORK}"
 export DSH_WECOM_CORP_ID="${DSH_WECOM_CORP_ID:-ww2ec793812513c257}"
-export DSH_WECOM_AGENT_ID="${DSH_WECOM_AGENT_ID:-1000239}"
+export DSH_WECOM_AGENT_ID="${DSH_WECOM_AGENT_ID:-1000324}"
 if [[ -z "${DSH_WECOM_APP_SECRET:-}" ]]; then
   printf '请先在服务端环境设置 DSH_WECOM_APP_SECRET（使用轮换后的自建应用 Secret）；拒绝无登录启动\n' >&2
   exit 1
