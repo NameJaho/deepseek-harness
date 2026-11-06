@@ -233,7 +233,8 @@ fi
 cd "$DSH_REPO"
 
 # Keep the test profile independent from a previously deployed company `web`
-# profile. A contaminated profile is retained as a timestamped backup before
+# profile. Plugins installed with `dsh plugin add` are kept across restarts; a
+# profile with an unrecognized bundle is retained as a timestamped backup before
 # the shipped official Web template recreates it.
 DSH_PROFILE_DIR="$DSH_HOME/profiles/$DSH_PROFILE"
 DSH_PROFILE_INIT=0
@@ -244,19 +245,20 @@ const fs = require('node:fs')
 const path = process.argv[2]
 const manifest = JSON.parse(fs.readFileSync(path, 'utf8'))
 const bundles = manifest.dsh?.profile?.bundles
-const dependencies = Object.keys(manifest.dependencies ?? {})
-const expected = ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app']
-const official = Array.isArray(bundles)
-  && bundles.length === expected.length
-  && bundles.every((name, index) => name === expected[index])
-  && dependencies.length === 0
-process.exit(official ? 0 : 1)
+const dependencies = manifest.dependencies ?? {}
+const official = ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app']
+// Bundles after the official pair must be plugins installed with `dsh plugin add`,
+// which records each one as a dependency; any other extra bundle marks a foreign profile.
+const recognized = Array.isArray(bundles)
+  && official.every((name, index) => bundles[index] === name)
+  && bundles.slice(official.length).every(name => Object.hasOwn(dependencies, name))
+process.exit(recognized ? 0 : 1)
 NODE
 then
   DSH_PROFILE_BACKUP="$DSH_BASE/profile-backups/$DSH_PROFILE-$(date +%Y%m%d%H%M%S)"
   mkdir -p -m 700 "$(dirname "$DSH_PROFILE_BACKUP")"
   mv "$DSH_PROFILE_DIR" "$DSH_PROFILE_BACKUP"
-  printf '检测到非官方测试 profile，已备份到：%s\n' "$DSH_PROFILE_BACKUP" >&2
+  printf '检测到无法识别的测试 profile（缺少官方 bundle，或含非 dsh plugin add 安装的 bundle），已备份到：%s\n' "$DSH_PROFILE_BACKUP" >&2
   DSH_PROFILE_INIT=1
 fi
 
